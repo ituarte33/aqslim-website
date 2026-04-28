@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQSLIM Wellness Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F5F0E8;
+    --warm-white: #FDFAF4;
+    --sage: #7A8C6E;
+    --sage-light: #A8B89A;
+    --sage-dark: #4A5C40;
+    --terracotta: #C17A4A;
+    --terracotta-light: #D4956A;
+    --charcoal: #2C2C2C;
+    --medium: #5A5A5A;
+    --light: #8A8A8A;
+    --border: rgba(122,140,110,0.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family:'Jost',sans-serif; background:var(--warm-white); color:var(--charcoal); overflow-x:hidden; }
+
+  /* LANGUAGE TOGGLE */
+  .lang-bar {
+    position:fixed; top:0; left:0; right:0; z-index:1000;
+    background:var(--sage-dark); color:#fff;
+    display:flex; justify-content:flex-end; align-items:center;
+    padding:6px 32px; font-size:12px; letter-spacing:0.1em;
+  }
+  .lang-btn {
+    background:none; border:1px solid rgba(255,255,255,0.4);
+    color:#fff; padding:4px 12px; cursor:pointer; font-family:'Jost',sans-serif;
+    font-size:11px; letter-spacing:0.1em; border-radius:2px;
+    transition:all 0.2s; margin-left:8px;
+  }
+  .lang-btn.active { background:rgba(255,255,255,0.2); border-color:#fff; }
+  .lang-btn:hover { background:rgba(255,255,255,0.15); }
+
+  /* NAV */
+  nav {
+    position:fixed; top:30px; left:0; right:0; z-index:999;
+    background:rgba(253,250,244,0.95); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center;
+    padding:0 48px; height:70px;
+  }
+  .nav-logo {
+    font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600;
+    color:var(--sage-dark); letter-spacing:0.05em; text-decoration:none;
+  }
+  .nav-logo span { color:var(--terracotta); }
+  .nav-links { display:flex; gap:36px; list-style:none; }
+  .nav-links a {
+    text-decoration:none; color:var(--medium); font-size:13px;
+    letter-spacing:0.08em; font-weight:500; text-transform:uppercase;
+    transition:color 0.2s; position:relative;
+  }
+  .nav-links a::after {
+    content:''; position:absolute; bottom:-4px; left:0; right:0; height:1px;
+    background:var(--terracotta); transform:scaleX(0); transition:transform 0.2s;
+  }
+  .nav-links a:hover { color:var(--terracotta); }
+  .nav-links a:hover::after { transform:scaleX(1); }
+
+  /* HERO */
+  .hero {
+    min-height:100vh; display:flex; align-items:center;
+    padding: 120px 48px 80px;
+    background: linear-gradient(135deg, var(--warm-white) 0%, var(--cream) 60%, rgba(122,140,110,0.08) 100%);
+    position:relative; overflow:hidden;
+  }
+  .hero::before {
+    content:''; position:absolute; top:-100px; right:-100px;
+    width:600px; height:600px; border-radius:50%;
+    background:radial-gradient(circle, rgba(193,122,74,0.06) 0%, transparent 70%);
+  }
+  .hero::after {
+    content:''; position:absolute; bottom:-80px; left:30%;
+    width:400px; height:400px; border-radius:50%;
+    background:radial-gradient(circle, rgba(122,140,110,0.06) 0%, transparent 70%);
+  }
+  .hero-content { max-width:680px; position:relative; z-index:1; }
+  .hero-eyebrow {
+    font-size:12px; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--terracotta); font-weight:500; margin-bottom:20px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .hero-eyebrow::before { content:''; display:block; width:40px; height:1px; background:var(--terracotta); }
+  .hero h1 {
+    font-family:'Cormorant Garamond',serif; font-size:clamp(48px,6vw,80px);
+    font-weight:300; line-height:1.1; color:var(--charcoal); margin-bottom:24px;
+  }
+  .hero h1 em { font-style:italic; color:var(--sage-dark); }
+  .hero-sub {
+    font-size:16px; line-height:1.8; color:var(--medium); margin-bottom:40px; max-width:500px;
+  }
+  .hero-cta {
+    display:inline-block; background:var(--sage-dark); color:#fff;
+    padding:16px 40px; text-decoration:none; font-size:13px;
+    letter-spacing:0.12em; text-transform:uppercase; font-weight:500;
+    transition:all 0.3s; position:relative; overflow:hidden;
+  }
+  .hero-cta::before {
+    content:''; position:absolute; inset:0;
+    background:var(--terracotta); transform:translateX(-100%); transition:transform 0.3s;
+  }
+  .hero-cta span { position:relative; z-index:1; }
+  .hero-cta:hover::before { transform:translateX(0); }
+  .hero-stats {
+    display:flex; gap:48px; margin-top:60px;
+    padding-top:40px; border-top:1px solid var(--border);
+  }
+  .stat-num {
+    font-family:'Cormorant Garamond',serif; font-size:42px; font-weight:300;
+    color:var(--sage-dark); line-height:1;
+  }
+  .stat-label { font-size:12px; color:var(--light); letter-spacing:0.08em; margin-top:4px; }
+
+  /* SECTIONS */
+  section { padding:100px 48px; }
+  .section-eyebrow {
+    font-size:11px; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--terracotta); font-weight:500; margin-bottom:16px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .section-eyebrow::before { content:''; display:block; width:30px; height:1px; background:var(--terracotta); }
+  .section-title {
+    font-family:'Cormorant Garamond',serif; font-size:clamp(36px,4vw,52px);
+    font-weight:300; line-height:1.2; color:var(--charcoal); margin-bottom:20px;
+  }
+  .section-title em { font-style:italic; color:var(--sage-dark); }
+  .section-sub { font-size:15px; line-height:1.8; color:var(--medium); max-width:560px; }
+
+  /* ABOUT */
+  .about { background:var(--cream); }
+  .about-grid { display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center; max-width:1200px; margin:0 auto; }
+  .about-visual {
+    position:relative; height:500px;
+    background:linear-gradient(135deg, var(--sage) 0%, var(--sage-dark) 100%);
+    border-radius:2px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .about-visual-text {
+    font-family:'Cormorant Garamond',serif; font-size:80px; font-weight:300;
+    color:rgba(255,255,255,0.15); letter-spacing:0.1em; text-align:center;
+    line-height:1;
+  }
+  .about-badge {
+    position:absolute; bottom:32px; right:32px;
+    background:var(--terracotta); color:#fff;
+    padding:16px 20px; text-align:center;
+  }
+  .about-badge-num {
+    font-family:'Cormorant Garamond',serif; font-size:36px; font-weight:300; line-height:1;
+  }
+  .about-badge-text { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; margin-top:4px; }
+  .about-content { padding:20px 0; }
+  .about-content p { font-size:15px; line-height:1.9; color:var(--medium); margin-bottom:20px; }
+  .about-features { display:flex; flex-direction:column; gap:16px; margin-top:32px; }
+  .about-feature {
+    display:flex; align-items:flex-start; gap:16px;
+    padding:16px; background:var(--warm-white); border-left:3px solid var(--sage);
+  }
+  .about-feature-icon { font-size:20px; flex-shrink:0; margin-top:2px; }
+  .about-feature-title { font-weight:500; font-size:14px; margin-bottom:4px; color:var(--charcoal); }
+  .about-feature-text { font-size:13px; color:var(--medium); line-height:1.6; }
+
+  /* AURICULOTHERAPY */
+  .auri { background:var(--warm-white); }
+  .auri-inner { max-width:1200px; margin:0 auto; }
+  .auri-header { display:grid; grid-template-columns:1fr 1fr; gap:80px; margin-bottom:64px; }
+  .auri-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:32px; }
+  .auri-step {
+    padding:32px; border:1px solid var(--border); position:relative;
+    transition:border-color 0.3s, transform 0.3s;
+  }
+  .auri-step:hover { border-color:var(--sage); transform:translateY(-4px); }
+  .auri-step-num {
+    font-family:'Cormorant Garamond',serif; font-size:64px; font-weight:300;
+    color:var(--sage-light); line-height:1; margin-bottom:16px; opacity:0.4;
+  }
+  .auri-step-title { font-size:16px; font-weight:500; margin-bottom:8px; color:var(--charcoal); }
+  .auri-step-text { font-size:13px; color:var(--medium); line-height:1.7; }
+
+  /* SERVICES */
+  .services { background:var(--sage-dark); color:#fff; }
+  .services .section-title { color:#fff; }
+  .services .section-eyebrow { color:var(--terracotta-light); }
+  .services .section-eyebrow::before { background:var(--terracotta-light); }
+  .services-inner { max-width:1200px; margin:0 auto; }
+  .services-header { display:grid; grid-template-columns:1fr 1fr; gap:80px; margin-bottom:64px; align-items:end; }
+  .services .section-sub { color:rgba(255,255,255,0.6); }
+  .services-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; }
+  .service-card {
+    background:rgba(255,255,255,0.05); padding:40px 32px;
+    border:1px solid rgba(255,255,255,0.08);
+    transition:background 0.3s;
+  }
+  .service-card:hover { background:rgba(255,255,255,0.1); }
+  .service-icon { font-size:32px; margin-bottom:20px; }
+  .service-title { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:400; margin-bottom:12px; color:#fff; }
+  .service-text { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.8; }
+
+  /* SUPPLEMENTS */
+  .supplements { background:var(--cream); }
+  .supplements-inner { max-width:1200px; margin:0 auto; }
+  .supplements-header { display:grid; grid-template-columns:1fr 1fr; gap:80px; margin-bottom:64px; align-items:end; }
+  .supplements-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:32px; }
+  .supplement-card {
+    background:var(--warm-white); padding:40px;
+    border:1px solid var(--border); display:flex; gap:32px; align-items:flex-start;
+    transition:border-color 0.3s;
+  }
+  .supplement-card:hover { border-color:var(--sage); }
+  .supplement-img {
+    width:100px; height:120px; flex-shrink:0;
+    background:linear-gradient(135deg, var(--sage-light) 0%, var(--sage) 100%);
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(255,255,255,0.6); font-size:11px; letter-spacing:0.1em;
+    text-transform:uppercase; text-align:center; padding:8px; line-height:1.4;
+    font-family:'Jost',sans-serif;
+  }
+  .supplement-name { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; margin-bottom:8px; }
+  .supplement-type { font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--terracotta); margin-bottom:12px; }
+  .supplement-desc { font-size:13px; color:var(--medium); line-height:1.7; }
+
+  /* CONTACT */
+  .contact { background:var(--warm-white); }
+  .contact-inner { max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:80px; }
+  .contact-info { }
+  .contact-detail { display:flex; gap:16px; margin-bottom:28px; align-items:flex-start; }
+  .contact-detail-icon {
+    width:40px; height:40px; background:var(--sage-dark); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; flex-shrink:0;
+  }
+  .contact-detail-label { font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--light); margin-bottom:4px; }
+  .contact-detail-value { font-size:15px; color:var(--charcoal); }
+  .map-container {
+    margin-top:32px; height:300px; border:1px solid var(--border); overflow:hidden;
+  }
+  .map-container iframe { width:100%; height:100%; border:none; }
+  .contact-form { }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  .form-group { display:flex; flex-direction:column; margin-bottom:16px; }
+  .form-group label {
+    font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--medium); margin-bottom:8px; font-weight:500;
+  }
+  .form-group input, .form-group textarea, .form-group select {
+    padding:14px 16px; border:1px solid var(--border); background:var(--cream);
+    font-family:'Jost',sans-serif; font-size:14px; color:var(--charcoal);
+    outline:none; transition:border-color 0.2s; resize:none;
+    -webkit-appearance:none;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    border-color:var(--sage);
+  }
+  .form-group textarea { height:120px; }
+  .form-submit {
+    background:var(--sage-dark); color:#fff; border:none; padding:16px 48px;
+    font-family:'Jost',sans-serif; font-size:13px; letter-spacing:0.12em;
+    text-transform:uppercase; font-weight:500; cursor:pointer;
+    transition:background 0.3s; width:100%;
+  }
+  .form-submit:hover { background:var(--terracotta); }
+  .form-success {
+    display:none; background:var(--sage); color:#fff; padding:16px;
+    text-align:center; font-size:14px; margin-top:16px;
+  }
+
+  /* FOOTER */
+  footer {
+    background:var(--charcoal); color:rgba(255,255,255,0.5);
+    padding:40px 48px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .footer-logo {
+    font-family:'Cormorant Garamond',serif; font-size:20px; color:rgba(255,255,255,0.8);
+  }
+  .footer-logo span { color:var(--terracotta-light); }
+  footer p { font-size:12px; letter-spacing:0.05em; }
+
+  /* ANIMATIONS */
+  .fade-in { opacity:0; transform:translateY(20px); transition:opacity 0.6s, transform 0.6s; }
+  .fade-in.visible { opacity:1; transform:translateY(0); }
+
+  /* HIDDEN LANG CONTENT */
+  [data-en], [data-es] { }
+  .lang-en [data-es] { display:none; }
+  .lang-es [data-en] { display:none; }
+
+  /* HAMBURGER */
+  .hamburger {
+    display:none; flex-direction:column; gap:5px; cursor:pointer;
+    background:none; border:none; padding:4px;
+  }
+  .hamburger span {
+    display:block; width:24px; height:2px; background:var(--sage-dark);
+    transition:all 0.3s;
+  }
+  .hamburger.open span:nth-child(1) { transform:translateY(7px) rotate(45deg); }
+  .hamburger.open span:nth-child(2) { opacity:0; }
+  .hamburger.open span:nth-child(3) { transform:translateY(-7px) rotate(-45deg); }
+
+  .mobile-menu {
+    display:none; position:fixed; top:100px; left:0; right:0; z-index:998;
+    background:rgba(253,250,244,0.98); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+    padding:24px 24px 32px; flex-direction:column; gap:0;
+  }
+  .mobile-menu.open { display:flex; }
+  .mobile-menu a {
+    text-decoration:none; color:var(--medium); font-size:14px;
+    letter-spacing:0.08em; font-weight:500; text-transform:uppercase;
+    padding:16px 0; border-bottom:1px solid var(--border);
+    transition:color 0.2s;
+  }
+  .mobile-menu a:hover { color:var(--terracotta); }
+  .mobile-menu a:last-child { border-bottom:none; }
+
+  /* WHATSAPP BUTTON */
+  .whatsapp-float {
+    position:fixed; bottom:28px; right:28px; z-index:1000;
+    background:#25D366; color:#fff;
+    width:56px; height:56px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px; text-decoration:none;
+    box-shadow:0 4px 20px rgba(37,211,102,0.4);
+    transition:transform 0.2s, box-shadow 0.2s;
+  }
+  .whatsapp-float:hover {
+    transform:scale(1.1);
+    box-shadow:0 6px 28px rgba(37,211,102,0.55);
+  }
+
+  /* SUPPLEMENT CARDS — photo-ready */
+  .supplement-photo-slot {
+    width:100px; height:120px; flex-shrink:0;
+    background:linear-gradient(160deg, var(--cream) 0%, #e8e0d4 100%);
+    border:1px dashed var(--sage-light);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; padding:8px;
+  }
+  .supplement-photo-slot .slot-icon { font-size:28px; opacity:0.55; }
+  .supplement-photo-slot .slot-text {
+    font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--sage); text-align:center; line-height:1.4;
+  }
+
+  /* MOBILE */
+  @media(max-width:768px) {
+    nav { padding:0 20px; }
+    .nav-links { display:none; }
+    .hamburger { display:flex; }
+    section { padding:60px 20px; }
+    .hero { padding:140px 20px 60px; }
+    .about-grid, .auri-header, .services-header, .supplements-header, .contact-inner { grid-template-columns:1fr; gap:40px; }
+    .auri-steps, .services-grid { grid-template-columns:1fr; }
+    .supplements-grid { grid-template-columns:1fr; }
+    .hero-stats { gap:24px; }
+    .form-row { grid-template-columns:1fr; }
+    footer { flex-direction:column; gap:12px; text-align:center; }
+    .whatsapp-float { bottom:20px; right:20px; }
+  }
+</style>
+</head>
+<body class="lang-es">
+
+<!-- LANGUAGE BAR -->
+<div class="lang-bar">
+  <button class="lang-btn active" onclick="setLang('es')" id="btn-es">ES</button>
+  <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">AQ<span>SLIM</span></a>
+  <ul class="nav-links">
+    <li><a href="#about" data-es>Nosotros</a><a href="#about" data-en>About</a></li>
+    <li><a href="#auriculotherapy" data-es>Auriculoterapia</a><a href="#auriculotherapy" data-en>Auriculotherapy</a></li>
+    <li><a href="#services" data-es>Servicios</a><a href="#services" data-en>Services</a></li>
+    <li><a href="#supplements" data-es>Suplementos</a><a href="#supplements" data-en>Supplements</a></li>
+    <li><a href="#contact" data-es>Contacto</a><a href="#contact" data-en>Contact</a></li>
+  </ul>
+  <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#about" onclick="closeMenu()"><span data-es>Nosotros</span><span data-en>About</span></a>
+  <a href="#auriculotherapy" onclick="closeMenu()"><span data-es>Auriculoterapia</span><span data-en>Auriculotherapy</span></a>
+  <a href="#services" onclick="closeMenu()"><span data-es>Servicios</span><span data-en>Services</span></a>
+  <a href="#supplements" onclick="closeMenu()"><span data-es>Suplementos</span><span data-en>Supplements</span></a>
+  <a href="#contact" onclick="closeMenu()"><span data-es>Contacto</span><span data-en>Contact</span></a>
+</div>
+
+<!-- WHATSAPP FLOAT -->
+<a href="https://wa.me/16195550000" target="_blank" class="whatsapp-float" title="WhatsApp">
+  <svg viewBox="0 0 24 24" width="28" height="28" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+</a>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content fade-in">
+    <div class="hero-eyebrow">
+      <span data-es>El Método AQSLIM</span>
+      <span data-en>The AQSLIM Method</span>
+    </div>
+    <h1 data-es>Tu camino hacia un <em>bienestar verdadero</em></h1>
+    <h1 data-en>Your path to <em>true wellness</em></h1>
+    <p class="hero-sub" data-es>
+      En AQSLIM Wellness Center combinamos Auriculoterapia, nutrición personalizada y suplementos naturales para ayudarte a alcanzar tu peso ideal de forma sostenible y saludable.
+    </p>
+    <p class="hero-sub" data-en>
+      At AQSLIM Wellness Center we combine Auriculotherapy, personalized nutrition, and natural supplements to help you reach your ideal weight in a sustainable, healthy way.
+    </p>
+    <a href="#contact" class="hero-cta"><span data-es>Agenda tu consulta</span><span data-en>Book your consultation</span></a>
+    <div class="hero-stats">
+      <div>
+        <div class="stat-num">100+</div>
+        <div class="stat-label" data-es>Pacientes atendidos</div>
+        <div class="stat-label" data-en>Patients served</div>
+      </div>
+      <div>
+        <div class="stat-num">60</div>
+        <div class="stat-label" data-es>Protocolos de auriculoterapia</div>
+        <div class="stat-label" data-en>Auriculotherapy protocols</div>
+      </div>
+      <div>
+        <div class="stat-num">3</div>
+        <div class="stat-label" data-es>Fases del programa</div>
+        <div class="stat-label" data-en>Program phases</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="about-grid fade-in">
+    <div class="about-visual">
+      <div class="about-visual-text">AQ<br>SLIM</div>
+      <div class="about-badge">
+        <div class="about-badge-num">El Cajon</div>
+        <div class="about-badge-text">California</div>
+      </div>
+    </div>
+    <div class="about-content">
+      <div class="section-eyebrow"><span data-es>Nuestra Historia</span><span data-en>Our Story</span></div>
+      <h2 class="section-title" data-es>Bienestar <em>holístico</em> con resultados reales</h2>
+      <h2 class="section-title" data-en>Holistic wellness with <em>real results</em></h2>
+      <p data-es>AQSLIM Wellness Center nació de la pasión por ofrecer una alternativa natural y efectiva para la pérdida de peso. Nuestro enfoque integra la sabiduría milenaria de la Auriculoterapia con planes nutricionales personalizados y suplementos naturales de alta calidad.</p>
+      <p data-en>AQSLIM Wellness Center was born from a passion for offering a natural, effective alternative for weight loss. Our approach integrates the ancient wisdom of Auriculotherapy with personalized nutrition plans and high-quality natural supplements.</p>
+      <p data-es>Cada paciente recibe un protocolo completamente individualizado basado en un análisis completo de sus síntomas, historial de salud y metas personales.</p>
+      <p data-en>Each patient receives a fully individualized protocol based on a comprehensive analysis of their symptoms, health history, and personal goals.</p>
+      <div class="about-features">
+        <div class="about-feature">
+          <div class="about-feature-icon">🌿</div>
+          <div>
+            <div class="about-feature-title" data-es>100% Natural</div>
+            <div class="about-feature-title" data-en>100% Natural</div>
+            <div class="about-feature-text" data-es>Sin medicamentos, sin cirugías. Solo técnicas naturales y suplementos de calidad.</div>
+            <div class="about-feature-text" data-en>No medications, no surgery. Only natural techniques and quality supplements.</div>
+          </div>
+        </div>
+        <div class="about-feature">
+          <div class="about-feature-icon">🎯</div>
+          <div>
+            <div class="about-feature-title" data-es>Personalizado</div>
+            <div class="about-feature-title" data-en>Personalized</div>
+            <div class="about-feature-text" data-es>Cada protocolo se adapta a tu cuerpo, síntomas y objetivos únicos.</div>
+            <div class="about-feature-text" data-en>Every protocol is tailored to your body, symptoms, and unique goals.</div>
+          </div>
+        </div>
+        <div class="about-feature">
+          <div class="about-feature-icon">🌍</div>
+          <div>
+            <div class="about-feature-title" data-es>Bilingüe</div>
+            <div class="about-feature-title" data-en>Bilingual</div>
+            <div class="about-feature-text" data-es>Atendemos en español e inglés para servir mejor a nuestra comunidad.</div>
+            <div class="about-feature-text" data-en>We serve in Spanish and English to better serve our community.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AURICULOTHERAPY -->
+<section class="auri" id="auriculotherapy">
+  <div class="auri-inner">
+    <div class="auri-header fade-in">
+      <div>
+        <div class="section-eyebrow"><span data-es>Nuestra Especialidad</span><span data-en>Our Specialty</span></div>
+        <h2 class="section-title" data-es>¿Qué es la <em>Auriculoterapia?</em></h2>
+        <h2 class="section-title" data-en>What is <em>Auriculotherapy?</em></h2>
+      </div>
+      <div>
+        <p class="section-sub" data-es>La Auriculoterapia es una técnica milenaria originaria de la medicina tradicional oriental. Al estimular puntos específicos en el oído externo, activamos el sistema nervioso para regular el apetito, el metabolismo y el equilibrio emocional — sin agujas, sin dolor.</p>
+        <p class="section-sub" data-en>Auriculotherapy is an ancient technique rooted in traditional Eastern medicine. By stimulating specific points on the outer ear, we activate the nervous system to regulate appetite, metabolism, and emotional balance — no needles, no pain.</p>
+      </div>
+    </div>
+    <div class="auri-steps fade-in">
+      <div class="auri-step">
+        <div class="auri-step-num">01</div>
+        <div class="auri-step-title" data-es>Evaluación de Síntomas</div>
+        <div class="auri-step-title" data-en>Symptom Assessment</div>
+        <div class="auri-step-text" data-es>Completás un cuestionario de 37 síntomas que nos permite identificar tus sistemas orgánicos prioritarios y nivel de toxicidad.</div>
+        <div class="auri-step-text" data-en>You complete a 37-symptom questionnaire that allows us to identify your priority organ systems and toxicity level.</div>
+      </div>
+      <div class="auri-step">
+        <div class="auri-step-num">02</div>
+        <div class="auri-step-title" data-es>Protocolo Personalizado</div>
+        <div class="auri-step-title" data-en>Personalized Protocol</div>
+        <div class="auri-step-text" data-es>Seleccionamos entre más de 60 protocolos de auriculoterapia para diseñar tu sesión única, combinando puntos para control de peso, ansiedad, digestión y más.</div>
+        <div class="auri-step-text" data-en>We select from over 60 auriculotherapy protocols to design your unique session, combining points for weight control, anxiety, digestion, and more.</div>
+      </div>
+      <div class="auri-step">
+        <div class="auri-step-num">03</div>
+        <div class="auri-step-title" data-es>Seguimiento y Evolución</div>
+        <div class="auri-step-title" data-en>Ongoing Follow-Up</div>
+        <div class="auri-step-text" data-es>Cada semana ajustamos tu protocolo según tu progreso. Alternamos oído izquierdo y derecho para optimizar los resultados en peso y talla.</div>
+        <div class="auri-step-text" data-en>Each week we adjust your protocol based on your progress. We alternate left and right ear to optimize results in weight and measurements.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="services" id="services">
+  <div class="services-inner">
+    <div class="services-header fade-in">
+      <div>
+        <div class="section-eyebrow"><span data-es>Lo Que Ofrecemos</span><span data-en>What We Offer</span></div>
+        <h2 class="section-title" data-es>Nuestros <em>servicios</em></h2>
+        <h2 class="section-title" data-en>Our <em>services</em></h2>
+      </div>
+      <p class="section-sub" data-es>Un programa integral que combina terapia, nutrición y acompañamiento personalizado para resultados duraderos.</p>
+      <p class="section-sub" data-en>A comprehensive program combining therapy, nutrition, and personalized support for lasting results.</p>
+    </div>
+    <div class="services-grid fade-in">
+      <div class="service-card">
+        <div class="service-icon">👂</div>
+        <div class="service-title" data-es>Auriculoterapia</div>
+        <div class="service-title" data-en>Auriculotherapy</div>
+        <div class="service-text" data-es>Sesiones semanales con balines magnéticos en puntos específicos del oído. Reducción de ansiedad, control del apetito y activación del metabolismo.</div>
+        <div class="service-text" data-en>Weekly sessions with magnetic pellets on specific ear points. Anxiety reduction, appetite control, and metabolism activation.</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🥗</div>
+        <div class="service-title" data-es>Plan Nutricional</div>
+        <div class="service-title" data-en>Nutrition Plan</div>
+        <div class="service-text" data-es>Programa personalizado en 3 fases: Qi-Xue (Keto), Tao y Mantenimiento. Diseñado según tus metas, calorías y distribución de macronutrientes.</div>
+        <div class="service-text" data-en>Personalized 3-phase program: Qi-Xue (Keto), Tao, and Maintenance. Designed around your goals, calories, and macro distribution.</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">📊</div>
+        <div class="service-title" data-es>Seguimiento Clínico</div>
+        <div class="service-title" data-en>Clinical Monitoring</div>
+        <div class="service-text" data-es>Registro de peso, medidas corporales, IMC y % de grasa en cada consulta. Reporte de progreso personalizado con tus metas.</div>
+        <div class="service-text" data-en>Weight, body measurements, BMI, and body fat % recorded at every visit. Personalized progress report with your goals.</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">💊</div>
+        <div class="service-title" data-es>Suplementación Natural</div>
+        <div class="service-title" data-en>Natural Supplements</div>
+        <div class="service-text" data-es>Recomendamos suplementos naturales de la línea AQ-SLIM para apoyar tu proceso: fibra natural, laxantes suaves y más, según tus necesidades.</div>
+        <div class="service-text" data-en>We recommend natural supplements from the AQ-SLIM line to support your process: natural fiber, gentle laxatives, and more based on your needs.</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">📱</div>
+        <div class="service-title" data-es>App de Seguimiento</div>
+        <div class="service-title" data-en>Tracking App</div>
+        <div class="service-text" data-es>Acceso a tu plan nutricional, registro de comidas, mensajería con tu terapeuta y notificaciones — todo en tu teléfono.</div>
+        <div class="service-text" data-en>Access your nutrition plan, log meals, message your therapist, and receive notifications — all from your phone.</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🌿</div>
+        <div class="service-title" data-es>Consulta Inicial</div>
+        <div class="service-title" data-en>Initial Consultation</div>
+        <div class="service-text" data-es>Primera consulta de evaluación completa: cuestionario de síntomas, análisis de toxicidad, toma de medidas y diseño de tu protocolo personalizado.</div>
+        <div class="service-text" data-en>Full initial evaluation: symptom questionnaire, toxicity analysis, measurements, and design of your personalized protocol.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUPPLEMENTS -->
+<section class="supplements" id="supplements">
+  <div class="supplements-inner">
+    <div class="supplements-header fade-in">
+      <div>
+        <div class="section-eyebrow"><span data-es>Nuestra Línea</span><span data-en>Our Line</span></div>
+        <h2 class="section-title" data-es>Suplementos <em>AQ-SLIM</em></h2>
+        <h2 class="section-title" data-en>AQ-SLIM <em>Supplements</em></h2>
+      </div>
+      <p class="section-sub" data-es>Nuestra línea de suplementos naturales está diseñada para complementar tu tratamiento y potenciar tus resultados de forma segura y efectiva.</p>
+      <p class="section-sub" data-en>Our natural supplement line is designed to complement your treatment and enhance your results safely and effectively.</p>
+    </div>
+    <div class="supplements-grid fade-in">
+      <div class="supplement-card">
+        <div class="supplement-photo-slot">
+          <div class="slot-icon">🌾</div>
+          <div class="slot-text" data-es>Foto<br>próximamente</div>
+          <div class="slot-text" data-en>Photo<br>coming soon</div>
+        </div>
+        <div>
+          <div class="supplement-name" data-es>Fibra Natural</div>
+          <div class="supplement-name" data-en>Natural Fiber</div>
+          <div class="supplement-type" data-es>Digestivo · AQ-SLIM</div>
+          <div class="supplement-type" data-en>Digestive · AQ-SLIM</div>
+          <div class="supplement-desc" data-es>Apoya la salud digestiva y la sensación de saciedad. Se toma en agua en ayunas para optimizar su efecto durante el día.</div>
+          <div class="supplement-desc" data-en>Supports digestive health and feelings of fullness. Taken in water on an empty stomach to optimize its effect throughout the day.</div>
+        </div>
+      </div>
+      <div class="supplement-card">
+        <div class="supplement-photo-slot">
+          <div class="slot-icon">🍃</div>
+          <div class="slot-text" data-es>Foto<br>próximamente</div>
+          <div class="slot-text" data-en>Photo<br>coming soon</div>
+        </div>
+        <div>
+          <div class="supplement-name" data-es>Laxante Suave</div>
+          <div class="supplement-name" data-en>Gentle Laxative</div>
+          <div class="supplement-type" data-es>Detox · AQ-SLIM</div>
+          <div class="supplement-type" data-en>Detox · AQ-SLIM</div>
+          <div class="supplement-desc" data-es>Fórmula suave y natural para apoyar la eliminación y el proceso de detoxificación durante las fases del programa.</div>
+          <div class="supplement-desc" data-en>Gentle, natural formula to support elimination and the detoxification process during program phases.</div>
+        </div>
+      </div>
+      <div class="supplement-card">
+        <div class="supplement-photo-slot">
+          <div class="slot-icon">💊</div>
+          <div class="slot-text" data-es>Foto<br>próximamente</div>
+          <div class="slot-text" data-en>Photo<br>coming soon</div>
+        </div>
+        <div>
+          <div class="supplement-name" data-es>Suplemento 3</div>
+          <div class="supplement-name" data-en>Supplement 3</div>
+          <div class="supplement-type" data-es>AQ-SLIM · Próximamente</div>
+          <div class="supplement-type" data-en>AQ-SLIM · Coming Soon</div>
+          <div class="supplement-desc" data-es>Descripción del suplemento disponible pronto. Contáctanos para más información sobre nuestra línea completa.</div>
+          <div class="supplement-desc" data-en>Supplement description coming soon. Contact us for more information about our complete product line.</div>
+        </div>
+      </div>
+      <div class="supplement-card">
+        <div class="supplement-photo-slot">
+          <div class="slot-icon">🌿</div>
+          <div class="slot-text" data-es>Foto<br>próximamente</div>
+          <div class="slot-text" data-en>Photo<br>coming soon</div>
+        </div>
+        <div>
+          <div class="supplement-name" data-es>Suplemento 4</div>
+          <div class="supplement-name" data-en>Supplement 4</div>
+          <div class="supplement-type" data-es>AQ-SLIM · Próximamente</div>
+          <div class="supplement-type" data-en>AQ-SLIM · Coming Soon</div>
+          <div class="supplement-desc" data-es>Descripción del suplemento disponible pronto. Contáctanos para más información sobre nuestra línea completa.</div>
+          <div class="supplement-desc" data-en>Supplement description coming soon. Contact us for more information about our complete product line.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact" id="contact">
+  <div class="contact-inner fade-in">
+    <div class="contact-info">
+      <div class="section-eyebrow"><span data-es>Visítanos</span><span data-en>Visit Us</span></div>
+      <h2 class="section-title" data-es>Ponte en <em>contacto</em></h2>
+      <h2 class="section-title" data-en>Get in <em>touch</em></h2>
+      <p style="font-size:14px;color:var(--medium);margin-bottom:32px;line-height:1.8;" data-es>Estamos aquí para responder tus preguntas y ayudarte a comenzar tu camino hacia el bienestar. Contáctanos hoy.</p>
+      <p style="font-size:14px;color:var(--medium);margin-bottom:32px;line-height:1.8;" data-en>We're here to answer your questions and help you start your wellness journey. Contact us today.</p>
+
+      <div class="contact-detail">
+        <div class="contact-detail-icon">📞</div>
+        <div>
+          <div class="contact-detail-label" data-es>Teléfono / WhatsApp</div>
+          <div class="contact-detail-label" data-en>Phone / WhatsApp</div>
+          <div class="contact-detail-value">(619) 555-0000</div>
+        </div>
+      </div>
+      <div class="contact-detail">
+        <div class="contact-detail-icon">📍</div>
+        <div>
+          <div class="contact-detail-label" data-es>Dirección</div>
+          <div class="contact-detail-label" data-en>Address</div>
+          <div class="contact-detail-value">El Cajon, California 92020</div>
+        </div>
+      </div>
+      <div class="contact-detail">
+        <div class="contact-detail-icon">✉️</div>
+        <div>
+          <div class="contact-detail-label">Email</div>
+          <div class="contact-detail-value">aqslim@gmail.com</div>
+        </div>
+      </div>
+      <div class="contact-detail">
+        <div class="contact-detail-icon">🌐</div>
+        <div>
+          <div class="contact-detail-label" data-es>Idiomas</div>
+          <div class="contact-detail-label" data-en>Languages</div>
+          <div class="contact-detail-value" data-es>Español · English</div>
+          <div class="contact-detail-value" data-en>Spanish · English</div>
+        </div>
+      </div>
+
+      <div class="map-container">
+        <iframe
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d53779.81!2d-116.9878!3d32.7948!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x80d956d5555555%3A0x55a0e9a5c9b2a1!2sEl%20Cajon%2C%20CA!5e0!3m2!1sen!2sus!4v1"
+          allowfullscreen="" loading="lazy">
+        </iframe>
+      </div>
+    </div>
+
+    <div class="contact-form">
+      <div class="section-eyebrow"><span data-es>Agenda tu cita</span><span data-en>Book your appointment</span></div>
+      <h2 class="section-title" data-es>Escríbenos <em>hoy</em></h2>
+      <h2 class="section-title" data-en>Write to us <em>today</em></h2>
+
+      <div style="margin-top:32px;">
+        <div class="form-row">
+          <div class="form-group">
+            <label data-es>Nombre</label>
+            <label data-en>Name</label>
+            <input type="text" id="name" placeholder="">
+          </div>
+          <div class="form-group">
+            <label data-es>Teléfono</label>
+            <label data-en>Phone</label>
+            <input type="tel" id="phone" placeholder="">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="email" placeholder="">
+        </div>
+        <div class="form-group">
+          <label data-es>¿Cómo podemos ayudarte?</label>
+          <label data-en>How can we help you?</label>
+          <select id="service">
+            <option value="" data-es>Selecciona un servicio</option>
+            <option value="" data-en>Select a service</option>
+            <option data-es>Primera consulta / evaluación</option>
+            <option data-en>Initial consultation / evaluation</option>
+            <option data-es>Sesión de Auriculoterapia</option>
+            <option data-en>Auriculotherapy session</option>
+            <option data-es>Plan Nutricional</option>
+            <option data-en>Nutrition Plan</option>
+            <option data-es>Información sobre suplementos</option>
+            <option data-en>Supplement information</option>
+            <option data-es>Otra consulta</option>
+            <option data-en>Other inquiry</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-es>Mensaje</label>
+          <label data-en>Message</label>
+          <textarea id="message" placeholder=""></textarea>
+        </div>
+        <button class="form-submit" onclick="submitForm()">
+          <span data-es>Enviar mensaje</span>
+          <span data-en>Send message</span>
+        </button>
+        <div class="form-success" id="form-success">
+          <span data-es>✓ ¡Mensaje enviado! Te contactaremos pronto.</span>
+          <span data-en>✓ Message sent! We'll be in touch soon.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">AQ<span>SLIM</span> Wellness Center</div>
+  <p data-es>© 2026 AQSLIM Wellness Center · El Cajon, CA · aqslim@gmail.com</p>
+  <p data-en>© 2026 AQSLIM Wellness Center · El Cajon, CA · aqslim@gmail.com</p>
+</footer>
+
+<script>
+  // LANGUAGE TOGGLE
+  function setLang(lang) {
+    document.body.className = 'lang-' + lang;
+    document.getElementById('btn-es').classList.toggle('active', lang === 'es');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.documentElement.lang = lang;
+    // Update textarea placeholder
+    const msg = document.getElementById('message');
+    if(msg) msg.placeholder = lang === 'es' ? 'Cuéntanos sobre tus metas de salud...' : 'Tell us about your health goals...';
+  }
+
+  // HAMBURGER MENU
+  function toggleMenu() {
+    const menu = document.getElementById('mobile-menu');
+    const btn = document.getElementById('hamburger');
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  }
+  function closeMenu() {
+    document.getElementById('mobile-menu').classList.remove('open');
+    document.getElementById('hamburger').classList.remove('open');
+  }
+
+  // SCROLL ANIMATIONS
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(el => {
+      if(el.isIntersecting) { el.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+  // FORM SUBMIT
+  function submitForm() {
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    if(!name || !email) {
+      alert(document.body.classList.contains('lang-es') ? 'Por favor completa nombre y email.' : 'Please fill in your name and email.');
+      return;
+    }
+    document.getElementById('form-success').style.display = 'block';
+    document.getElementById('name').value = '';
+    document.getElementById('email').value = '';
+    document.getElementById('phone').value = '';
+    document.getElementById('message').value = '';
+  }
+
+  // SMOOTH NAV
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      closeMenu();
+      const target = document.querySelector(a.getAttribute('href'));
+      if(target) target.scrollIntoView({behavior:'smooth'});
+    });
+  });
+</script>
+</body>
+</html>
