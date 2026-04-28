@@ -83,7 +83,10 @@
     width:400px; height:400px; border-radius:50%;
     background:radial-gradient(circle, rgba(122,140,110,0.06) 0%, transparent 70%);
   }
-  .hero-content { max-width:680px; position:relative; z-index:1; }
+  .hero-inner { display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:center; width:100%; max-width:1200px; position:relative; z-index:1; }
+  .hero-content { position:relative; z-index:1; }
+  .hero-visual { display:flex; align-items:center; justify-content:center; position:relative; }
+  .hero-visual svg { width:100%; max-width:480px; height:auto; filter:drop-shadow(0 8px 40px rgba(122,140,110,0.12)); }
   .hero-eyebrow {
     font-size:12px; letter-spacing:0.2em; text-transform:uppercase;
     color:var(--terracotta); font-weight:500; margin-bottom:20px;
@@ -353,6 +356,8 @@
 
   /* MOBILE */
   @media(max-width:768px) {
+    .hero-inner { grid-template-columns:1fr; gap:40px; }
+    .hero-visual { display:none; }
     nav { padding:0 20px; }
     .nav-links { display:none; }
     .hamburger { display:flex; }
@@ -409,35 +414,66 @@
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-content fade-in">
-    <div class="hero-eyebrow">
-      <span data-es>El Método AQSLIM</span>
-      <span data-en>The AQSLIM Method</span>
+  <div class="hero-inner">
+    <div class="hero-content fade-in">
+      <div class="hero-eyebrow">
+        <span data-es>El Método AQSLIM</span>
+        <span data-en>The AQSLIM Method</span>
+      </div>
+      <h1 data-es>Tu camino hacia un <em>bienestar verdadero</em></h1>
+      <h1 data-en>Your path to <em>true wellness</em></h1>
+      <p class="hero-sub" data-es>
+        En AQSLIM Wellness Center combinamos Auriculoterapia, nutrición personalizada y suplementos naturales para ayudarte a alcanzar tu peso ideal de forma sostenible y saludable.
+      </p>
+      <p class="hero-sub" data-en>
+        At AQSLIM Wellness Center we combine Auriculotherapy, personalized nutrition, and natural supplements to help you reach your ideal weight in a sustainable, healthy way.
+      </p>
+      <a href="#contact" class="hero-cta"><span data-es>Agenda tu consulta</span><span data-en>Book your consultation</span></a>
+      <div class="hero-stats">
+        <div>
+          <div class="stat-num">100+</div>
+          <div class="stat-label" data-es>Pacientes atendidos</div>
+          <div class="stat-label" data-en>Patients served</div>
+        </div>
+        <div>
+          <div class="stat-num">60</div>
+          <div class="stat-label" data-es>Protocolos de auriculoterapia</div>
+          <div class="stat-label" data-en>Auriculotherapy protocols</div>
+        </div>
+        <div>
+          <div class="stat-num">3</div>
+          <div class="stat-label" data-es>Fases del programa</div>
+          <div class="stat-label" data-en>Program phases</div>
+        </div>
+      </div>
     </div>
-    <h1 data-es>Tu camino hacia un <em>bienestar verdadero</em></h1>
-    <h1 data-en>Your path to <em>true wellness</em></h1>
-    <p class="hero-sub" data-es>
-      En AQSLIM Wellness Center combinamos Auriculoterapia, nutrición personalizada y suplementos naturales para ayudarte a alcanzar tu peso ideal de forma sostenible y saludable.
-    </p>
-    <p class="hero-sub" data-en>
-      At AQSLIM Wellness Center we combine Auriculotherapy, personalized nutrition, and natural supplements to help you reach your ideal weight in a sustainable, healthy way.
-    </p>
-    <a href="#contact" class="hero-cta"><span data-es>Agenda tu consulta</span><span data-en>Book your consultation</span></a>
-    <div class="hero-stats">
-      <div>
-        <div class="stat-num">100+</div>
-        <div class="stat-label" data-es>Pacientes atendidos</div>
-        <div class="stat-label" data-en>Patients served</div>
-      </div>
-      <div>
-        <div class="stat-num">60</div>
-        <div class="stat-label" data-es>Protocolos de auriculoterapia</div>
-        <div class="stat-label" data-en>Auriculotherapy protocols</div>
-      </div>
-      <div>
-        <div class="stat-num">3</div>
-        <div class="stat-label" data-es>Fases del programa</div>
-        <div class="stat-label" data-en>Program phases</div>
+    <div class="hero-visual fade-in">
+      <!-- REPLACE: swap the <img> src below with your photo -->
+      <div style="
+        width:100%; max-width:480px; aspect-ratio:4/5;
+        background:linear-gradient(160deg, #EDE8DC 0%, #D6CEBC 100%);
+        border:1px solid rgba(122,140,110,0.25);
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        gap:16px; position:relative; overflow:hidden;
+      ">
+        <!-- subtle grid lines for depth -->
+        <svg width="100%" height="100%" style="position:absolute;inset:0;opacity:0.12;" xmlns="http://www.w3.org/2000/svg">
+          <defs><pattern id="pg" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0L0 0 0 40" fill="none" stroke="#4A5C40" stroke-width="0.5"/></pattern></defs>
+          <rect width="100%" height="100%" fill="url(#pg)"/>
+        </svg>
+        <!-- icon -->
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:0.35;">
+          <rect x="8" y="6" width="40" height="44" rx="2" stroke="#4A5C40" stroke-width="1.5"/>
+          <circle cx="28" cy="24" r="10" stroke="#4A5C40" stroke-width="1.5"/>
+          <path d="M14 42 Q28 34 42 42" stroke="#4A5C40" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div style="text-align:center; z-index:1;">
+          <div style="font-family:'Jost',sans-serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#4A5C40; opacity:0.6;" data-es>Tu foto aquí</div>
+          <div style="font-family:'Jost',sans-serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#4A5C40; opacity:0.6;" data-en>Your photo here</div>
+          <div style="font-family:'Jost',sans-serif; font-size:10px; color:#7A8C6E; margin-top:6px; opacity:0.5;">480 × 600 px recommended</div>
+        </div>
+        <!-- bottom terracotta bar -->
+        <div style="position:absolute; bottom:0; left:0; right:0; height:4px; background:#C17A4A; opacity:0.4;"></div>
       </div>
     </div>
   </div>
