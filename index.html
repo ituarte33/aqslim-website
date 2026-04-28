@@ -750,22 +750,22 @@
           <div class="form-group">
             <label data-es>Nombre</label>
             <label data-en>Name</label>
-            <input type="text" id="name" placeholder="">
+            <input type="text" id="name" name="name" placeholder="" required>
           </div>
           <div class="form-group">
             <label data-es>Teléfono</label>
             <label data-en>Phone</label>
-            <input type="tel" id="phone" placeholder="">
+            <input type="tel" id="phone" name="phone" placeholder="">
           </div>
         </div>
         <div class="form-group">
           <label>Email</label>
-          <input type="email" id="email" placeholder="">
+          <input type="email" id="email" name="email" placeholder="" required>
         </div>
         <div class="form-group">
           <label data-es>¿Cómo podemos ayudarte?</label>
           <label data-en>How can we help you?</label>
-          <select id="service">
+          <select id="service" name="service">
             <option value="" data-es>Selecciona un servicio</option>
             <option value="" data-en>Select a service</option>
             <option data-es>Primera consulta / evaluación</option>
@@ -783,15 +783,19 @@
         <div class="form-group">
           <label data-es>Mensaje</label>
           <label data-en>Message</label>
-          <textarea id="message" placeholder=""></textarea>
+          <textarea id="message" name="message" placeholder=""></textarea>
         </div>
-        <button class="form-submit" onclick="submitForm()">
+        <button class="form-submit" id="form-btn" onclick="submitForm(event)">
           <span data-es>Enviar mensaje</span>
           <span data-en>Send message</span>
         </button>
         <div class="form-success" id="form-success">
           <span data-es>✓ ¡Mensaje enviado! Te contactaremos pronto.</span>
           <span data-en>✓ Message sent! We'll be in touch soon.</span>
+        </div>
+        <div class="form-success" id="form-error" style="background:var(--terracotta);display:none;">
+          <span data-es>✗ Error al enviar. Por favor intenta de nuevo.</span>
+          <span data-en>✗ Failed to send. Please try again.</span>
         </div>
       </div>
     </div>
@@ -838,18 +842,48 @@
   document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
 
   // FORM SUBMIT
-  function submitForm() {
-    const name = document.getElementById('name').value;
-    const email = document.getElementById('email').value;
-    if(!name || !email) {
-      alert(document.body.classList.contains('lang-es') ? 'Por favor completa nombre y email.' : 'Please fill in your name and email.');
+  async function submitForm(e) {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const isEs = document.body.classList.contains('lang-es');
+    if (!name || !email) {
+      alert(isEs ? 'Por favor completa nombre y email.' : 'Please fill in your name and email.');
       return;
     }
-    document.getElementById('form-success').style.display = 'block';
-    document.getElementById('name').value = '';
-    document.getElementById('email').value = '';
-    document.getElementById('phone').value = '';
-    document.getElementById('message').value = '';
+    const btn = document.getElementById('form-btn');
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    document.getElementById('form-error').style.display = 'none';
+    const data = {
+      name,
+      email,
+      phone: document.getElementById('phone').value,
+      service: document.getElementById('service').value,
+      message: document.getElementById('message').value,
+    };
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        document.getElementById('form-success').style.display = 'block';
+        document.getElementById('name').value = '';
+        document.getElementById('email').value = '';
+        document.getElementById('phone').value = '';
+        document.getElementById('service').value = '';
+        document.getElementById('message').value = '';
+      } else {
+        document.getElementById('form-error').style.display = 'block';
+      }
+    } catch (_) {
+      document.getElementById('form-error').style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
   }
 
   // SMOOTH NAV
