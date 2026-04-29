@@ -3,6 +3,11 @@
 import { useEffect } from 'react'
 
 export function HomeScripts() {
+  // Add synchronously before first paint to avoid cursor flash
+  if (typeof document !== 'undefined') {
+    document.body.classList.add('marketing')
+  }
+
   useEffect(() => {
     document.body.classList.add('marketing')
 
@@ -48,12 +53,16 @@ export function HomeScripts() {
     })
     document.querySelectorAll('#mobile-menu a').forEach(a => a.addEventListener('click', closeMenu))
 
-    // Scroll reveal
+    // Scroll reveal — immediately show elements already in the viewport (fixes after-navigation blank hero)
     const obs = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') }),
-      { threshold: 0.08 }
+      { threshold: 0, rootMargin: '0px 0px -40px 0px' }
     )
-    document.querySelectorAll('.reveal, .reveal-left').forEach(el => obs.observe(el))
+    document.querySelectorAll('.reveal, .reveal-left').forEach(el => {
+      const rect = (el as HTMLElement).getBoundingClientRect()
+      if (rect.top < window.innerHeight) el.classList.add('visible')
+      else obs.observe(el)
+    })
 
     // Smooth scroll for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(a => {
