@@ -25,3 +25,17 @@ Next.js 15 (App Router) · Clerk · Airtable REST API · AWS S3 · Vercel
 - Bilingual UI (EN/ES)                                                                                                                                             
 - Airtable integration: read/write from the app                                                                                                                    
 - AWS S3 for protocol image storage
+                                                                                                                       
+## Revised Plan                                              
+                                                                                                                                                                   
+### MVP (Now) — Next.js on Vercel
+- Admin login for Romulo (Clerk)
+- Read from Airtable: patient list, consultation history
+- AWS S3 for protocol images
+- README with architecture diagram + migration plan documented
+                                                                                                                                                                   
+### v2 (Later) — Kotlin/Spring Boot on AWS
+- Swap Next.js API routes → Spring Boot REST API on ECS Fargate
+- Keep Next.js as the frontend (or migrate to standalone React)
+- Patient login goes live here 
+- Airtable write-back
