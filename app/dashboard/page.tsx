@@ -10,7 +10,13 @@ export default async function DashboardPage() {
 
   const user = await currentUser()
 
-  let patients = await getClientes().catch(() => [])
+  let patients: Awaited<ReturnType<typeof getClientes>> = []
+  let airtableError: string | null = null
+  try {
+    patients = await getClientes()
+  } catch (e) {
+    airtableError = e instanceof Error ? e.message : String(e)
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8' }}>
@@ -43,6 +49,11 @@ export default async function DashboardPage() {
           </span>
         </div>
 
+        {airtableError && (
+          <div style={{ padding: '16px 20px', background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', marginBottom: 24, fontSize: 13, fontFamily: 'monospace' }}>
+            {airtableError}
+          </div>
+        )}
         <PatientsTable patients={patients} />
       </main>
 
