@@ -45,7 +45,7 @@ body:hover .cursor-ring { opacity:1; }
 
 /* NAV */
 nav {
-  position:fixed; top:32px; left:0; right:0; z-index:999;
+  position:fixed; left:0; right:0; z-index:999;
   background:rgba(10,10,10,0.92); backdrop-filter:blur(20px);
   border-bottom:1px solid var(--border-gold);
   display:flex; align-items:center; justify-content:space-between;

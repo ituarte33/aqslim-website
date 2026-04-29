@@ -40,7 +40,7 @@ export default async function DashboardPage() {
 
       {/* Content */}
       <main style={{ padding: '48px 40px', maxWidth: 1400, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 32, marginTop: 64 }}>
           <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 400 }}>
             Pacientes
           </h1>
