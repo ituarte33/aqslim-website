@@ -1,3 +1,6 @@
 .vercel
 .claude
+.next
 node_modules
+.env.local
+.env*.local

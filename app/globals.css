@@ -1,0 +1,20 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Montserrat', sans-serif; background: #0A0A0A; color: #FAFAF8; }
+
+a { color: inherit; text-decoration: none; }
+
+.btn-gold {
+  display: inline-block;
+  padding: 14px 36px;
+  background: #C9A84C;
+  color: #0A0A0A;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+.btn-gold:hover { background: #E2C87A; }

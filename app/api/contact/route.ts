@@ -1,16 +1,12 @@
-const { Resend } = require('resend');
+import { Resend } from 'resend'
+import { NextRequest, NextResponse } from 'next/server'
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { name, email, phone, service, message } = req.body ?? {};
+export async function POST(req: NextRequest) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const { name, email, phone, service, message } = await req.json()
 
   if (!name || !email) {
-    return res.status(400).json({ error: 'Name and email are required' });
+    return NextResponse.json({ error: 'Name and email are required' }, { status: 400 })
   }
 
   await resend.emails.send({
@@ -28,7 +24,7 @@ module.exports = async (req, res) => {
       </table>
       <p style="font-family:sans-serif;font-size:14px;margin-top:16px;"><strong>Mensaje:</strong><br>${message || '—'}</p>
     `,
-  });
+  })
 
-  res.status(200).json({ ok: true });
-};
+  return NextResponse.json({ ok: true })
+}
