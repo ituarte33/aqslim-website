@@ -31,6 +31,7 @@ export interface Cliente {
     'Peso Meta (con unidad)'?: string
     'Unidad de Peso'?: string
     'Email'?: string
+    'Teléfono'?: string
     'Estado del Cliente'?: string
     [key: string]: unknown
   }
@@ -100,18 +101,20 @@ export async function getClienteById(id: string): Promise<Cliente> {
   return airtableFetch(`/Clientes/${id}`)
 }
 
+export async function updateCliente(id: string, fields: Partial<Cliente['fields']>): Promise<Cliente> {
+  return airtableFetch(`/Clientes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fields }),
+  })
+}
+
 export async function createProspecto(fields: {
   'Nombre Completo': string
   'Email': string
 }): Promise<Cliente> {
   return airtableFetch('/Clientes', {
     method: 'POST',
-    body: JSON.stringify({
-      fields: {
-        ...fields,
-        'Estado del Cliente': 'Prospecto',
-      },
-    }),
+    body: JSON.stringify({ fields }),
   })
 }
 

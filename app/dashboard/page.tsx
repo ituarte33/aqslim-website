@@ -14,17 +14,20 @@ export default async function DashboardPage() {
     const email = await getUserEmail()
     if (!email) redirect('/sign-in')
 
-    let cliente = await getClienteByEmail(email)
+    const cliente = await getClienteByEmail(email)
 
     if (!cliente) {
-      // First login — create a Prospecto record in Airtable
+      // First login — create record and go straight to onboarding
       const user = await currentUser()
       const nombre = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || email
-      cliente = await createProspecto({ 'Nombre Completo': nombre, 'Email': email })
+      await createProspecto({ 'Nombre Completo': nombre, 'Email': email })
+      redirect('/onboarding')
     }
 
+    // Returning user — check if they still need to complete onboarding
     const estado = cliente.fields['Estado del Cliente'] as string | undefined
-    if (estado === 'Prospecto') redirect('/onboarding')
+    const hasPhone = !!cliente.fields['Teléfono']
+    if (estado === 'Prospecto' || !hasPhone) redirect('/onboarding')
 
     redirect(`/dashboard/${cliente.id}`)
   }
