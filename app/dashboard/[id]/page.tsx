@@ -37,6 +37,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       patient={patient}
       consultations={consultations}
       error={error}
+      isAdmin={role === 'admin'}
     />
   )
 }

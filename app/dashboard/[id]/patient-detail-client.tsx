@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { UserButton } from '@clerk/nextjs'
 import type { Cliente, Consulta } from '@/lib/airtable'
 
 type Props = {
   patient: Cliente | null
   consultations: Consulta[]
   error: string | null
+  isAdmin: boolean
 }
 
 function fmt(val: unknown): string {
@@ -125,7 +127,7 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
   )
 }
 
-export function PatientDetailClient({ patient, consultations, error }: Props) {
+export function PatientDetailClient({ patient, consultations, error, isAdmin }: Props) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabId>('weight')
 
@@ -157,17 +159,22 @@ export function PatientDetailClient({ patient, consultations, error }: Props) {
             Portal
           </span>
         </span>
-        <button
-          onClick={() => router.push('/dashboard')}
-          style={{
-            background: 'none', border: '1px solid rgba(201,168,76,0.3)',
-            color: '#C9A84C', cursor: 'pointer', fontSize: 11,
-            letterSpacing: '0.12em', padding: '8px 16px',
-            fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase',
-          }}
-        >
-          ← Pacientes
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {isAdmin && (
+            <button
+              onClick={() => router.push('/dashboard')}
+              style={{
+                background: 'none', border: '1px solid rgba(201,168,76,0.3)',
+                color: '#C9A84C', cursor: 'pointer', fontSize: 11,
+                letterSpacing: '0.12em', padding: '8px 16px',
+                fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase',
+              }}
+            >
+              ← Pacientes
+            </button>
+          )}
+          <UserButton />
+        </div>
       </header>
 
       <main style={{ padding: '48px 40px', maxWidth: 1200, margin: '0 auto' }}>
