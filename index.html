@@ -357,7 +357,7 @@ nav {
   font-family:'Playfair Display',serif; font-size:22px; font-weight:400;
   margin-bottom:16px; color:var(--black); line-height:1.2;
 }
-.service-text { font-size:12px; color:var(--gray-dark); line-height:1.9; font-weight:300; }
+.service-text { font-size:22px; color:var(--gray-dark); line-height:1.9; font-weight:300; }
 
 /* SUPPLEMENTS */
 .supplements { background:var(--off-black); padding:120px 80px; }
@@ -587,7 +587,7 @@ footer {
     <li><a href="#supplements"><span data-es>Suplementos</span><span data-en>Supplements</span></a></li>
     <li><a href="#contact"><span data-es>Contacto</span><span data-en>Contact</span></a></li>
   </ul>
-  <a href="/sign-in" class="hero-cta-btn" style="padding:10px 24px;font-size:9px;text-decoration:none;">
+  <a href="/sign-in" class="hero-cta-btn" style="padding:10px 24px;font-size:13px;text-decoration:none;">
     <span data-es>Portal Paciente</span><span data-en>Patient Portal</span>
   </a>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()">
@@ -614,8 +614,10 @@ footer {
 <!-- HERO -->
 <section class="hero">
   <div class="hero-left">
-    <div class="hero-number">AQ</div>
-    <div class="hero-tag reveal"><span data-es>El Método AQSLIM — El Cajon, CA</span><span data-en>The AQSLIM Method — El Cajon, CA</span></div>
+    <div class="hero-left">
+    <img src="/aqslim-logo-2-no-bkgrd.png" alt="AQSLIM Logo" style="width:75%;height:75%;object-fit:contain;object-center:right;">
+    </div>
+    <div class="hero-tag reveal"><span data-es>El Método AQSLIM</span><span data-en>The AQSLIM Method</span></div>
     <h1 class="reveal delay-1">
       <span data-es>Tu camino hacia un</span>
       <span data-en>Your path to</span>
@@ -650,24 +652,16 @@ footer {
     <div class="hero-visual-frame">
       <div class="hero-frame-accent"></div>
       <div class="hero-img-wrapper">
-        <img src="/site-img-1.jpeg" alt="AQSLIM Wellness Center Especialista"
-          style="width:100%;height:100%;object-fit:cover;object-position:top center;filter:grayscale(10%) contrast(1.05);"
+        <img src="/rom-prof-chair-img.png" alt="AQSLIM Wellness Center Especialista"
+          style="width:80%;height:80%;object-fit:cover;object-position:top center;filter:grayscale(10%) contrast(1.05);"
           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-        <div class="hero-img-placeholder" style="display:none;">
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-            <rect x="8" y="8" width="48" height="48" rx="2" stroke="rgba(201,168,76,0.3)" stroke-width="1"/>
-            <circle cx="32" cy="28" r="10" stroke="rgba(201,168,76,0.3)" stroke-width="1"/>
-            <path d="M12 56 Q32 38 52 56" stroke="rgba(201,168,76,0.3)" stroke-width="1" fill="none"/>
-          </svg>
-          <div class="placeholder-text" data-es>Foto del<br>especialista</div>
-          <div class="placeholder-text" data-en>Specialist<br>photo</div>
-        </div>
-      </div>
-      <div class="hero-badge">
-        <div class="hero-badge-num">El</div>
-        <div class="hero-badge-text">Cajon CA</div>
       </div>
       <div class="hero-frame-accent-br"></div>
+    </div>
+    <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:32px 36px;">
+      <div style="font-size:19px;letter-spacing:0.25em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;font-family:'Montserrat',sans-serif;">AQSLIM Wellness Center</div>
+      <div style="font-size:21px;letter-spacing:0.12em;color:rgba(255,255,255,0.7);line-height:1.8;font-family:'Tenor Sans',sans-serif;">270 E Douglas Ave · El Cajon, CA 92020<br>(619) 392-0797</div>
     </div>
   </div>
 </section>
@@ -695,16 +689,8 @@ footer {
 <section class="about" id="about">
   <div class="about-inner">
     <div class="about-visual-panel" style="padding:0;overflow:hidden;position:relative;min-height:700px;">
-      <img src="/site-img-2.jpeg" alt="Dr. AQSLIM" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block">
+      <img src="/rom-prof-arms-crsd-2-img.png" alt="Dr. AQSLIM" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block">
       <div style="position:absolute;bottom:0;left:0;right:0;height:220px;background:linear-gradient(to top,rgba(10,10,10,0.85) 0%,transparent 100%);"></div>
-      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);"></div>
-      <div style="position:absolute;bottom:0;left:0;right:0;padding:32px 36px;">
-        <div style="font-size:9px;letter-spacing:0.25em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;font-family:'Montserrat',sans-serif;">AQSLIM Wellness Center</div>
-        <div style="font-size:11px;letter-spacing:0.12em;color:rgba(255,255,255,0.7);line-height:1.8;font-family:'Tenor Sans',sans-serif;">270 E Douglas Ave · El Cajon, CA 92020<br>(619) 392-0797</div>
-      </div>
-      <div style="position:absolute;top:24px;right:24px;width:110px;height:130px;border:2px solid var(--gold);overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-        <img src="/site-img-3.jpeg" alt="Dr. AQSLIM" style="width:100%;height:100%;object-fit:cover;object-position:center top;">
-      </div>
     </div>
     <div class="about-content-panel">
       <div class="section-label reveal"><span data-es>Nuestra Historia</span><span data-en>Our Story</span></div>
@@ -763,8 +749,8 @@ footer {
         </h2>
       </div>
       <div>
-        <p style="font-size:14px;line-height:2.1;color:var(--gray);font-weight:300;letter-spacing:0.02em;" data-es>La Auriculoterapia es una disciplina científica que combina la sabiduría de la medicina oriental con la neurología moderna. Al estimular puntos específicos en el oído externo, activamos el sistema nervioso central para regular el apetito, el metabolismo y el equilibrio emocional — sin agujas, sin dolor, con resultados medibles y documentados.</p>
-        <p style="font-size:14px;line-height:2.1;color:var(--gray);font-weight:300;letter-spacing:0.02em;" data-en>Auriculotherapy is a scientific discipline combining Eastern medicine wisdom with modern neurology. By stimulating specific points on the outer ear, we activate the central nervous system to regulate appetite, metabolism, and emotional balance — no needles, no pain, with measurable and documented results.</p>
+        <p style="font-size:18px;line-height:2.1;color:var(--gray);font-weight:300;letter-spacing:0.02em;" data-es>La Auriculoterapia es una disciplina científica que combina la sabiduría de la medicina oriental con la neurología moderna. Al estimular puntos específicos en el oído externo, activamos el sistema nervioso central para regular el apetito, el metabolismo y el equilibrio emocional — sin agujas, sin dolor, con resultados medibles y documentados.</p>
+        <p style="font-size:18px;line-height:2.1;color:var(--gray);font-weight:300;letter-spacing:0.02em;" data-en>Auriculotherapy is a scientific discipline combining Eastern medicine wisdom with modern neurology. By stimulating specific points on the outer ear, we activate the central nervous system to regulate appetite, metabolism, and emotional balance — no needles, no pain, with measurable and documented results.</p>
       </div>
     </div>
 
@@ -784,12 +770,12 @@ footer {
             <span data-es>La Teoría <em style="color:var(--gold)">Embriológica</em> de Nogier</span>
             <span data-en>Nogier's <em style="color:var(--gold)">Embryological</em> Theory</span>
           </h3>
-          <p style="font-size:13px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-es>En 1951, el médico francés <strong style="color:var(--white);font-weight:500;">Dr. Paul Nogier</strong> realizó un descubrimiento revolucionario: el oído externo humano contiene un mapa completo del cuerpo en forma de <strong style="color:var(--gold);font-weight:500;">feto invertido</strong>. El lóbulo corresponde a la cabeza, el antihélix a la columna vertebral, y la concha a los órganos internos.</p>
-          <p style="font-size:13px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-en>In 1951, French physician <strong style="color:var(--white);font-weight:500;">Dr. Paul Nogier</strong> made a revolutionary discovery: the human outer ear contains a complete body map in the shape of an <strong style="color:var(--gold);font-weight:500;">inverted fetus</strong>. The earlobe corresponds to the head, the antihelix to the spine, and the concha to the internal organs.</p>
-          <p style="font-size:13px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-es>Su base científica radica en la <strong style="color:var(--white);font-weight:500;">embriología</strong>: durante el desarrollo fetal, el oído externo se forma a partir de las mismas tres capas embrionarias que dan origen a todo el organismo. Esta conexión estructural explica por qué estimular el oído genera respuestas terapéuticas en órganos y sistemas distantes.</p>
-          <p style="font-size:13px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-en>Its scientific basis lies in <strong style="color:var(--white);font-weight:500;">embryology</strong>: during fetal development, the outer ear forms from the same three embryonic layers that give rise to the entire organism. This structural connection explains why stimulating the ear generates therapeutic responses in distant organs and systems.</p>
-          <p style="font-size:13px;line-height:2.1;color:var(--gray);font-weight:300;" data-es>Nogier identificó que cada punto auricular está conectado al sistema nervioso central a través de ramas del nervio vago, el nervio auriculotemporal y el plexo cervical — creando una autopista neurológica directa entre el oído y el cerebro.</p>
-          <p style="font-size:13px;line-height:2.1;color:var(--gray);font-weight:300;" data-en>Nogier identified that each auricular point is connected to the central nervous system through branches of the vagus nerve, auriculotemporal nerve, and cervical plexus — creating a direct neurological highway between the ear and the brain.</p>
+          <p style="font-size:17px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-es>En 1951, el médico francés <strong style="color:var(--white);font-weight:500;">Dr. Paul Nogier</strong> realizó un descubrimiento revolucionario: el oído externo humano contiene un mapa completo del cuerpo en forma de <strong style="color:var(--gold);font-weight:500;">feto invertido</strong>. El lóbulo corresponde a la cabeza, el antihélix a la columna vertebral, y la concha a los órganos internos.</p>
+          <p style="font-size:17px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-en>In 1951, French physician <strong style="color:var(--white);font-weight:500;">Dr. Paul Nogier</strong> made a revolutionary discovery: the human outer ear contains a complete body map in the shape of an <strong style="color:var(--gold);font-weight:500;">inverted fetus</strong>. The earlobe corresponds to the head, the antihelix to the spine, and the concha to the internal organs.</p>
+          <p style="font-size:17px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-es>Su base científica radica en la <strong style="color:var(--white);font-weight:500;">embriología</strong>: durante el desarrollo fetal, el oído externo se forma a partir de las mismas tres capas embrionarias que dan origen a todo el organismo. Esta conexión estructural explica por qué estimular el oído genera respuestas terapéuticas en órganos y sistemas distantes.</p>
+          <p style="font-size:17px;line-height:2.1;color:var(--gray);font-weight:300;margin-bottom:20px;" data-en>Its scientific basis lies in <strong style="color:var(--white);font-weight:500;">embryology</strong>: during fetal development, the outer ear forms from the same three embryonic layers that give rise to the entire organism. This structural connection explains why stimulating the ear generates therapeutic responses in distant organs and systems.</p>
+          <p style="font-size:17px;line-height:2.1;color:var(--gray);font-weight:300;" data-es>Nogier identificó que cada punto auricular está conectado al sistema nervioso central a través de ramas del nervio vago, el nervio auriculotemporal y el plexo cervical — creando una autopista neurológica directa entre el oído y el cerebro.</p>
+          <p style="font-size:17px;line-height:2.1;color:var(--gray);font-weight:300;" data-en>Nogier identified that each auricular point is connected to the central nervous system through branches of the vagus nerve, auriculotemporal nerve, and cervical plexus — creating a direct neurological highway between the ear and the brain.</p>
         </div>
 
         <!-- Ear diagram SVG -->
@@ -858,28 +844,28 @@ footer {
           <div style="font-family:'Playfair Display',serif;font-size:48px;font-weight:400;color:rgba(201,168,76,0.12);line-height:1;margin-bottom:16px;">I</div>
           <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;" data-es>Ectodermo</div>
           <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;" data-en>Ectoderm</div>
-          <div style="font-size:12px;color:var(--white);font-weight:500;margin-bottom:8px;" data-es>Hélix y Antehélix</div>
-          <div style="font-size:12px;color:var(--white);font-weight:500;margin-bottom:8px;" data-en>Helix and Antihelix</div>
-          <div style="font-size:12px;color:var(--gray);line-height:1.9;font-weight:300;" data-es>Corresponde a la piel, sistema nervioso y órganos de los sentidos. Los puntos en esta zona influyen sobre el sistema neurológico, piel y extremidades.</div>
-          <div style="font-size:12px;color:var(--gray);line-height:1.9;font-weight:300;" data-en>Corresponds to skin, nervous system, and sense organs. Points in this zone influence the neurological system, skin, and extremities.</div>
+          <div style="font-size:16px;color:var(--white);font-weight:500;margin-bottom:8px;" data-es>Hélix y Antehélix</div>
+          <div style="font-size:16px;color:var(--white);font-weight:500;margin-bottom:8px;" data-en>Helix and Antihelix</div>
+          <div style="font-size:16px;color:var(--gray);line-height:1.9;font-weight:300;" data-es>Corresponde a la piel, sistema nervioso y órganos de los sentidos. Los puntos en esta zona influyen sobre el sistema neurológico, piel y extremidades.</div>
+          <div style="font-size:16px;color:var(--gray);line-height:1.9;font-weight:300;" data-en>Corresponds to skin, nervous system, and sense organs. Points in this zone influence the neurological system, skin, and extremities.</div>
         </div>
         <div style="background:var(--mid);padding:36px 28px;border-top:2px solid rgba(201,168,76,0.5);position:relative;">
           <div style="font-family:'Playfair Display',serif;font-size:48px;font-weight:400;color:rgba(201,168,76,0.12);line-height:1;margin-bottom:16px;">II</div>
           <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;" data-es>Mesodermo</div>
           <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;" data-en>Mesoderm</div>
-          <div style="font-size:12px;color:var(--white);font-weight:500;margin-bottom:8px;" data-es>Antitragus y Fosa Triangular</div>
-          <div style="font-size:12px;color:var(--white);font-weight:500;margin-bottom:8px;" data-en>Antitragus and Triangular Fossa</div>
-          <div style="font-size:12px;color:var(--gray);line-height:1.9;font-weight:300;" data-es>Da origen a músculos, huesos, tejido conjuntivo y sistema cardiovascular. Sus puntos actúan sobre el aparato locomotor, circulación y metabolismo.</div>
-          <div style="font-size:12px;color:var(--gray);line-height:1.9;font-weight:300;" data-en>Gives rise to muscles, bones, connective tissue, and the cardiovascular system. Its points act on the musculoskeletal system, circulation, and metabolism.</div>
+          <div style="font-size:16px;color:var(--white);font-weight:500;margin-bottom:8px;" data-es>Antitragus y Fosa Triangular</div>
+          <div style="font-size:16px;color:var(--white);font-weight:500;margin-bottom:8px;" data-en>Antitragus and Triangular Fossa</div>
+          <div style="font-size:16px;color:var(--gray);line-height:1.9;font-weight:300;" data-es>Da origen a músculos, huesos, tejido conjuntivo y sistema cardiovascular. Sus puntos actúan sobre el aparato locomotor, circulación y metabolismo.</div>
+          <div style="font-size:16px;color:var(--gray);line-height:1.9;font-weight:300;" data-en>Gives rise to muscles, bones, connective tissue, and the cardiovascular system. Its points act on the musculoskeletal system, circulation, and metabolism.</div>
         </div>
         <div style="background:var(--mid);padding:36px 28px;border-top:2px solid rgba(201,168,76,0.25);position:relative;">
           <div style="font-family:'Playfair Display',serif;font-size:48px;font-weight:400;color:rgba(201,168,76,0.12);line-height:1;margin-bottom:16px;">III</div>
           <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;" data-es>Endodermo</div>
           <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;" data-en>Endoderm</div>
-          <div style="font-size:12px;color:var(--white);font-weight:500;margin-bottom:8px;" data-es>Concha del Oído</div>
-          <div style="font-size:12px;color:var(--white);font-weight:500;margin-bottom:8px;" data-en>Ear Concha</div>
-          <div style="font-size:12px;color:var(--gray);line-height:1.9;font-weight:300;" data-es>Origina los órganos internos: hígado, pulmones, sistema digestivo y glándulas endocrinas. La concha es la zona de mayor importancia para el control de peso y la regulación hormonal.</div>
-          <div style="font-size:12px;color:var(--gray);line-height:1.9;font-weight:300;" data-en>Originates internal organs: liver, lungs, digestive system, and endocrine glands. The concha is the most important zone for weight control and hormonal regulation.</div>
+          <div style="font-size:16px;color:var(--white);font-weight:500;margin-bottom:8px;" data-es>Concha del Oído</div>
+          <div style="font-size:16px;color:var(--white);font-weight:500;margin-bottom:8px;" data-en>Ear Concha</div>
+          <div style="font-size:16px;color:var(--gray);line-height:1.9;font-weight:300;" data-es>Origina los órganos internos: hígado, pulmones, sistema digestivo y glándulas endocrinas. La concha es la zona de mayor importancia para el control de peso y la regulación hormonal.</div>
+          <div style="font-size:16px;color:var(--gray);line-height:1.9;font-weight:300;" data-en>Originates internal organs: liver, lungs, digestive system, and endocrine glands. The concha is the most important zone for weight control and hormonal regulation.</div>
         </div>
       </div>
     </div>
@@ -938,7 +924,7 @@ footer {
         <div class="section-label reveal"><span data-es>Lo Que Ofrecemos</span><span data-en>What We Offer</span></div>
         <h2 class="section-h2 reveal"><span data-es>Nuestros <em>servicios</em></span><span data-en>Our <em>services</em></span></h2>
       </div>
-      <p style="font-size:13px;line-height:2;color:var(--gray-dark);max-width:380px;font-weight:300;" class="reveal">
+      <p style="font-size:23px;line-height:2;color:var(--gray-dark);font-weight:300;" class="reveal">
         <span data-es>Un programa integral que combina terapia, nutrición y acompañamiento personalizado para resultados duraderos.</span>
         <span data-en>A comprehensive program combining therapy, nutrition, and personalized support for lasting results.</span>
       </p>
@@ -1004,7 +990,7 @@ footer {
         <div class="section-label"><span data-es>Nuestra Línea</span><span data-en>Our Line</span></div>
         <h2 class="section-h2" style="color:var(--white);"><span data-es>Suplementos <em>AQ-SLIM</em></span><span data-en>AQ-SLIM <em>Supplements</em></span></h2>
       </div>
-      <p style="font-size:13px;line-height:2;color:var(--gray);max-width:360px;font-weight:300;">
+      <p style="font-size:23px;line-height:2;color:var(--gray);font-weight:300;">
         <span data-es>Nuestra línea de suplementos naturales está diseñada para complementar tu tratamiento y potenciar tus resultados de forma segura.</span>
         <span data-en>Our natural supplement line is designed to complement your treatment and enhance your results safely.</span>
       </p>
