@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Cliente } from '@/lib/airtable'
 
 function safeStr(val: unknown): string {
@@ -14,6 +15,7 @@ const PREFERRED_FIRST = ['Nombre Completo', 'ID Cliente', 'Edad']
 
 export function PatientsTable({ patients }: { patients: Cliente[] }) {
   const [search, setSearch] = useState('')
+  const router = useRouter()
 
   const columns = useMemo(() => {
     if (patients.length === 0) return []
@@ -74,10 +76,18 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
           </thead>
           <tbody>
             {filtered.map((p, i) => (
-              <tr key={p.id} style={{
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
-              }}>
+              <tr
+                key={p.id}
+                onClick={() => router.push(`/dashboard/${p.id}`)}
+                style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,168,76,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)')}
+              >
                 {columns.map(col => (
                   <td key={col} style={{
                     padding: '12px 16px', whiteSpace: 'nowrap',

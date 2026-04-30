@@ -26,7 +26,7 @@ export interface Cliente {
   id: string
   fields: {
     'Nombre Completo'?: string
-    'ID Cliente'?: string
+    'ID Cliente'?: number
     'Edad'?: number
     'Peso Meta (con unidad)'?: string
     'Unidad de Peso'?: string
@@ -38,9 +38,36 @@ export interface Cliente {
 export interface Consulta {
   id: string
   fields: {
-    Fecha?: string
-    Peso?: number
-    Cliente?: string[]
+    'ID Consulta'?: string
+    'ID Cliente'?: string
+    'Fecha Consulta'?: string
+    'Tipo de Consulta'?: string
+    'Peso (kg)'?: number
+    'Peso (con unidad)'?: string
+    'Peso Meta'?: number
+    '% Grasa Corporal'?: number
+    'IMC'?: number
+    'Cintura (cm)'?: number
+    'Cadera (cm)'?: number
+    'Brazos (cm)'?: number
+    'Muslos (cm)'?: number
+    'Pecho/Busto (cm)'?: number
+    'Diferencia vs Semana Anterior (kg)'?: number
+    'Dias desde Consulta'?: number
+    'Cumplimiento Dieta (1-10)'?: number
+    'Nivel de Energía'?: string
+    'Calidad de Sueño'?: string
+    'Cómo Se Siente (1-10)'?: number
+    '¿Ansiedad?'?: boolean
+    '¿Tuvo Hambre?'?: boolean
+    'Recomendaciones al Cliente'?: string
+    'Próxima Cita'?: string
+    'Método de Pago'?: string
+    'Monto Cobrado ($)'?: number
+    'Email Cliente'?: string
+    'Idioma Preferido'?: string
+    'Unidad Cliente'?: string
+    'Email Post-Consulta Enviado'?: boolean
     [key: string]: unknown
   }
 }
@@ -74,8 +101,8 @@ export async function getClienteById(id: string): Promise<Cliente> {
 
 // ---------- Consultas ----------
 
-export async function getConsultasByCliente(clienteId: string): Promise<Consulta[]> {
-  const formula = encodeURIComponent(`FIND("${clienteId}", ARRAYJOIN(Cliente))`)
-  const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=desc`)
+export async function getConsultasByCliente(idCliente: number): Promise<Consulta[]> {
+  const formula = encodeURIComponent(`{ID Cliente} = ${idCliente}`)
+  const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
   return data.records
 }
