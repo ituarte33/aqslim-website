@@ -508,6 +508,14 @@ footer {
 .delay-2 { transition-delay:0.2s; }
 .delay-3 { transition-delay:0.3s; }
 
+/* TABLET */
+@media(max-width:1500px) {
+nav { padding:0 20px; }
+  .nav-links { display:none; }
+  .hamburger { display:flex; }
+  .lang-bar { padding:0 20px; }
+}
+
 /* MOBILE */
 @media(max-width:900px) {
   .hero { grid-template-columns:1fr; }
