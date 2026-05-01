@@ -1,19 +1,19 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
-export function HomeScripts() {
-  // Add synchronously before first paint to avoid cursor flash
-  if (typeof document !== 'undefined') {
-    document.body.classList.add('marketing')
-  }
+export function HomeContent({ html }: { html: string }) {
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     document.body.classList.add('marketing')
 
+    if (!ref.current) return
+    const root = ref.current
+
     // Custom cursor
-    const dotEl = document.getElementById('cursorDot')?.firstElementChild as HTMLElement | null
-    const ringEl = document.getElementById('cursorRing')?.firstElementChild as HTMLElement | null
+    const dotEl = root.querySelector<HTMLElement>('#cursorDot > *')
+    const ringEl = root.querySelector<HTMLElement>('#cursorRing > *')
     let mx = 0, my = 0, rx = 0, ry = 0
     let running = true
 
@@ -33,55 +33,53 @@ export function HomeScripts() {
     // Language toggle
     function setLang(lang: string) {
       document.body.className = 'lang-' + lang + ' marketing'
-      document.getElementById('btn-es')?.classList.toggle('active', lang === 'es')
-      document.getElementById('btn-en')?.classList.toggle('active', lang === 'en')
+      root.querySelector('#btn-es')?.classList.toggle('active', lang === 'es')
+      root.querySelector('#btn-en')?.classList.toggle('active', lang === 'en')
       document.documentElement.lang = lang
-      const msg = document.getElementById('message') as HTMLTextAreaElement | null
+      const msg = root.querySelector<HTMLTextAreaElement>('#message')
       if (msg) msg.placeholder = lang === 'es' ? 'Cuéntanos sobre tus metas de salud...' : 'Tell us about your health goals...'
     }
-    document.getElementById('btn-es')?.addEventListener('click', () => setLang('es'))
-    document.getElementById('btn-en')?.addEventListener('click', () => setLang('en'))
+    root.querySelector('#btn-es')?.addEventListener('click', () => setLang('es'))
+    root.querySelector('#btn-en')?.addEventListener('click', () => setLang('en'))
 
     // Mobile menu
     function closeMenu() {
-      document.getElementById('mobile-menu')?.classList.remove('open')
-      document.getElementById('hamburger')?.classList.remove('open')
+      root.querySelector('#mobile-menu')?.classList.remove('open')
+      root.querySelector('#hamburger')?.classList.remove('open')
     }
-    document.getElementById('hamburger')?.addEventListener('click', () => {
-      document.getElementById('mobile-menu')?.classList.toggle('open')
-      document.getElementById('hamburger')?.classList.toggle('open')
+    root.querySelector('#hamburger')?.addEventListener('click', () => {
+      root.querySelector('#mobile-menu')?.classList.toggle('open')
+      root.querySelector('#hamburger')?.classList.toggle('open')
     })
-    document.querySelectorAll('#mobile-menu a').forEach(a => a.addEventListener('click', closeMenu))
+    root.querySelectorAll('#mobile-menu a').forEach(a => a.addEventListener('click', closeMenu))
 
-    // Scroll reveal — immediately show elements already in the viewport (fixes after-navigation blank hero)
+    // Scroll reveal
     const obs = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') }),
       { threshold: 0, rootMargin: '0px 0px -40px 0px' }
     )
-    document.querySelectorAll('.reveal, .reveal-left').forEach(el => {
+    root.querySelectorAll('.reveal, .reveal-left').forEach(el => {
       const rect = (el as HTMLElement).getBoundingClientRect()
       if (rect.top < window.innerHeight) el.classList.add('visible')
       else obs.observe(el)
     })
 
-    // Smooth scroll for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
+    // Smooth scroll
+    root.querySelectorAll('a[href^="#"]').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault()
         closeMenu()
         const href = a.getAttribute('href')
-        if (href && href !== '#') {
-          document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' })
-        }
+        if (href && href !== '#') document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' })
       })
     })
 
     // Contact form
-    document.getElementById('form-btn')?.addEventListener('click', async (e) => {
+    root.querySelector('#form-btn')?.addEventListener('click', async (e) => {
       e.preventDefault()
-      const get = (id: string) => document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null
-      const name = (get('name') as HTMLInputElement)?.value.trim() ?? ''
-      const email = (get('email') as HTMLInputElement)?.value.trim() ?? ''
+      const get = (id: string) => root.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('#' + id)
+      const name = get('name')?.value.trim() ?? ''
+      const email = get('email')?.value.trim() ?? ''
       const isEs = document.body.classList.contains('lang-es')
 
       if (!name || !email) {
@@ -89,9 +87,9 @@ export function HomeScripts() {
         return
       }
 
-      const btn = document.getElementById('form-btn') as HTMLButtonElement | null
-      const successEl = document.getElementById('form-success') as HTMLElement | null
-      const errorEl = document.getElementById('form-error') as HTMLElement | null
+      const btn = root.querySelector<HTMLButtonElement>('#form-btn')
+      const successEl = root.querySelector<HTMLElement>('#form-success')
+      const errorEl = root.querySelector<HTMLElement>('#form-error')
 
       if (btn) { btn.disabled = true; btn.style.opacity = '0.6' }
       if (errorEl) errorEl.style.display = 'none'
@@ -102,16 +100,15 @@ export function HomeScripts() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name, email,
-            phone: (get('phone') as HTMLInputElement)?.value ?? '',
-            service: (get('service') as HTMLSelectElement)?.value ?? '',
-            message: (get('message') as HTMLTextAreaElement)?.value ?? '',
+            phone: get('phone')?.value ?? '',
+            service: get('service')?.value ?? '',
+            message: get('message')?.value ?? '',
           }),
         })
         if (res.ok) {
           if (successEl) successEl.style.display = 'block'
           ;['name', 'email', 'phone', 'service', 'message'].forEach(id => {
-            const el = get(id)
-            if (el) el.value = ''
+            const el = get(id); if (el) el.value = ''
           })
         } else {
           if (errorEl) errorEl.style.display = 'block'
@@ -131,5 +128,5 @@ export function HomeScripts() {
     }
   }, [])
 
-  return null
+  return <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
 }
