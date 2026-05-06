@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClientes, getClienteByEmail, createProspecto } from '@/lib/airtable'
+import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto } from '@/lib/airtable'
 import { getRole, getUserEmail } from '@/lib/auth'
 import { DashboardClient } from './dashboard-client'
 
@@ -24,9 +24,10 @@ export default async function DashboardPage() {
       redirect('/onboarding')
     }
 
-    // Returning user — redirect to onboarding if still a Prospecto
-    const estado = (cliente.fields['Estado del Cliente'] as string | undefined)?.trim().toLowerCase()
-    if (estado === 'prospecto') redirect('/onboarding')
+    // Only show dashboard if they have at least one consulta
+    const idCliente = cliente.fields['ID Cliente']
+    const consultas = idCliente ? await getConsultasByCliente(idCliente) : []
+    if (consultas.length === 0) redirect('/onboarding')
 
     redirect(`/dashboard/${cliente.id}`)
   }

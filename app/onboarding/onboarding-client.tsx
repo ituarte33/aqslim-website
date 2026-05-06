@@ -11,6 +11,7 @@ const SCHEDULING_URL = 'https://book.squareup.com/appointments/46af1166-2cd2-412
 type Props = {
   defaultFirstName: string
   defaultLastName: string
+  initialStep?: 'profile' | 'next-steps'
 }
 
 const inputStyle = {
@@ -53,8 +54,8 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
-export function OnboardingClient({ defaultFirstName, defaultLastName }: Props) {
-  const [step, setStep] = useState<'profile' | 'next-steps'>('profile')
+export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile' }: Props) {
+  const [step, setStep] = useState<'profile' | 'next-steps'>(initialStep)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -453,26 +454,30 @@ export function OnboardingClient({ defaultFirstName, defaultLastName }: Props) {
 
                 {/* Step 2 — Questionnaire */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(201,168,76,0.3)',
                   padding: '24px',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
                 }}>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#6A6560', minWidth: 28 }}>02</span>
+                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#C9A84C', minWidth: 28 }}>02</span>
                     <div>
-                      <div style={{ fontSize: 13, color: '#9A9590', marginBottom: 4 }}>Cuestionario de síntomas</div>
-                      <div style={{ fontSize: 12, color: '#6A6560' }}>Disponible próximamente en tu portal.</div>
+                      <div style={{ fontSize: 13, color: '#FAFAF8', marginBottom: 4 }}>Cuestionario de síntomas</div>
+                      <div style={{ fontSize: 12, color: '#9A9590' }}>Cuéntanos cómo te has sentido.</div>
                     </div>
                   </div>
-                  <span style={{
-                    border: '1px solid rgba(255,255,255,0.1)', color: '#6A6560',
-                    padding: '10px 20px', fontSize: 11,
-                    letterSpacing: '0.12em', textTransform: 'uppercase',
-                    fontFamily: 'Montserrat, sans-serif',
-                  }}>
-                    Próximamente
-                  </span>
+                  <a
+                    href="/cuestionario"
+                    style={{
+                      background: '#C9A84C', color: '#0A0A0A',
+                      padding: '10px 20px', fontSize: 11,
+                      letterSpacing: '0.12em', textTransform: 'uppercase',
+                      fontFamily: 'Montserrat, sans-serif', fontWeight: 500,
+                      textDecoration: 'none', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Completar →
+                  </a>
                 </div>
               </div>
             </>

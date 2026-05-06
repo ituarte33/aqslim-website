@@ -156,6 +156,78 @@ export async function createProspecto(nombre: string, email: string): Promise<Cl
   })
 }
 
+// ---------- Cuestionario Sintomas ----------
+
+export const CUESTIONARIO_TABLE = 'tblRn6LRSb8XhKOl7'
+
+export const CUESTIONARIO_FIELDS = {
+  ID_CLIENTE:   'fldFzCXg9ADeL2fq2',
+  NOMBRE:       'fldkVApGgGDFmZhIR',
+  FECHA:        'fldpXEQWFMSb4l4Sf',
+  OBSERVACIONES:'fld5a7uUKjwGrFyF8',
+  // Digestivo
+  D_ESTRENIMIENTO:  'fldluEzmmArzfIzQz',
+  D_DIARREA:        'flddDVMWsuO72KPBR',
+  D_GASES:          'fldDiOE21l40db8m1',
+  D_ACIDEZ:         'fld1gckNyHtmsXLOb',
+  D_NAUSEA:         'fldAPVi83pKs6NmkO',
+  D_DOLOR_ABD:      'fldtPuzaTx342X2wZ',
+  D_HINCHAZON:      'fldjrzc05a98kv1xY',
+  D_COLITIS:        'fldwkjYZ6TfvnCHwV',
+  // Hepático
+  H_FATIGA:         'fld8y2aLuEjh4lIhd',
+  H_DOLOR_COSTADO:  'fld0csAjXnA48fvYQ',
+  H_PIEL_OJOS:      'fldqVmygsnkui2Mc4',
+  H_BOCA_AMARGA:    'fldv1FHnONjVR40NK',
+  H_INTOLERANCIA:   'fld8zzQpy8nslUdja',
+  // Hormonal
+  HOR_TIROIDES:     'fldpTFVJxc7AaX3SV',
+  HOR_SUDORACION:   'fldoNzzgXoaLBjOTz',
+  HOR_IRREGULAR:    'fld99HsQQwlg8hCG4',
+  HOR_PMS:          'fldXGKArf7a39xlfy',
+  HOR_AUMENTO_PESO: 'fldCXsIsLlgtVgSZn',
+  HOR_FRIO:         'fld0xXqE8DaxzFMPP',
+  // Nervioso
+  N_ANSIEDAD:       'fldUzmw1RLEJ0m3Rd',
+  N_ESTRES:         'fldweQxO1yvadbt1m',
+  N_INSOMNIO:       'fldL5KMuMyF6p130P',
+  N_DEPRESION:      'fldqYUsEJHJJO27UR',
+  N_DOLORES_CAB:    'fldZCDJXqHHZpVG1k',
+  N_MIGRANAS:       'fldGt7WTbtRgcqRjC',
+  N_MAREOS:         'fldcXas3JOtA12O7p',
+  // Cardiovascular
+  C_PRESION:        'fldU7blWhHz22B9gv',
+  C_PALPITACIONES:  'fldwwOKn32UIxq4Nn',
+  C_CIRCULACION:    'fldqoanqQrube5sjo',
+  C_MANOS_PIES:     'fldgC0jnJd8a6ueMZ',
+  C_RETENCION:      'fldSoIjDCd04r0I23',
+  // Renal
+  R_MICCION:        'fldb7GThzY6NfDLpC',
+  R_INFECCIONES:    'fldhppvDFJYVqcX3I',
+  R_ARDOR:          'fld9goQb0ezI5Hf8v',
+  // Músculo-Esquelético
+  M_ESPALDA:        'fldplCTHMJB4WciQI',
+  M_ARTICULAR:      'fldZ5wCWOU0EB6dRB',
+  M_MUSCULAR:       'fldJ1BQ8cQWuIcEnt',
+  M_RIGIDEZ:        'fldhD7qPovwxbsrNM',
+  // Piel
+  P_ACNE:           'fldoNt3tBApOMcOkq',
+  P_ECZEMA:         'fldIV9lUaiGtlzSbm',
+  P_PIEL_RESECA:    'fldAel2zk1Aehwy3R',
+  P_PICAZON:        'flds3bvAYn85pF4ox',
+  // Estado General
+  G_ENERGIA:        'fldksbjNbbK2dlc6E',
+  G_CONCENTRACION:  'fldQVYo5LvgKeeb2U',
+  G_AUMENTO_PESO:   'fld65YMBTMdVzDDdj',
+} as const
+
+export async function createCuestionario(fields: Record<string, unknown>): Promise<void> {
+  await airtableFetch(`/${CUESTIONARIO_TABLE}`, {
+    method: 'POST',
+    body: JSON.stringify({ fields }),
+  })
+}
+
 // ---------- Consultas ----------
 
 export async function getConsultasByCliente(idCliente: number): Promise<Consulta[]> {

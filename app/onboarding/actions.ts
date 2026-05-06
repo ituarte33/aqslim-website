@@ -44,7 +44,6 @@ export async function saveProfile(formData: FormData) {
     [CLIENTES_FIELDS.COMO_NOS_CONOCIO]:  comoNosConocio,
     [CLIENTES_FIELDS.META_DEL_CLIENTE]:  metaDelCliente,
     [CLIENTES_FIELDS.ACEPTO_TERMINOS]:   true,
-    [CLIENTES_FIELDS.ESTADO_DEL_CLIENTE]: 'Nuevo',
   }
 
   const fechaISO = mmddyyyyToISO(fechaNacimiento)

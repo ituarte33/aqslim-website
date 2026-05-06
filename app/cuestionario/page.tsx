@@ -1,9 +1,9 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getClienteByEmail } from '@/lib/airtable'
-import { OnboardingClient } from './onboarding-client'
+import { CuestionarioClient } from './cuestionario-client'
 
-export default async function OnboardingPage() {
+export default async function CuestionarioPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
@@ -12,15 +12,12 @@ export default async function OnboardingPage() {
   if (!email) redirect('/sign-in')
 
   const cliente = await getClienteByEmail(email)
-  if (!cliente) redirect('/dashboard')
-
-  const profileFilled = cliente.fields['He leído y acepto los términos anteriores'] === true
+  if (!cliente) redirect('/onboarding')
 
   return (
-    <OnboardingClient
-      defaultFirstName={user?.firstName ?? ''}
-      defaultLastName={user?.lastName ?? ''}
-      initialStep={profileFilled ? 'next-steps' : 'profile'}
+    <CuestionarioClient
+      clienteId={cliente.id}
+      nombreCliente={cliente.fields['Nombre Completo'] ?? ''}
     />
   )
 }
