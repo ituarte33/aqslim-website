@@ -24,10 +24,9 @@ export default async function DashboardPage() {
       redirect('/onboarding')
     }
 
-    // Returning user — check if they still need to complete onboarding
-    const estado = cliente.fields['Estado del Cliente'] as string | undefined
-    const hasPhone = !!cliente.fields['Teléfono']
-    if (estado === 'Prospecto' || !hasPhone) redirect('/onboarding')
+    // Returning user — redirect to onboarding if still a Prospecto
+    const estado = (cliente.fields['Estado del Cliente'] as string | undefined)?.trim().toLowerCase()
+    if (estado === 'prospecto') redirect('/onboarding')
 
     redirect(`/dashboard/${cliente.id}`)
   }
