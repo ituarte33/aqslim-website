@@ -554,6 +554,7 @@ footer {
   body { cursor:auto; }
   .whatsapp-float { bottom:20px; right:20px; }
 }
+
 </style>
 </head>
 <body class="lang-es">
@@ -585,6 +586,7 @@ footer {
     <li><a href="#auriculotherapy"><span data-es>Auriculoterapia</span><span data-en>Auriculotherapy</span></a></li>
     <li><a href="#services"><span data-es>Servicios</span><span data-en>Services</span></a></li>
     <li><a href="#supplements"><span data-es>Suplementos</span><span data-en>Supplements</span></a></li>
+    <li><a href="#appointment"><span data-es>Cita</span><span data-en>Appointment</span></a></li>
     <li><a href="#contact"><span data-es>Contacto</span><span data-en>Contact</span></a></li>
   </ul>
   <a href="/sign-in" class="hero-cta-btn" style="padding:10px 24px;font-size:13px;text-decoration:none;">
@@ -601,6 +603,7 @@ footer {
   <a href="#auriculotherapy" onclick="closeMenu()"><span data-es>Auriculoterapia</span><span data-en>Auriculotherapy</span></a>
   <a href="#services" onclick="closeMenu()"><span data-es>Servicios</span><span data-en>Services</span></a>
   <a href="#supplements" onclick="closeMenu()"><span data-es>Suplementos</span><span data-en>Supplements</span></a>
+  <a href="#appointment" onclick="closeMenu()"><span data-es>Cita</span><span data-en>Appointment</span></a>
   <a href="#contact" onclick="closeMenu()"><span data-es>Contacto</span><span data-en>Contact</span></a>
 </div>
 
@@ -627,7 +630,7 @@ footer {
     <p class="hero-sub reveal delay-2" data-es>Combinamos Auriculoterapia milenaria, nutrición personalizada y suplementos naturales para ayudarte a alcanzar tu peso ideal — de forma sostenible y científicamente respaldada.</p>
     <p class="hero-sub reveal delay-2" data-en>We combine ancient Auriculotherapy, personalized nutrition, and natural supplements to help you reach your ideal weight — sustainably and scientifically supported.</p>
     <div class="reveal delay-3" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
-      <a href="#contact" class="hero-cta-btn"><span data-es>Agenda tu consulta</span><span data-en>Book your consultation</span></a>
+      <a href="#appointment" class="hero-cta-btn"><span data-es>Agenda tu consulta</span><span data-en>Book your consultation</span></a>
       <a href="#about" class="hero-cta-secondary"><span data-es>Conoce el método</span><span data-en>Learn the method</span></a>
     </div>
     <div class="hero-stats reveal">
@@ -1018,6 +1021,58 @@ footer {
   </div>
 </section>
 
+<!-- BOOK APPOINTMENT -->
+<section class="book-appt" id="appointment">
+  <div class="book-appt-inner">
+    <div class="section-label reveal"><span data-es>Reserva tu lugar</span><span data-en>Reserve your spot</span></div>
+    <h2 class="book-appt-h2 reveal delay-1">
+      <span data-es>Cómo <em>agendar</em> tu cita</span>
+      <span data-en>How to <em>book</em> your appointment</span>
+    </h2>
+    <p class="book-appt-sub reveal delay-2" data-es>Sigue estos tres pasos para reservar tu sesión y prepararte para tu primera visita en AQSLIM.</p>
+    <p class="book-appt-sub reveal delay-2" data-en>Follow these three steps to reserve your session and prepare for your first visit at AQSLIM.</p>
+
+    <div class="book-steps reveal delay-3">
+      <!-- Step 1 -->
+      <div class="book-step">
+        <div class="book-step-num">01</div>
+        <div class="book-step-icon">👤</div>
+        <div class="book-step-title" data-es>Crea tu cuenta</div>
+        <div class="book-step-title" data-en>Create your account</div>
+        <div class="book-step-text" data-es>Regístrate en nuestro portal de pacientes. Tu cuenta te da acceso a tu expediente clínico, historial de sesiones y la posibilidad de agendar en línea.</div>
+        <div class="book-step-text" data-en>Register on our patient portal. Your account gives you access to your clinical record, session history, and the ability to book online.</div>
+        <a href="/sign-in" class="book-step-btn">
+          <span data-es>Ir al portal</span><span data-en>Go to portal</span>
+        </a>
+      </div>
+      <!-- Step 2 -->
+      <div class="book-step">
+        <div class="book-step-num">02</div>
+        <div class="book-step-icon">📅</div>
+        <div class="book-step-title" data-es>Agenda tu cita</div>
+        <div class="book-step-title" data-en>Book your appointment</div>
+        <div class="book-step-text" data-es>Una vez dentro del portal, selecciona el servicio que deseas y elige la fecha y horario disponible que mejor se adapte a tu agenda.</div>
+        <div class="book-step-text" data-en>Once inside the portal, select the service you need and choose the available date and time that best fits your schedule.</div>
+        <a href="/sign-in" class="book-step-btn-outline">
+          <span data-es>Agendar</span><span data-en>Schedule</span>
+        </a>
+      </div>
+      <!-- Step 3 -->
+      <div class="book-step">
+        <div class="book-step-num">03</div>
+        <div class="book-step-icon">📋</div>
+        <div class="book-step-title" data-es>Llena tu formulario</div>
+        <div class="book-step-title" data-en>Complete intake form</div>
+        <div class="book-step-text" data-es>Antes de tu primera visita, completa tu formulario de historial de salud. Esta información nos permite diseñar un protocolo completamente personalizado para ti.</div>
+        <div class="book-step-text" data-en>Before your first visit, complete your health history intake form. This information allows us to design a fully personalized protocol just for you.</div>
+        <a href="/sign-in" class="book-step-btn-outline">
+          <span data-es>Formulario</span><span data-en>Intake form</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- CONTACT -->
 <section class="contact" id="contact">
   <div class="contact-inner">
@@ -1028,8 +1083,8 @@ footer {
           <span data-es>Ponte en <em>contacto</em></span>
           <span data-en>Get in <em>touch</em></span>
         </h2>
-        <p style="font-size:13px;line-height:2;color:rgba(0,0,0,0.6);margin-top:20px;font-weight:300;" data-es>Estamos aquí para responder tus preguntas y ayudarte a comenzar tu camino hacia el bienestar.</p>
-        <p style="font-size:13px;line-height:2;color:rgba(0,0,0,0.6);margin-top:20px;font-weight:300;" data-en>We're here to answer your questions and help you start your wellness journey.</p>
+        <p style="font-size:18px;line-height:2;color:rgba(0,0,0,0.6);margin-top:20px;font-weight:300;" data-es>Estamos aquí para responder tus preguntas y ayudarte a comenzar tu camino hacia el bienestar.</p>
+        <p style="font-size:18px;line-height:2;color:rgba(0,0,0,0.6);margin-top:20px;font-weight:300;" data-en>We're here to answer your questions and help you start your wellness journey.</p>
         <div class="contact-details">
           <div class="contact-detail">
             <div class="contact-detail-icon">📞</div>
@@ -1044,7 +1099,7 @@ footer {
             <div>
               <div class="contact-detail-label" data-es>Dirección</div>
               <div class="contact-detail-label" data-en>Address</div>
-              <div class="contact-detail-value" style="font-size:13px;">270 E Douglas Ave<br>El Cajon, CA 92020</div>
+              <div class="contact-detail-value">270 E Douglas Ave<br>El Cajon, CA 92020</div>
             </div>
           </div>
           <div class="contact-detail">
@@ -1062,10 +1117,10 @@ footer {
     </div>
 
     <div class="contact-right">
-      <div class="section-label"><span data-es>Agenda tu cita</span><span data-en>Book your appointment</span></div>
+      <div class="section-label"><span data-es>Escríbenos</span><span data-en>Send a message</span></div>
       <h2 class="contact-right-h2">
-        <span data-es>Escríbenos <em>hoy</em></span>
-        <span data-en>Write to us <em>today</em></span>
+        <span data-es>¿Tienes <em>preguntas?</em></span>
+        <span data-en>Have <em>questions?</em></span>
       </h2>
       <div class="form-row">
         <div class="form-group">
