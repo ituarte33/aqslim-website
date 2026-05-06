@@ -20,7 +20,7 @@ export default async function DashboardPage() {
       // First login — create record and go straight to onboarding
       const user = await currentUser()
       const nombre = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || email
-      await createProspecto({ 'Nombre Completo': nombre, 'Email': email })
+      await createProspecto(nombre, email)
       redirect('/onboarding')
     }
 

@@ -1,5 +1,29 @@
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
+export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
+
+// Field IDs for the Clientes table. Use these as keys in write operations
+// so that Airtable field renames never break the API.
+export const CLIENTES_FIELDS = {
+  NOMBRE_COMPLETO:      'fldKnMcOw30Oq0Nct',
+  EMAIL:                'fldFaHBmXkiZPi7SD',
+  FECHA_NACIMIENTO:     'fld4GgMFoHwbeb7uZ',
+  SEXO:                 'fldEaI3u7ug0oksNe',
+  TELEFONO:             'fldYoxcDIjes4GtYt',
+  DIRECCION:            'fldo2P3H3KsX06Td6',
+  CIUDAD:               'fld6IafwnNVs7DjaQ',
+  ZIP:                  'fldwbSOM9G3h3qYCG',
+  IDIOMA_PREFERIDO:     'fldRpFEL77yUkfaPG',
+  COMO_NOS_CONOCIO:     'fldE5rU0yD6dZqNKw',
+  ACEPTO_TERMINOS:      'fldaHiraHz4bhhjVD',
+  ESTADO_DEL_CLIENTE:   'fldqyYielhA0GDF0h',
+  META_DEL_CLIENTE:     'fldxBWCYYqlUJIqM1',
+  UNIDAD_DE_PESO:       'fldFDfVOWUTJLBaEq',
+  PESO_META:            'fldJOztXSqZKsmZV5',
+  CONDICIONES_ALERGIAS: 'fldeWA9A4FvulirHk',
+  ID_CLIENTE:           'fldeTMbkVItk4nPUW',
+} as const
+
 async function airtableFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -19,8 +43,8 @@ async function airtableFetch(path: string, options?: RequestInit) {
 }
 
 // ---------- Types ----------
-// Field names are in Spanish to match Romulo's Airtable base.
-// Update these as you confirm the exact field names in each table.
+// Field names match what the Airtable API returns in READ responses.
+// For WRITE operations, use CLIENTES_FIELDS field IDs above.
 
 export interface Cliente {
   id: string
@@ -28,11 +52,22 @@ export interface Cliente {
     'Nombre Completo'?: string
     'ID Cliente'?: number
     'Edad'?: number
+    'Fecha Nacimiento'?: string
+    'Sexo'?: string
+    'Peso Meta'?: number
     'Peso Meta (con unidad)'?: string
     'Unidad de Peso'?: string
     'Email'?: string
     'Teléfono'?: string
+    'Dirección'?: string
+    'Ciudad'?: string
+    'ZIP'?: number
     'Estado del Cliente'?: string
+    'Idioma Preferido'?: string
+    'Cómo Nos Conoció'?: string
+    'He leído y acepto los términos anteriores'?: boolean
+    'Meta del Cliente'?: string
+    'Condiciones Especiales / Alergias'?: string
     [key: string]: unknown
   }
 }
@@ -83,7 +118,7 @@ export async function getClientes(): Promise<Cliente[]> {
   do {
     const params = new URLSearchParams({ pageSize: '100' })
     if (offset) params.set('offset', offset)
-    const data = await airtableFetch(`/Clientes?${params}`)
+    const data = await airtableFetch(`/${CLIENTES_TABLE}?${params}`)
     records.push(...data.records)
     offset = data.offset
   } while (offset)
@@ -93,28 +128,31 @@ export async function getClientes(): Promise<Cliente[]> {
 
 export async function getClienteByEmail(email: string): Promise<Cliente | null> {
   const formula = encodeURIComponent(`{Email} = "${email}"`)
-  const data = await airtableFetch(`/Clientes?filterByFormula=${formula}`)
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}`)
   return data.records[0] ?? null
 }
 
 export async function getClienteById(id: string): Promise<Cliente> {
-  return airtableFetch(`/Clientes/${id}`)
+  return airtableFetch(`/${CLIENTES_TABLE}/${id}`)
 }
 
-export async function updateCliente(id: string, fields: Partial<Cliente['fields']>): Promise<Cliente> {
-  return airtableFetch(`/Clientes/${id}`, {
+export async function updateCliente(id: string, fields: Record<string, unknown>): Promise<Cliente> {
+  return airtableFetch(`/${CLIENTES_TABLE}/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ fields }),
   })
 }
 
-export async function createProspecto(fields: {
-  'Nombre Completo': string
-  'Email': string
-}): Promise<Cliente> {
-  return airtableFetch('/Clientes', {
+export async function createProspecto(nombre: string, email: string): Promise<Cliente> {
+  return airtableFetch(`/${CLIENTES_TABLE}`, {
     method: 'POST',
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({
+      fields: {
+        [CLIENTES_FIELDS.NOMBRE_COMPLETO]:  nombre,
+        [CLIENTES_FIELDS.EMAIL]:            email,
+        [CLIENTES_FIELDS.ESTADO_DEL_CLIENTE]: 'Prospecto',
+      },
+    }),
   })
 }
 

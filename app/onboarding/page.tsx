@@ -7,7 +7,11 @@ export default async function OnboardingPage() {
   if (!userId) redirect('/sign-in')
 
   const user = await currentUser()
-  const nombre = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || ''
 
-  return <OnboardingClient defaultNombre={nombre} />
+  return (
+    <OnboardingClient
+      defaultFirstName={user?.firstName ?? ''}
+      defaultLastName={user?.lastName ?? ''}
+    />
+  )
 }
