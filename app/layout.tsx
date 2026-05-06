@@ -1,6 +1,7 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import './globals.css'
+import { LanguageModal } from './language-modal'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="lang-es">
         <ClerkProvider afterSignOutUrl="/signed-out">
+          <LanguageModal />
           {children}
         </ClerkProvider>
       </body>

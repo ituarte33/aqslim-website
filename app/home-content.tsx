@@ -31,7 +31,9 @@ export function HomeContent({ html }: { html: string }) {
     animRing()
 
     // Language toggle
+    const LANG_KEY = 'aqslim-lang'
     function setLang(lang: string) {
+      localStorage.setItem(LANG_KEY, lang)
       document.body.className = 'lang-' + lang + ' marketing'
       root.querySelector('#btn-es')?.classList.toggle('active', lang === 'es')
       root.querySelector('#btn-en')?.classList.toggle('active', lang === 'en')
@@ -39,8 +41,14 @@ export function HomeContent({ html }: { html: string }) {
       const msg = root.querySelector<HTMLTextAreaElement>('#message')
       if (msg) msg.placeholder = lang === 'es' ? 'Cuéntanos sobre tus metas de salud...' : 'Tell us about your health goals...'
     }
+    // Apply saved preference on init
+    const savedLang = localStorage.getItem(LANG_KEY) ?? 'es'
+    setLang(savedLang)
     root.querySelector('#btn-es')?.addEventListener('click', () => setLang('es'))
     root.querySelector('#btn-en')?.addEventListener('click', () => setLang('en'))
+    // Sync when modal fires
+    function onModalLang(e: Event) { setLang((e as CustomEvent<string>).detail) }
+    window.addEventListener('aqslim-lang', onModalLang)
 
     // Mobile menu
     function closeMenu() {
@@ -123,6 +131,7 @@ export function HomeContent({ html }: { html: string }) {
     return () => {
       running = false
       document.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('aqslim-lang', onModalLang)
       document.body.classList.remove('marketing')
       obs.disconnect()
     }
