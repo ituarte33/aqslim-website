@@ -582,7 +582,7 @@ footer {
 .delay-3 { transition-delay:0.3s; }
 
 /* TABLET */
-@media(max-width:1500px) {
+@media(max-width:1600px) {
 nav { padding:0 20px; }
   .nav-links { display:none; }
   .hamburger { display:flex; }
