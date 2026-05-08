@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, Consulta } from '@/lib/airtable'
+import { pt } from '@/lib/portal-type'
 
 type Props = {
   patient: Cliente | null
@@ -28,10 +29,10 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
       padding: '16px 20px',
       minWidth: 140,
     }}>
-      <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9A9590', marginBottom: 8 }}>
+      <div style={{ fontSize: pt.sm, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9A9590', marginBottom: 8 }}>
         {label}
       </div>
-      <div style={{ fontSize: 20, color: highlight ? '#C9A84C' : '#FAFAF8', fontFamily: "'Playfair Display', serif" }}>
+      <div style={{ fontSize: pt.lg, color: highlight ? '#C9A84C' : '#FAFAF8', fontFamily: pt.serif }}>
         {value}
       </div>
     </div>
@@ -63,17 +64,17 @@ const TABS: { id: TabId; label: string }[] = [
 
 function ConsultaTable({ consultations, fields }: { consultations: Consulta[]; fields: (keyof Consulta['fields'])[] }) {
   if (consultations.length === 0) {
-    return <p style={{ color: '#6A6560', fontSize: 13 }}>Sin consultas registradas.</p>
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin consultas registradas.</p>
   }
   return (
     <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
         <thead>
           <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
             {fields.map(f => (
               <th key={String(f)} style={{
                 textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
-                fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
+                fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
               }}>
                 {String(f)}
               </th>
@@ -105,7 +106,7 @@ function ConsultaTable({ consultations, fields }: { consultations: Consulta[]; f
 function NotesTab({ consultations }: { consultations: Consulta[] }) {
   const withNotes = consultations.filter(c => c.fields['Recomendaciones al Cliente'])
   if (withNotes.length === 0) {
-    return <p style={{ color: '#6A6560', fontSize: 13 }}>Sin recomendaciones registradas.</p>
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin recomendaciones registradas.</p>
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -115,10 +116,10 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
           border: '1px solid rgba(255,255,255,0.08)',
           padding: '20px 24px',
         }}>
-          <div style={{ fontSize: 11, color: '#C9A84C', letterSpacing: '0.12em', marginBottom: 10 }}>
+          <div style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.12em', marginBottom: 10 }}>
             {fmt(c.fields['Fecha Consulta'])}
           </div>
-          <p style={{ fontSize: 14, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+          <p style={{ fontSize: pt.md, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
             {String(c.fields['Recomendaciones al Cliente'])}
           </p>
         </div>
@@ -137,12 +138,12 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
     borderBottom: activeTab === id ? '2px solid #C9A84C' : '2px solid transparent',
     color: activeTab === id ? '#C9A84C' : '#9A9590',
     cursor: 'pointer' as const,
-    fontSize: 11,
+    fontSize: pt.sm,
     letterSpacing: '0.14em',
     padding: '10px 0',
     marginRight: 28,
     textTransform: 'uppercase' as const,
-    fontFamily: 'Montserrat, sans-serif',
+    fontFamily: pt.sans,
     transition: 'color 0.2s',
   })
 
@@ -153,9 +154,9 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
         padding: '20px 40px', borderBottom: '1px solid rgba(201,168,76,0.2)',
         position: 'sticky', top: 0, background: 'rgba(10,10,10,0.92)',
       }}>
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, letterSpacing: '0.08em' }}>
+        <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
           AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
-          <span style={{ fontSize: 11, color: '#9A9590', marginLeft: 12, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'Montserrat, sans-serif' }}>
+          <span style={{ fontSize: pt.sm, color: '#9A9590', marginLeft: 12, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans }}>
             Portal
           </span>
         </span>
@@ -165,9 +166,9 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
               onClick={() => router.push('/dashboard')}
               style={{
                 background: 'none', border: '1px solid rgba(201,168,76,0.3)',
-                color: '#C9A84C', cursor: 'pointer', fontSize: 11,
+                color: '#C9A84C', cursor: 'pointer', fontSize: pt.sm,
                 letterSpacing: '0.12em', padding: '8px 16px',
-                fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase',
+                fontFamily: pt.sans, textTransform: 'uppercase',
               }}
             >
               ← Pacientes
@@ -179,7 +180,7 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
 
       <main style={{ padding: '48px 40px', maxWidth: 1200, margin: '0 auto' }}>
         {error && (
-          <div style={{ padding: '16px 20px', background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', marginBottom: 24, fontSize: 13, fontFamily: 'monospace' }}>
+          <div style={{ padding: '16px 20px', background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', marginBottom: 24, fontSize: pt.base, fontFamily: 'monospace' }}>
             {error}
           </div>
         )}
@@ -188,10 +189,10 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
           <>
             {/* Patient header */}
             <div style={{ marginBottom: 40 }}>
-              <p style={{ fontSize: 11, color: '#9A9590', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
+              <p style={{ fontSize: pt.sm, color: '#9A9590', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
                 Expediente del Paciente
               </p>
-              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 36, fontWeight: 400, margin: '0 0 24px' }}>
+              <h1 style={{ fontFamily: pt.serif, fontSize: pt.hero, fontWeight: 400, margin: '0 0 24px' }}>
                 {fmt(patient.fields['Nombre Completo'])}
               </h1>
 
@@ -220,7 +221,7 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
         )}
 
         {!patient && !error && (
-          <p style={{ color: '#6A6560', fontSize: 13 }}>Paciente no encontrado.</p>
+          <p style={{ color: '#6A6560', fontSize: pt.base }}>Paciente no encontrado.</p>
         )}
       </main>
 

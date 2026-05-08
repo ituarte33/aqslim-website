@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { UserButton } from '@clerk/nextjs'
 import { saveCuestionario } from './actions'
+import { pt } from '@/lib/portal-type'
 
 // Field IDs match CUESTIONARIO_FIELDS in lib/airtable.ts
 const SECTIONS = [
@@ -143,8 +144,8 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
         ? value === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(201,168,76,0.15)'
         : 'rgba(255,255,255,0.02)',
       color: selected ? (value === 0 ? '#9A9590' : '#C9A84C') : '#4A4540',
-      fontSize: 13,
-      fontFamily: 'Montserrat, sans-serif',
+      fontSize: pt.base,
+      fontFamily: pt.sans,
       fontWeight: selected ? 600 : 400,
       cursor: 'pointer',
       transition: 'all 0.1s',
@@ -156,26 +157,26 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
     return (
       <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8', display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', borderBottom: '1px solid rgba(201,168,76,0.2)' }}>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, letterSpacing: '0.08em' }}>
+          <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
             AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
           </span>
           <UserButton />
         </header>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 40px' }}>
-          <p style={{ fontSize: 11, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>Enviado</p>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 36, fontWeight: 400, marginBottom: 16 }}>
+          <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>Enviado</p>
+          <h1 style={{ fontFamily: pt.serif, fontSize: pt.hero, fontWeight: 400, marginBottom: 16 }}>
             Cuestionario completado
           </h1>
-          <p style={{ fontSize: 14, color: '#9A9590', maxWidth: 440, textAlign: 'center', lineHeight: 1.8, marginBottom: 40 }}>
+          <p style={{ fontSize: pt.md, color: '#9A9590', maxWidth: 440, textAlign: 'center', lineHeight: 1.8, marginBottom: 40 }}>
             Gracias, {nombreCliente.split(' ')[0]}. Tu cuestionario ha sido enviado. Tu terapeuta lo revisará antes de tu consulta.
           </p>
           <a
             href={`/dashboard/${clienteId}`}
             style={{
               background: '#C9A84C', color: '#0A0A0A',
-              padding: '14px 32px', fontSize: 11,
+              padding: '14px 32px', fontSize: pt.sm,
               letterSpacing: '0.14em', textTransform: 'uppercase',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 500,
+              fontFamily: pt.sans, fontWeight: 500,
               textDecoration: 'none',
             }}
           >
@@ -190,11 +191,11 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8', display: 'flex', flexDirection: 'column' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', borderBottom: '1px solid rgba(201,168,76,0.2)', position: 'sticky', top: 0, background: '#0A0A0A', zIndex: 10 }}>
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, letterSpacing: '0.08em' }}>
+        <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
           AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <span style={{ fontSize: 12, color: '#9A9590' }}>{nombreCliente}</span>
+          <span style={{ fontSize: pt.sm, color: '#9A9590' }}>{nombreCliente}</span>
           <UserButton />
         </div>
       </header>
@@ -203,13 +204,13 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
         <div style={{ width: '100%', maxWidth: 680 }}>
 
           {/* Page header */}
-          <p style={{ fontSize: 11, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
+          <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
             Paso 2
           </p>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 400, marginBottom: 8 }}>
+          <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8 }}>
             Cuestionario de Síntomas
           </h1>
-          <p style={{ fontSize: 13, color: '#9A9590', marginBottom: 8, lineHeight: 1.7 }}>
+          <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 8, lineHeight: 1.7 }}>
             Califica cada síntoma según la frecuencia con la que lo presentas.
           </p>
 
@@ -225,8 +226,8 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
                 borderRight: i < 3 ? '1px solid rgba(201,168,76,0.2)' : 'none',
                 background: i === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(201,168,76,0.04)',
               }}>
-                <div style={{ fontSize: 16, fontFamily: "'Playfair Display', serif", color: i === 0 ? '#6A6560' : '#C9A84C', marginBottom: 2 }}>{i}</div>
-                <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: i === 0 ? '#6A6560' : '#9A9590' }}>{lbl}</div>
+                <div style={{ fontSize: pt.md, fontFamily: pt.serif, color: i === 0 ? '#6A6560' : '#C9A84C', marginBottom: 2 }}>{i}</div>
+                <div style={{ fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: i === 0 ? '#6A6560' : '#9A9590' }}>{lbl}</div>
               </div>
             ))}
           </div>
@@ -238,7 +239,7 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
                 {/* Section header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                   <span style={{
-                    fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase',
+                    fontSize: pt.xs, letterSpacing: '0.2em', textTransform: 'uppercase',
                     color: '#C9A84C', whiteSpace: 'nowrap',
                   }}>
                     {section.title}
@@ -258,7 +259,7 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
                         gap: 16,
                       }}
                     >
-                      <span style={{ fontSize: 13, color: '#FAFAF8', flex: 1 }}>{item.label}</span>
+                      <span style={{ fontSize: pt.base, color: '#FAFAF8', flex: 1 }}>{item.label}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {([0, 1, 2, 3] as const).map((v) => (
                           <button
@@ -281,7 +282,7 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
             {/* Observaciones */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <span style={{ fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C9A84C', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: pt.xs, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C9A84C', whiteSpace: 'nowrap' }}>
                   Observaciones
                 </span>
                 <div style={{ flex: 1, height: 1, background: 'rgba(201,168,76,0.2)' }} />
@@ -296,9 +297,9 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
                   border: '1px solid rgba(201,168,76,0.3)',
                   color: '#FAFAF8',
                   padding: '12px 16px',
-                  fontSize: 13,
+                  fontSize: pt.base,
                   outline: 'none',
-                  fontFamily: 'Montserrat, sans-serif',
+                  fontFamily: pt.sans,
                   boxSizing: 'border-box',
                   resize: 'vertical',
                   minHeight: 100,
@@ -307,7 +308,7 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
             </div>
 
             {error && (
-              <p style={{ fontSize: 12, color: '#ff6b6b', margin: 0 }}>{error}</p>
+              <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>
             )}
 
             <button
@@ -318,10 +319,10 @@ export function CuestionarioClient({ clienteId, nombreCliente }: Props) {
                 color: '#0A0A0A',
                 border: 'none',
                 padding: '14px 40px',
-                fontSize: 11,
+                fontSize: pt.sm,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                fontFamily: 'Montserrat, sans-serif',
+                fontFamily: pt.sans,
                 cursor: isPending ? 'not-allowed' : 'pointer',
                 fontWeight: 500,
                 alignSelf: 'flex-start',

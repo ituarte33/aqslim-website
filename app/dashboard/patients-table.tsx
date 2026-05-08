@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Cliente } from '@/lib/airtable'
+import { pt } from '@/lib/portal-type'
 
 function safeStr(val: unknown): string {
   if (val == null) return ''
@@ -48,12 +49,12 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
             border: '1px solid rgba(201,168,76,0.3)',
             color: '#FAFAF8',
             padding: '10px 16px',
-            fontSize: 13,
+            fontSize: pt.base,
             outline: 'none',
           }}
         />
         {search && (
-          <span style={{ marginLeft: 16, fontSize: 12, color: '#9A9590' }}>
+          <span style={{ marginLeft: 16, fontSize: pt.sm, color: '#9A9590' }}>
             {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
           </span>
         )}
@@ -61,13 +62,13 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
 
       {/* Table */}
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
               {columns.map(col => (
                 <th key={col} style={{
                   textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
-                  fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
+                  fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
                 }}>
                   {col}
                 </th>
@@ -103,7 +104,7 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
       </div>
 
       {filtered.length === 0 && (
-        <p style={{ color: '#6A6560', fontSize: 13, marginTop: 32, textAlign: 'center' }}>
+        <p style={{ color: '#6A6560', fontSize: pt.base, marginTop: 32, textAlign: 'center' }}>
           No se encontraron resultados para &ldquo;{search}&rdquo;
         </p>
       )}

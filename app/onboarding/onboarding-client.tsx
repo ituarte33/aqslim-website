@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { UserButton } from '@clerk/nextjs'
 import { saveProfile } from './actions'
+import { pt } from '@/lib/portal-type'
 
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
@@ -19,9 +20,9 @@ const inputStyle = {
   border: '1px solid rgba(201,168,76,0.3)',
   color: '#FAFAF8',
   padding: '12px 16px',
-  fontSize: 14,
+  fontSize: pt.base,
   outline: 'none',
-  fontFamily: 'Montserrat, sans-serif',
+  fontFamily: pt.sans,
   boxSizing: 'border-box' as const,
 }
 
@@ -33,7 +34,7 @@ const textareaStyle: React.CSSProperties = {
 }
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: pt.sm,
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
   color: '#9A9590',
@@ -45,7 +46,7 @@ function SectionDivider({ label }: { label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-      <span style={{ fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6A6560', whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: pt.xs, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6A6560', whiteSpace: 'nowrap' }}>
         {label}
       </span>
       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -94,8 +95,8 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
     return {
       flex: 1,
       padding: '11px 14px',
-      fontSize: 13,
-      fontFamily: 'Montserrat, sans-serif',
+      fontSize: pt.base,
+      fontFamily: pt.sans,
       fontWeight: 500,
       cursor: 'pointer',
       border: selected ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)',
@@ -154,7 +155,7 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '20px 40px', borderBottom: '1px solid rgba(201,168,76,0.2)',
       }}>
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, letterSpacing: '0.08em' }}>
+        <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
           AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
         </span>
         <UserButton />
@@ -165,13 +166,13 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
 
           {step === 'profile' && (
             <>
-              <p style={{ fontSize: 11, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
+              <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
                 Bienvenido a AQSLIM
               </p>
-              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 400, marginBottom: 8 }}>
+              <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8 }}>
                 {t('Completa tu perfil', 'Complete your profile')}
               </h1>
-              <p style={{ fontSize: 13, color: '#9A9590', marginBottom: 36, lineHeight: 1.7 }}>
+              <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 36, lineHeight: 1.7 }}>
                 {t('Necesitamos algunos datos para personalizar tu programa.', 'We need a few details to personalize your program.')}
               </p>
 
@@ -357,7 +358,7 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                   background: 'rgba(255,255,255,0.03)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   padding: '16px',
-                  fontSize: 12,
+                  fontSize: pt.base,
                   color: '#9A9590',
                   lineHeight: 1.8,
                 }}>
@@ -375,13 +376,13 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                     onChange={(e) => setAceptoTerminos(e.target.checked)}
                     style={{ width: 16, height: 16, accentColor: '#C9A84C', cursor: 'pointer', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 13, color: aceptoTerminos ? '#FAFAF8' : '#9A9590' }}>
+                  <span style={{ fontSize: pt.base, color: aceptoTerminos ? '#FAFAF8' : '#9A9590' }}>
                     {t('He leído y acepto los términos anteriores', 'I have read and accept the terms above')}
                   </span>
                 </label>
 
                 {error && (
-                  <p style={{ fontSize: 12, color: '#ff6b6b', margin: 0 }}>{error}</p>
+                  <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>
                 )}
 
                 <button
@@ -392,10 +393,10 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                     color: '#0A0A0A',
                     border: 'none',
                     padding: '14px 32px',
-                    fontSize: 11,
+                    fontSize: pt.sm,
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
-                    fontFamily: 'Montserrat, sans-serif',
+                    fontFamily: pt.sans,
                     cursor: isPending ? 'not-allowed' : 'pointer',
                     fontWeight: 500,
                     alignSelf: 'flex-start',
@@ -410,13 +411,13 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
 
           {step === 'next-steps' && (
             <>
-              <p style={{ fontSize: 11, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
+              <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
                 Perfil guardado
               </p>
-              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 400, marginBottom: 8 }}>
+              <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8 }}>
                 Prepara tu primera consulta
               </h1>
-              <p style={{ fontSize: 13, color: '#9A9590', marginBottom: 40, lineHeight: 1.7 }}>
+              <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 40, lineHeight: 1.7 }}>
                 Completa los siguientes pasos antes de tu cita inicial.
               </p>
 
@@ -431,12 +432,12 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                   {/* Card header */}
                   <div style={{ padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                      <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#C9A84C', minWidth: 28 }}>
+                      <span style={{ fontFamily: pt.serif, fontSize: pt.lg, color: '#C9A84C', minWidth: 28 }}>
                         {step1Done ? '✓' : '01'}
                       </span>
                       <div>
-                        <div style={{ fontSize: 13, color: '#FAFAF8', marginBottom: 4 }}>Agenda tu consulta inicial</div>
-                        <div style={{ fontSize: 12, color: '#9A9590' }}>
+                        <div style={{ fontSize: pt.base, color: '#FAFAF8', marginBottom: 4 }}>Agenda tu consulta inicial</div>
+                        <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
                           {step1Done ? 'Cita agendada.' : 'Selecciona el horario que mejor se adapte a ti.'}
                         </div>
                       </div>
@@ -467,19 +468,19 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
                 }}>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#C9A84C', minWidth: 28 }}>02</span>
+                    <span style={{ fontFamily: pt.serif, fontSize: pt.lg, color: '#C9A84C', minWidth: 28 }}>02</span>
                     <div>
-                      <div style={{ fontSize: 13, color: '#FAFAF8', marginBottom: 4 }}>Cuestionario de síntomas</div>
-                      <div style={{ fontSize: 12, color: '#9A9590' }}>Cuéntanos cómo te has sentido.</div>
+                      <div style={{ fontSize: pt.base, color: '#FAFAF8', marginBottom: 4 }}>Cuestionario de síntomas</div>
+                      <div style={{ fontSize: pt.sm, color: '#9A9590' }}>Cuéntanos cómo te has sentido.</div>
                     </div>
                   </div>
                   <a
                     href="/cuestionario"
                     style={{
                       background: '#C9A84C', color: '#0A0A0A',
-                      padding: '10px 20px', fontSize: 11,
+                      padding: '10px 20px', fontSize: pt.sm,
                       letterSpacing: '0.12em', textTransform: 'uppercase',
-                      fontFamily: 'Montserrat, sans-serif', fontWeight: 500,
+                      fontFamily: pt.sans, fontWeight: 500,
                       textDecoration: 'none', whiteSpace: 'nowrap',
                     }}
                   >
