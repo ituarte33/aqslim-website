@@ -22,6 +22,7 @@ export const CLIENTES_FIELDS = {
   PESO_META:            'fldJOztXSqZKsmZV5',
   CONDICIONES_ALERGIAS: 'fldeWA9A4FvulirHk',
   ID_CLIENTE:           'fldeTMbkVItk4nPUW',
+  CITA_AGENDADA:        'fldx8HY7jVOFV74cQ',
 } as const
 
 async function airtableFetch(path: string, options?: RequestInit) {
@@ -68,6 +69,7 @@ export interface Cliente {
     'He leído y acepto los términos anteriores'?: boolean
     'Meta del Cliente'?: string
     'Condiciones Especiales / Alergias'?: string
+    'Cita Agendada'?: boolean
     [key: string]: unknown
   }
 }

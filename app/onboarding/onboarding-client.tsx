@@ -4,14 +4,13 @@ import { useState, useTransition } from 'react'
 import { UserButton } from '@clerk/nextjs'
 import { saveProfile } from './actions'
 
-// ─── PASTE YOUR SQUARESPACE SCHEDULING LINK HERE ───────────────────────────
-const SCHEDULING_URL = 'https://book.squareup.com/appointments/46af1166-2cd2-4127-b94f-531a768d54c9/location/8PN49DRQ1C6TC/services'
-// ────────────────────────────────────────────────────────────────────────────
+const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
 type Props = {
   defaultFirstName: string
   defaultLastName: string
   initialStep?: 'profile' | 'next-steps'
+  step1Done?: boolean
 }
 
 const inputStyle = {
@@ -54,7 +53,7 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
-export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile' }: Props) {
+export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false }: Props) {
   const [step, setStep] = useState<'profile' | 'next-steps'>(initialStep)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -424,32 +423,40 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {/* Step 1 — Schedule */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(201,168,76,0.3)',
-                  padding: '24px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                  background: step1Done ? 'rgba(201,168,76,0.06)' : 'rgba(255,255,255,0.03)',
+                  border: step1Done ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.3)',
+                  transition: 'all 0.3s',
+                  overflow: 'hidden',
                 }}>
-                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#C9A84C', minWidth: 28 }}>01</span>
-                    <div>
-                      <div style={{ fontSize: 13, color: '#FAFAF8', marginBottom: 4 }}>Agenda tu consulta inicial</div>
-                      <div style={{ fontSize: 12, color: '#9A9590' }}>Selecciona el horario que mejor se adapte a ti.</div>
+                  {/* Card header */}
+                  <div style={{ padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                      <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: '#C9A84C', minWidth: 28 }}>
+                        {step1Done ? '✓' : '01'}
+                      </span>
+                      <div>
+                        <div style={{ fontSize: 13, color: '#FAFAF8', marginBottom: 4 }}>Agenda tu consulta inicial</div>
+                        <div style={{ fontSize: 12, color: '#9A9590' }}>
+                          {step1Done ? 'Cita agendada.' : 'Selecciona el horario que mejor se adapte a ti.'}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <a
-                    href={SCHEDULING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      background: '#C9A84C', color: '#0A0A0A',
-                      padding: '10px 20px', fontSize: 11,
-                      letterSpacing: '0.12em', textTransform: 'uppercase',
-                      fontFamily: 'Montserrat, sans-serif', fontWeight: 500,
-                      textDecoration: 'none', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Agendar →
-                  </a>
+
+                  {/* Square booking iframe */}
+                  {!step1Done && (
+                    <iframe
+                      src={SQUARE_BOOKING_URL}
+                      title="Agendar consulta"
+                      style={{
+                        width: '100%',
+                        height: 600,
+                        border: 'none',
+                        display: 'block',
+                        borderTop: '1px solid rgba(201,168,76,0.15)',
+                      }}
+                    />
+                  )}
                 </div>
 
                 {/* Step 2 — Questionnaire */}

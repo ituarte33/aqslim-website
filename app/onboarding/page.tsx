@@ -15,12 +15,14 @@ export default async function OnboardingPage() {
   if (!cliente) redirect('/dashboard')
 
   const profileFilled = cliente.fields['He leído y acepto los términos anteriores'] === true
+  const step1Done = cliente.fields['Cita Agendada'] === true
 
   return (
     <OnboardingClient
       defaultFirstName={user?.firstName ?? ''}
       defaultLastName={user?.lastName ?? ''}
       initialStep={profileFilled ? 'next-steps' : 'profile'}
+      step1Done={step1Done}
     />
   )
 }
