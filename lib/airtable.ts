@@ -134,6 +134,12 @@ export async function getClienteByEmail(email: string): Promise<Cliente | null> 
   return data.records[0] ?? null
 }
 
+export async function getClienteByNombre(nombre: string): Promise<Cliente | null> {
+  const formula = encodeURIComponent(`{Nombre Completo} = "${nombre}"`)
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}`)
+  return data.records[0] ?? null
+}
+
 export async function getClienteById(id: string): Promise<Cliente> {
   return airtableFetch(`/${CLIENTES_TABLE}/${id}`)
 }
