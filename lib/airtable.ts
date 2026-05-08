@@ -23,6 +23,8 @@ export const CLIENTES_FIELDS = {
   CONDICIONES_ALERGIAS: 'fldeWA9A4FvulirHk',
   ID_CLIENTE:           'fldeTMbkVItk4nPUW',
   CITA_AGENDADA:        'fldx8HY7jVOFV74cQ',
+  PROXIMA_CITA:         'fldRXEdx8C11nXvjB',
+  SERVICIO_PROXIMA_CITA:'fldPQkPl1h8fA04g0',
 } as const
 
 async function airtableFetch(path: string, options?: RequestInit) {
@@ -70,6 +72,8 @@ export interface Cliente {
     'Meta del Cliente'?: string
     'Condiciones Especiales / Alergias'?: string
     'Cita Agendada'?: boolean
+    'Próxima Cita'?: string
+    'Servicio Próxima Cita'?: string
     [key: string]: unknown
   }
 }
@@ -149,6 +153,15 @@ export async function updateCliente(id: string, fields: Record<string, unknown>)
     method: 'PATCH',
     body: JSON.stringify({ fields }),
   })
+}
+
+export async function getClientesConCita(): Promise<Cliente[]> {
+  const formula = encodeURIComponent('{Cita Agendada} = TRUE()')
+  const field = encodeURIComponent('Próxima Cita')
+  const data = await airtableFetch(
+    `/${CLIENTES_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${field}&sort%5B0%5D%5Bdirection%5D=asc`
+  )
+  return data.records
 }
 
 export async function createProspecto(nombre: string, email: string): Promise<Cliente> {

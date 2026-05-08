@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto } from '@/lib/airtable'
+import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto, getClientesConCita } from '@/lib/airtable'
 import { getRole, getUserEmail } from '@/lib/auth'
 import { DashboardClient } from './dashboard-client'
 
@@ -35,9 +35,10 @@ export default async function DashboardPage() {
   // Admin path
   const user = await currentUser()
   let patients: Awaited<ReturnType<typeof getClientes>> = []
+  let upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>> = []
   let airtableError: string | null = null
   try {
-    patients = await getClientes()
+    ;[patients, upcomingCitas] = await Promise.all([getClientes(), getClientesConCita()])
   } catch (e) {
     airtableError = e instanceof Error ? e.message : String(e)
   }
@@ -46,6 +47,7 @@ export default async function DashboardPage() {
     <DashboardClient
       user={user ? { firstName: user.firstName, lastName: user.lastName } : null}
       patients={patients}
+      upcomingCitas={upcomingCitas}
       airtableError={airtableError}
     />
   )
