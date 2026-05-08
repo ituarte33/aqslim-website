@@ -4,7 +4,8 @@ import { currentUser } from '@clerk/nextjs/server'
 import { Resend } from 'resend'
 import { getClienteByEmail, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
 
-const CUESTIONARIO_URL = 'https://aqslim.com/cuestionario'
+const CUESTIONARIO_URL  = 'https://aqslim.com/cuestionario'
+const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
 function mmddyyyyToISO(date: string): string | undefined {
   const parts = date.split('/')
@@ -16,15 +17,29 @@ function mmddyyyyToISO(date: string): string | undefined {
 function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
   const es = lang === 'es'
 
-  const heading    = es ? `¡Bienvenido a AQSLIM, ${nombre}!` : `Welcome to AQSLIM, ${nombre}!`
-  const body1      = es
-    ? 'Tu perfil ha sido registrado exitosamente. El siguiente paso es completar el <strong style="color:#C9A84C">cuestionario de síntomas</strong>, que nos ayuda a personalizar tu programa de salud antes de tu primera consulta.'
-    : 'Your profile has been successfully registered. The next step is to complete the <strong style="color:#C9A84C">symptom questionnaire</strong>, which helps us personalize your health program before your first consultation.'
-  const btnLabel   = es ? 'Completar cuestionario →' : 'Complete questionnaire →'
-  const body2      = es
-    ? 'Solo toma unos minutos. Si ya agendaste tu cita, intenta completarlo al menos 24 horas antes.'
-    : 'It only takes a few minutes. If you have already scheduled your appointment, try to complete it at least 24 hours before.'
-  const footer     = es ? 'Si tienes preguntas, responde a este correo.' : 'If you have any questions, reply to this email.'
+  const heading = es ? `¡Bienvenido a AQSLIM, ${nombre}!` : `Welcome to AQSLIM, ${nombre}!`
+  const intro   = es
+    ? 'Tu perfil ha sido registrado exitosamente. Completa los siguientes dos pasos antes de tu primera consulta:'
+    : 'Your profile has been successfully registered. Please complete the following two steps before your first consultation:'
+  const footer  = es ? 'Si tienes preguntas, responde a este correo.' : 'If you have any questions, reply to this email.'
+
+  const step1Label = es ? 'Paso 1 — Agenda tu cita'         : 'Step 1 — Book your appointment'
+  const step1Desc  = es
+    ? 'Selecciona el día y horario que mejor se adapte a ti a través de nuestro sistema de citas en línea.'
+    : 'Choose the day and time that works best for you through our online booking system.'
+  const step1Btn   = es ? 'Agendar cita →' : 'Book appointment →'
+
+  const step2Label = es ? 'Paso 2 — Cuestionario de síntomas' : 'Step 2 — Symptom questionnaire'
+  const step2Desc  = es
+    ? 'Cuéntanos cómo te has sentido. Este cuestionario nos ayuda a personalizar tu programa antes de tu cita. Intenta completarlo al menos 24 horas antes.'
+    : 'Tell us how you have been feeling. This questionnaire helps us tailor your program before your appointment. Try to complete it at least 24 hours beforehand.'
+  const step2Btn   = es ? 'Completar cuestionario →' : 'Complete questionnaire →'
+
+  const stepCardStyle = 'background:#1A1A1A;border:1px solid rgba(201,168,76,0.18);padding:24px;margin-bottom:16px;'
+  const stepNumStyle  = 'font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A84C;font-family:Arial,sans-serif;margin:0 0 6px;'
+  const stepTitleStyle = 'font-size:17px;font-weight:400;color:#FAFAF8;font-family:Georgia,serif;margin:0 0 10px;'
+  const stepDescStyle  = 'font-size:13px;line-height:1.75;color:#9A9590;font-family:Arial,sans-serif;margin:0 0 18px;'
+  const btnStyle       = 'display:inline-block;padding:11px 22px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#0A0A0A;text-decoration:none;font-family:Arial,sans-serif;font-weight:700;background:#C9A84C;'
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -47,38 +62,35 @@ function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
           <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A84C;font-family:Arial,sans-serif;">
             ${es ? 'Bienvenido' : 'Welcome'}
           </p>
-          <h1 style="margin:0 0 24px;font-size:26px;font-weight:400;color:#FAFAF8;font-family:Georgia,serif;line-height:1.3;">
+          <h1 style="margin:0 0 16px;font-size:26px;font-weight:400;color:#FAFAF8;font-family:Georgia,serif;line-height:1.3;">
             ${heading}
           </h1>
-
           <p style="margin:0 0 28px;font-size:15px;line-height:1.8;color:#9A9590;font-family:Arial,sans-serif;">
-            ${body1}
+            ${intro}
           </p>
 
-          <!-- CTA Button -->
-          <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-            <tr><td style="background:#C9A84C;">
-              <a href="${CUESTIONARIO_URL}"
-                 style="display:inline-block;padding:14px 28px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#0A0A0A;text-decoration:none;font-family:Arial,sans-serif;font-weight:700;">
-                ${btnLabel}
-              </a>
-            </td></tr>
-          </table>
+          <!-- Step 1 -->
+          <div style="${stepCardStyle}">
+            <p style="${stepNumStyle}">${step1Label}</p>
+            <p style="${stepTitleStyle}">${es ? 'Reserva tu consulta inicial' : 'Reserve your initial consultation'}</p>
+            <p style="${stepDescStyle}">${step1Desc}</p>
+            <a href="${SQUARE_BOOKING_URL}" style="${btnStyle}">${step1Btn}</a>
+          </div>
 
-          <p style="margin:0;font-size:13px;line-height:1.7;color:#6A6560;font-family:Arial,sans-serif;">
-            ${body2}
-          </p>
+          <!-- Step 2 -->
+          <div style="${stepCardStyle}margin-bottom:0;">
+            <p style="${stepNumStyle}">${step2Label}</p>
+            <p style="${stepTitleStyle}">${es ? 'Completa tu cuestionario' : 'Complete your questionnaire'}</p>
+            <p style="${stepDescStyle}">${step2Desc}</p>
+            <a href="${CUESTIONARIO_URL}" style="${btnStyle}">${step2Btn}</a>
+          </div>
 
         </td></tr>
 
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#6A6560;font-family:Arial,sans-serif;">
-            ${footer}
-          </p>
-          <p style="margin:8px 0 0;font-size:11px;color:#3A3530;font-family:Arial,sans-serif;">
-            © AQSLIM · aqslim.com
-          </p>
+          <p style="margin:0;font-size:12px;color:#6A6560;font-family:Arial,sans-serif;">${footer}</p>
+          <p style="margin:8px 0 0;font-size:11px;color:#3A3530;font-family:Arial,sans-serif;">© AQSLIM · aqslim.com</p>
         </td></tr>
 
       </table>
