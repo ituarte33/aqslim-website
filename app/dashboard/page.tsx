@@ -26,7 +26,7 @@ export default async function DashboardPage() {
 
     // Only show dashboard if they have at least one consulta
     const idCliente = cliente.fields['ID Cliente']
-    const consultas = idCliente ? await getConsultasByCliente(idCliente) : []
+    const consultas = idCliente ? await getConsultasByCliente(String(idCliente)) : []
     if (consultas.length === 0) redirect('/onboarding')
 
     redirect(`/dashboard/${cliente.id}`)
