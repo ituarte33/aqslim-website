@@ -24,9 +24,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       if (!email || patient.fields['Email'] !== email) notFound()
     }
 
-    const idCliente = patient.fields['ID Cliente']
-    if (typeof idCliente === 'number') {
-      consultations = await getConsultasByCliente(idCliente)
+    const nombreCliente = patient.fields['Nombre Completo'] ?? ''
+    if (nombreCliente) {
+      consultations = await getConsultasByCliente(nombreCliente)
     }
   } catch (e) {
     error = e instanceof Error ? e.message : String(e)

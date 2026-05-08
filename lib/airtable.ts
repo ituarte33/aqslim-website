@@ -229,6 +229,12 @@ export const CUESTIONARIO_FIELDS = {
   G_AUMENTO_PESO:   'fld65YMBTMdVzDDdj',
 } as const
 
+export async function hasCuestionario(nombreCliente: string): Promise<boolean> {
+  const formula = encodeURIComponent(`{${CUESTIONARIO_FIELDS.NOMBRE}} = "${nombreCliente}"`)
+  const data = await airtableFetch(`/${CUESTIONARIO_TABLE}?filterByFormula=${formula}&maxRecords=1`)
+  return data.records.length > 0
+}
+
 export async function createCuestionario(fields: Record<string, unknown>): Promise<void> {
   await airtableFetch(`/${CUESTIONARIO_TABLE}`, {
     method: 'POST',
@@ -238,8 +244,14 @@ export async function createCuestionario(fields: Record<string, unknown>): Promi
 
 // ---------- Consultas ----------
 
-export async function getConsultasByCliente(idCliente: number): Promise<Consulta[]> {
-  const formula = encodeURIComponent(`{ID Cliente} = ${idCliente}`)
+export async function hasConsulta(nombreCliente: string): Promise<boolean> {
+  const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
+  const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&maxRecords=1`)
+  return data.records.length > 0
+}
+
+export async function getConsultasByCliente(nombreCliente: string): Promise<Consulta[]> {
+  const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
   return data.records
 }

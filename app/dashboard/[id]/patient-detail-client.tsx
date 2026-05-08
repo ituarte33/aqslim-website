@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, Consulta } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
@@ -202,6 +203,20 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
                 <StatCard label="Peso Meta" value={fmt(patient.fields['Peso Meta (con unidad)'])} highlight />
                 <StatCard label="Consultas" value={String(consultations.length)} />
               </div>
+
+              {isAdmin && (
+                <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                  <Link href="/dashboard/consulta-subsecuente" style={{
+                    background: 'none', color: '#C9A84C',
+                    border: '1px solid rgba(201,168,76,0.5)',
+                    padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                    textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+                    textDecoration: 'none', display: 'inline-block',
+                  }}>
+                    + Consulta Subsecuente
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Tabs */}

@@ -12,6 +12,8 @@ type Props = {
   defaultLastName: string
   initialStep?: 'profile' | 'next-steps'
   step1Done?: boolean
+  cuestionarioDone?: boolean
+  allDone?: boolean
 }
 
 const inputStyle = {
@@ -54,7 +56,7 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
-export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false }: Props) {
+export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false, cuestionarioDone = false, allDone = false }: Props) {
   const [step, setStep] = useState<'profile' | 'next-steps'>(initialStep)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -412,13 +414,16 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
           {step === 'next-steps' && (
             <>
               <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
-                Perfil guardado
+                {allDone ? 'Todo listo' : 'Perfil guardado'}
               </p>
               <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8 }}>
-                Prepara tu primera consulta
+                {allDone ? '¡Estás listo para tu consulta!' : 'Prepara tu primera consulta'}
               </h1>
               <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 40, lineHeight: 1.7 }}>
-                Completa los siguientes pasos antes de tu cita inicial.
+                {allDone
+                  ? 'Hemos recibido toda tu información. Tu expediente estará disponible aquí una vez que se registre tu primera consulta.'
+                  : 'Completa los siguientes pasos antes de tu cita inicial.'
+                }
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -462,30 +467,37 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
 
                 {/* Step 2 — Questionnaire */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(201,168,76,0.3)',
+                  background: cuestionarioDone ? 'rgba(201,168,76,0.06)' : 'rgba(255,255,255,0.03)',
+                  border: cuestionarioDone ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.3)',
                   padding: '24px',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                  transition: 'all 0.3s',
                 }}>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    <span style={{ fontFamily: pt.serif, fontSize: pt.lg, color: '#C9A84C', minWidth: 28 }}>02</span>
+                    <span style={{ fontFamily: pt.serif, fontSize: pt.lg, color: '#C9A84C', minWidth: 28 }}>
+                      {cuestionarioDone ? '✓' : '02'}
+                    </span>
                     <div>
                       <div style={{ fontSize: pt.base, color: '#FAFAF8', marginBottom: 4 }}>Cuestionario de síntomas</div>
-                      <div style={{ fontSize: pt.sm, color: '#9A9590' }}>Cuéntanos cómo te has sentido.</div>
+                      <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
+                        {cuestionarioDone ? 'Cuestionario completado.' : 'Cuéntanos cómo te has sentido.'}
+                      </div>
                     </div>
                   </div>
-                  <a
-                    href="/cuestionario"
-                    style={{
-                      background: '#C9A84C', color: '#0A0A0A',
-                      padding: '10px 20px', fontSize: pt.sm,
-                      letterSpacing: '0.12em', textTransform: 'uppercase',
-                      fontFamily: pt.sans, fontWeight: 500,
-                      textDecoration: 'none', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Completar →
-                  </a>
+                  {!cuestionarioDone && (
+                    <a
+                      href="/cuestionario"
+                      style={{
+                        background: '#C9A84C', color: '#0A0A0A',
+                        padding: '10px 20px', fontSize: pt.sm,
+                        letterSpacing: '0.12em', textTransform: 'uppercase',
+                        fontFamily: pt.sans, fontWeight: 500,
+                        textDecoration: 'none', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Completar →
+                    </a>
+                  )}
                 </div>
               </div>
             </>

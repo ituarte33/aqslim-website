@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClienteByEmail } from '@/lib/airtable'
+import { getClienteByEmail, hasCuestionario } from '@/lib/airtable'
 import { CuestionarioClient } from './cuestionario-client'
 
 export default async function CuestionarioPage() {
@@ -13,6 +13,9 @@ export default async function CuestionarioPage() {
 
   const cliente = await getClienteByEmail(email)
   if (!cliente) redirect('/onboarding')
+
+  const alreadySubmitted = await hasCuestionario(cliente.fields['Nombre Completo'] ?? '')
+  if (alreadySubmitted) redirect('/onboarding')
 
   return (
     <CuestionarioClient

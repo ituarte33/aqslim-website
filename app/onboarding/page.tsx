@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClienteByEmail } from '@/lib/airtable'
+import { getClienteByEmail, hasCuestionario, hasConsulta } from '@/lib/airtable'
 import { OnboardingClient } from './onboarding-client'
 
 export default async function OnboardingPage() {
@@ -16,6 +16,15 @@ export default async function OnboardingPage() {
 
   const profileFilled = cliente.fields['He leído y acepto los términos anteriores'] === true
   const step1Done = cliente.fields['Cita Agendada'] === true
+  const cuestionarioDone = profileFilled ? await hasCuestionario(cliente.fields['Nombre Completo'] ?? '') : false
+
+  const nombreCliente = cliente.fields['Nombre Completo'] ?? ''
+  if (nombreCliente) {
+    const consulta = await hasConsulta(nombreCliente)
+    if (consulta) redirect(`/dashboard/${cliente.id}`)
+  }
+
+  const allDone = step1Done && cuestionarioDone
 
   return (
     <OnboardingClient
@@ -23,6 +32,8 @@ export default async function OnboardingPage() {
       defaultLastName={user?.lastName ?? ''}
       initialStep={profileFilled ? 'next-steps' : 'profile'}
       step1Done={step1Done}
+      cuestionarioDone={cuestionarioDone}
+      allDone={allDone}
     />
   )
 }
