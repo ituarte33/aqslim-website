@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
   if (isBooking) {
     const appointmentDatetime = extractAppointmentDatetime(email.text)
-    const serviceName = extractServiceName(email.text)
+    const serviceName = extractServiceName(subject)
 
     if (!appointmentDatetime) console.warn('[booking-webhook] Could not extract appointment datetime')
     if (!serviceName) console.warn('[booking-webhook] Could not extract service name')
@@ -92,32 +92,23 @@ function extractCustomerEmail(text: string): string | null {
   return null
 }
 
-// Square emails typically have "Date: Thursday, January 15, 2026" and "Time: 10:00 AM"
+// Square email body format (actual):
+//   "Monday, May 11, 2026"  (one line)
+//   "5:15 PM - 5:45 PM PDT" (next line)
 function extractAppointmentDatetime(text: string): string | null {
-  const dateMatch = text.match(/Date:\s*(?:\w+,\s+)?(\w+ \d{1,2},?\s+\d{4})/i)
-  const timeMatch = text.match(/Time:\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i)
-
-  if (dateMatch && timeMatch) {
-    const d = new Date(`${dateMatch[1]} ${timeMatch[1]}`)
-    if (!isNaN(d.getTime())) return d.toISOString()
-  }
-
-  // Fallback: day-of-week + month + date + year + time on same region
-  const combined = text.match(
-    /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+(\w+ \d{1,2},?\s+\d{4})\s+(?:at\s+)?(\d{1,2}:\d{2}\s*(?:AM|PM))/i
+  const m = text.match(
+    /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(\w+ \d{1,2},\s+\d{4})\s*[\r\n]+\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i
   )
-  if (combined) {
-    const d = new Date(`${combined[1]} ${combined[2]}`)
+  if (m) {
+    const d = new Date(`${m[1]} ${m[2]}`)
     if (!isNaN(d.getTime())) return d.toISOString()
   }
-
   return null
 }
 
-function extractServiceName(text: string): string | null {
-  const m = text.match(/Service:\s*([^\n\r]+)/i)
-  if (m) return m[1].trim()
-  const m2 = text.match(/Appointment[^:]*:\s*([^\n\r]+)/i)
-  if (m2) return m2[1].trim()
-  return null
+// Square subjects look like: "New appointment: New Client"
+// Extract whatever comes after the "new appointment" indicator.
+function extractServiceName(subject: string): string | null {
+  const m = subject.match(/new appointment[:\s\-–]+(.+)/i)
+  return m ? m[1].trim() : null
 }
