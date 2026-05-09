@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
   if (isBooking) {
     const appointmentDatetime = extractAppointmentDatetime(email.text)
-    const serviceName = extractServiceName(subject)
+    const serviceName = extractServiceName(email.text)
 
     if (!appointmentDatetime) console.warn('[booking-webhook] Could not extract appointment datetime')
     if (!serviceName) console.warn('[booking-webhook] Could not extract service name')
@@ -106,9 +106,19 @@ function extractAppointmentDatetime(text: string): string | null {
   return null
 }
 
-// Square subjects look like: "New appointment: New Client"
-// Extract whatever comes after the "new appointment" indicator.
-function extractServiceName(subject: string): string | null {
-  const m = subject.match(/new appointment[:\s\-–]+(.+)/i)
-  return m ? m[1].trim() : null
+// Service name appears on its own line immediately after the time range line:
+//   "5:15 PM - 5:45 PM PDT"
+//   ""
+//   "New Client"    ← this is what we want
+function extractServiceName(text: string): string | null {
+  const m = text.match(
+    /\d{1,2}:\d{2}\s*(?:AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(?:AM|PM)[^\n]*\n[\s\n]*([^\n]+)/i
+  )
+  if (!m) return null
+  const val = m[1].trim()
+  if (!val) return null
+  // Skip if it looks like a phone number or email address
+  if (/^\+?[\d\s().,-]{7,}$/.test(val)) return null
+  if (/@/.test(val)) return null
+  return val
 }
