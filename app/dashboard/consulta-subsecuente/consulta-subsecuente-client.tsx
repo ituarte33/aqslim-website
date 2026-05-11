@@ -1,28 +1,507 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
+import { saveConsultaSubsecuente } from './actions'
+import type { Cliente } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
+  patient: Cliente | null
+  allPatients: Cliente[]
 }
 
-export function ConsultaSubsecuenteClient({ user }: Props) {
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(201,168,76,0.3)', color: '#FAFAF8',
+  padding: '12px 16px', fontSize: pt.base, outline: 'none',
+  fontFamily: pt.sans, boxSizing: 'border-box',
+}
+
+const labelStyle: React.CSSProperties = {
+  fontSize: pt.sm, letterSpacing: '0.14em', textTransform: 'uppercase',
+  color: '#9A9590', display: 'block', marginBottom: 8,
+}
+
+function SectionDivider({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 4px' }}>
+      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+      <span style={{ fontSize: pt.xs, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6A6560', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+    </div>
+  )
+}
+
+// ── Score selector (1-10) ─────────────────────────────────────────────────────
+
+function ScoreInput({
+  label, value, onChange,
+}: { label: string; value: number | null; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <span style={labelStyle}>{label}</span>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+          <button
+            key={n} type="button" onClick={() => onChange(n)}
+            style={{
+              width: 38, height: 38,
+              border: value === n ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+              background: value === n ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.03)',
+              color: value === n ? '#C9A84C' : '#9A9590',
+              cursor: 'pointer', fontSize: pt.sm, fontFamily: pt.sans,
+              transition: 'all 0.12s',
+            }}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Toggle group ──────────────────────────────────────────────────────────────
+
+function ToggleGroup<T extends string>({
+  label, options, value, onChange,
+}: { label: string; options: { value: T; label: string }[]; value: T | null; onChange: (v: T) => void }) {
+  return (
+    <div>
+      <span style={labelStyle}>{label}</span>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {options.map(o => (
+          <button
+            key={o.value} type="button" onClick={() => onChange(o.value)}
+            style={{
+              padding: '10px 18px', fontSize: pt.base, fontFamily: pt.sans,
+              cursor: 'pointer', fontWeight: 500, flex: 'none',
+              border: value === o.value ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)',
+              background: value === o.value ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.05)',
+              color: value === o.value ? '#C9A84C' : '#9A9590',
+              transition: 'all 0.15s',
+            }}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Patient info banner ───────────────────────────────────────────────────────
+
+function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
+  const nombre    = patient.fields['Nombre Completo'] ?? '—'
+  const idCliente = patient.fields['ID Cliente']
+  const edad      = patient.fields['Edad']
+  const unidad    = patient.fields['Unidad de Peso'] ?? 'Lbs'
+  const pesoMeta  = patient.fields['Peso Meta (con unidad)'] ?? patient.fields['Peso Meta']
+  const idioma    = patient.fields['Idioma Preferido']
+
+  return (
+    <div style={{
+      border: '1px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.04)',
+      padding: '20px 28px', marginBottom: 32,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+    }}>
+      <div>
+        <div style={{ fontSize: pt.xs, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: pt.sans, marginBottom: 6 }}>
+          {es ? 'Paciente' : 'Patient'}
+        </div>
+        <div style={{ fontFamily: pt.serif, fontSize: 22, color: '#FAFAF8', marginBottom: 4 }}>{nombre}</div>
+        <div style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
+          {[idCliente ? `ID ${idCliente}` : null, edad ? `${edad} ${es ? 'años' : 'yrs'}` : null].filter(Boolean).join(' · ')}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        {pesoMeta && (
+          <div>
+            <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>
+              {es ? 'Peso Meta' : 'Goal Weight'}
+            </div>
+            <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{String(pesoMeta)}</div>
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>
+            {es ? 'Unidad' : 'Unit'}
+          </div>
+          <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{unidad}</div>
+        </div>
+        {idioma && (
+          <div>
+            <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>
+              {es ? 'Idioma' : 'Language'}
+            </div>
+            <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{idioma}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
+  const es = lang === 'es'
+  const router = useRouter()
+
+  // When no patient is pre-selected, admin picks one from the list
+  const [selectedPatient, setSelectedPatient] = useState<Cliente | null>(initialPatient)
+  const [patientSearch, setPatientSearch] = useState('')
+
+  const patient = selectedPatient
+
+  // Form state
+  const [nivelEnergia,    setNivelEnergia]    = useState<string | null>(null)
+  const [calidadSueno,    setCalidadSueno]    = useState<string | null>(null)
+  const [metodoPago,      setMetodoPago]      = useState<string | null>(null)
+  const [ansiedad,        setAnsiedad]        = useState<string | null>(null)
+  const [tuvoHambre,      setTuvoHambre]      = useState<string | null>(null)
+  const [cumplimiento,    setCumplimiento]    = useState<number | null>(null)
+  const [comoSeSiente,    setComoSeSiente]    = useState<number | null>(null)
+
+  const [saved,      setSaved]      = useState<{ id: string } | null>(null)
+  const [error,      setError]      = useState<string | null>(null)
+  const [isPending,  startTransition] = useTransition()
+
+  // Today in YYYY-MM-DD local
+  const todayISO = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+
+  function handleSelectPatient(clienteId: string) {
+    const p = allPatients.find(p => p.id === clienteId) ?? null
+    setSelectedPatient(p)
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!patient) { setError(es ? 'Selecciona un paciente.' : 'Select a patient.'); return }
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    formData.set('clienteRecordId', patient.id)
+    if (ansiedad)   formData.set('ansiedad',   ansiedad)
+    if (tuvoHambre) formData.set('tuvoHambre', tuvoHambre)
+    if (nivelEnergia)  formData.set('nivelEnergia',       nivelEnergia)
+    if (calidadSueno)  formData.set('calidadSueno',       calidadSueno)
+    if (metodoPago)    formData.set('metodoPago',         metodoPago)
+    if (cumplimiento !== null) formData.set('cumplimientoDieta', String(cumplimiento))
+    if (comoSeSiente !== null) formData.set('comoSeSiente',      String(comoSeSiente))
+
+    startTransition(async () => {
+      try {
+        const result = await saveConsultaSubsecuente(formData)
+        setSaved(result)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : (es ? 'Error al guardar.' : 'Error saving.'))
+      }
+    })
+  }
+
+  // ── Success state ────────────────────────────────────────────────────────────
+  if (saved) {
+    return (
+      <DashboardShell user={user} lang={lang} setLang={setLang}>
+        <div style={{ maxWidth: 560, marginTop: 40 }}>
+          <div style={{
+            border: '1px solid rgba(111,191,111,0.4)', background: 'rgba(111,191,111,0.06)',
+            padding: '28px 32px', marginBottom: 24,
+          }}>
+            <div style={{ fontSize: pt.xs, color: '#6fbf6f', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans, marginBottom: 8 }}>
+              {es ? 'Consulta registrada' : 'Consultation recorded'}
+            </div>
+            <div style={{ fontFamily: pt.serif, fontSize: 22, color: '#FAFAF8', marginBottom: 6 }}>
+              {patient?.fields['Nombre Completo']}
+            </div>
+            <div style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
+              {es ? 'La consulta subsecuente fue guardada exitosamente en Airtable.' : 'The follow-up consultation was saved successfully to Airtable.'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={() => { setSaved(null); setSelectedPatient(initialPatient) }}
+              style={{
+                background: '#C9A84C', color: '#0A0A0A', border: 'none',
+                padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              {es ? '+ Nueva consulta' : '+ New consultation'}
+            </button>
+            {patient && (
+              <button
+                onClick={() => router.push(`/dashboard/${patient.id}`)}
+                style={{
+                  background: 'none', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.5)',
+                  padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500, cursor: 'pointer',
+                }}
+              >
+                {es ? 'Ver expediente →' : 'View record →'}
+              </button>
+            )}
+          </div>
+        </div>
+      </DashboardShell>
+    )
+  }
+
+  // ── Filtered patient list for selector ────────────────────────────────────────
+  const filteredPatients = patientSearch.trim()
+    ? allPatients.filter(p =>
+        (p.fields['Nombre Completo'] ?? '').toLowerCase().includes(patientSearch.toLowerCase()) ||
+        String(p.fields['ID Cliente'] ?? '').includes(patientSearch)
+      )
+    : allPatients
 
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang}>
-      <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 12, marginTop: 8 }}>
-        {lang === 'es' ? 'Consulta Subsecuente' : 'Follow-up Consultation'}
+      <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8, marginTop: 8 }}>
+        {es ? 'Consulta Subsecuente' : 'Follow-up Consultation'}
       </h1>
-      <p style={{ fontSize: pt.base, color: '#6A6560', marginBottom: 40, marginTop: 0 }}>
-        {lang === 'es'
-          ? 'Registra el seguimiento de un paciente existente.'
-          : 'Record a follow-up for an existing patient.'}
+      <p style={{ fontSize: pt.base, color: '#6A6560', marginBottom: 32, marginTop: 0 }}>
+        {es ? 'Registra el seguimiento de un paciente.' : 'Record a follow-up for an existing patient.'}
       </p>
 
-      <iframe className="airtable-embed" src="https://airtable.com/embed/appuUHRs26ATXnZjf/pagdtNubJwEQV5QpJ/form" frameBorder={0} width="100%" height="1500" style={{ background: 'transparent', border: '1px solid #ccc' }} />
+      {/* Patient selector (only when not pre-filled from expediente) */}
+      {!patient && (
+        <div style={{ marginBottom: 32, maxWidth: 560 }}>
+          <label style={labelStyle}>{es ? 'Buscar paciente' : 'Search patient'}</label>
+          <input
+            type="text"
+            placeholder={es ? 'Nombre o ID del paciente...' : 'Patient name or ID...'}
+            value={patientSearch}
+            onChange={e => setPatientSearch(e.target.value)}
+            style={{ ...inputStyle, marginBottom: 8 }}
+          />
+          {patientSearch && (
+            <div style={{
+              border: '1px solid rgba(201,168,76,0.25)', background: '#111',
+              maxHeight: 240, overflowY: 'auto',
+            }}>
+              {filteredPatients.length === 0 ? (
+                <div style={{ padding: '12px 16px', fontSize: pt.sm, color: '#6A6560', fontFamily: pt.sans }}>
+                  {es ? 'Sin resultados' : 'No results'}
+                </div>
+              ) : filteredPatients.slice(0, 10).map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { handleSelectPatient(p.id); setPatientSearch('') }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '12px 16px', background: 'none',
+                    border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    color: '#FAFAF8', cursor: 'pointer', fontSize: pt.base, fontFamily: pt.sans,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,168,76,0.06)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  {p.fields['Nombre Completo']}
+                  {p.fields['ID Cliente'] && (
+                    <span style={{ fontSize: pt.xs, color: '#6A6560', marginLeft: 8 }}>
+                      ID {p.fields['ID Cliente']}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Patient info banner */}
+      {patient && <PatientBanner patient={patient} es={es} />}
+
+      {/* Form — only show once patient is identified */}
+      {patient && (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 620 }}>
+
+          <SectionDivider label={es ? 'Fecha' : 'Date'} />
+
+          <div>
+            <label htmlFor="cs-fecha" style={labelStyle}>{es ? 'Fecha de Consulta' : 'Consultation Date'}</label>
+            <input
+              id="cs-fecha" name="fechaConsulta" type="date"
+              defaultValue={todayISO} required style={{ ...inputStyle, maxWidth: 220 }}
+            />
+          </div>
+
+          <SectionDivider label={es ? 'Mediciones' : 'Measurements'} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div>
+              <label htmlFor="cs-peso" style={labelStyle}>
+                {es ? 'Peso' : 'Weight'} ({patient.fields['Unidad de Peso'] ?? 'Lbs'})
+              </label>
+              <input id="cs-peso" name="pesoKg" type="number" step="0.1" min="0" style={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="cs-grasa" style={labelStyle}>% {es ? 'Grasa Corporal' : 'Body Fat'}</label>
+              <input id="cs-grasa" name="grasaCorporal" type="number" step="0.1" min="0" max="100" style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            {[
+              { id: 'cs-cintura', name: 'cintura',  label: es ? 'Cintura (cm)' : 'Waist (cm)'  },
+              { id: 'cs-cadera',  name: 'cadera',   label: es ? 'Cadera (cm)'  : 'Hips (cm)'   },
+              { id: 'cs-brazos',  name: 'brazos',   label: es ? 'Brazos (cm)'  : 'Arms (cm)'   },
+              { id: 'cs-muslos',  name: 'muslos',   label: es ? 'Muslos (cm)'  : 'Thighs (cm)' },
+              { id: 'cs-pecho',   name: 'pecho',    label: es ? 'Pecho/Busto (cm)' : 'Chest/Bust (cm)' },
+            ].map(f => (
+              <div key={f.name}>
+                <label htmlFor={f.id} style={labelStyle}>{f.label}</label>
+                <input id={f.id} name={f.name} type="number" step="0.1" min="0" style={inputStyle} />
+              </div>
+            ))}
+          </div>
+
+          <SectionDivider label={es ? 'Bienestar' : 'Wellness'} />
+
+          <ScoreInput
+            label={es ? 'Cumplimiento de Dieta (1-10)' : 'Diet Compliance (1-10)'}
+            value={cumplimiento} onChange={setCumplimiento}
+          />
+          <ScoreInput
+            label={es ? 'Cómo Se Siente (1-10)' : 'How They Feel (1-10)'}
+            value={comoSeSiente} onChange={setComoSeSiente}
+          />
+
+          <ToggleGroup
+            label={es ? 'Nivel de Energía' : 'Energy Level'}
+            options={[
+              { value: 'Excelente', label: es ? 'Excelente' : 'Excellent' },
+              { value: 'Bueno',     label: es ? 'Bueno'     : 'Good'      },
+              { value: 'Regular',   label: es ? 'Regular'   : 'Fair'      },
+              { value: 'Malo',      label: es ? 'Malo'      : 'Poor'      },
+              { value: 'Muy Malo',  label: es ? 'Muy Malo'  : 'Very Poor' },
+            ]}
+            value={nivelEnergia}
+            onChange={setNivelEnergia}
+          />
+
+          <ToggleGroup
+            label={es ? 'Calidad de Sueño' : 'Sleep Quality'}
+            options={[
+              { value: 'Excelente', label: es ? 'Excelente' : 'Excellent' },
+              { value: 'Bueno',     label: es ? 'Bueno'     : 'Good'      },
+              { value: 'Regular',   label: es ? 'Regular'   : 'Fair'      },
+              { value: 'Malo',      label: es ? 'Malo'      : 'Poor'      },
+              { value: 'Muy Malo',  label: es ? 'Muy Malo'  : 'Very Poor' },
+            ]}
+            value={calidadSueno}
+            onChange={setCalidadSueno}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <ToggleGroup
+              label={es ? '¿Ansiedad?' : 'Anxiety?'}
+              options={[
+                { value: 'Mucha', label: es ? 'Mucha' : 'High'  },
+                { value: 'Poca',  label: es ? 'Poca'  : 'Some'  },
+                { value: 'Nada',  label: es ? 'Nada'  : 'None'  },
+              ]}
+              value={ansiedad}
+              onChange={setAnsiedad}
+            />
+            <ToggleGroup
+              label={es ? '¿Tuvo Hambre?' : 'Felt Hungry?'}
+              options={[
+                { value: 'Mucha',     label: es ? 'Mucha'     : 'Very hungry'    },
+                { value: 'Manejable', label: es ? 'Manejable' : 'Manageable'     },
+                { value: 'Poca',      label: es ? 'Poca'      : 'A little'       },
+                { value: 'Nada',      label: es ? 'Nada'      : 'Not at all'     },
+              ]}
+              value={tuvoHambre}
+              onChange={setTuvoHambre}
+            />
+          </div>
+
+          <SectionDivider label={es ? 'Notas y Pago' : 'Notes & Payment'} />
+
+          <div>
+            <label htmlFor="cs-recomendaciones" style={labelStyle}>
+              {es ? 'Recomendaciones al Cliente' : 'Client Recommendations'}
+            </label>
+            <textarea
+              id="cs-recomendaciones" name="recomendaciones"
+              rows={4}
+              placeholder={es ? 'Instrucciones, observaciones, plan de dieta...' : 'Instructions, observations, diet plan...'}
+              style={{ ...inputStyle, resize: 'vertical', minHeight: 100, display: 'block' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div>
+              <label htmlFor="cs-proxima" style={labelStyle}>{es ? 'Próxima Cita' : 'Next Appointment'}</label>
+              <input id="cs-proxima" name="proximaCita" type="datetime-local" style={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="cs-monto" style={labelStyle}>{es ? 'Monto Cobrado ($)' : 'Amount Charged ($)'}</label>
+              <input id="cs-monto" name="montoCobrado" type="number" step="0.01" min="0" placeholder="0.00" style={inputStyle} />
+            </div>
+          </div>
+
+          <ToggleGroup
+            label={es ? 'Método de Pago' : 'Payment Method'}
+            options={[
+              { value: 'Efectivo',      label: 'Efectivo'      },
+              { value: 'Card',          label: 'Card'          },
+              { value: 'Venmo',         label: 'Venmo'         },
+              { value: 'Zelle',         label: 'Zelle'         },
+              { value: 'Transferencia', label: 'Transferencia' },
+            ]}
+            value={metodoPago}
+            onChange={setMetodoPago}
+          />
+
+          {error && <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button
+              type="submit" disabled={isPending}
+              style={{
+                background: isPending ? 'rgba(201,168,76,0.4)' : '#C9A84C',
+                color: '#0A0A0A', border: 'none',
+                padding: '14px 32px', fontSize: pt.sm,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                fontFamily: pt.sans, cursor: isPending ? 'not-allowed' : 'pointer', fontWeight: 500,
+              }}
+            >
+              {isPending
+                ? (es ? 'Guardando...' : 'Saving...')
+                : (es ? 'Guardar Consulta' : 'Save Consultation')}
+            </button>
+            {patient && (
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/${patient.id}`)}
+                style={{
+                  background: 'none', color: '#9A9590',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  padding: '14px 24px', fontSize: pt.sm,
+                  letterSpacing: '0.14em', textTransform: 'uppercase',
+                  fontFamily: pt.sans, cursor: 'pointer',
+                }}
+              >
+                {es ? 'Cancelar' : 'Cancel'}
+              </button>
+            )}
+          </div>
+        </form>
+      )}
     </DashboardShell>
   )
 }

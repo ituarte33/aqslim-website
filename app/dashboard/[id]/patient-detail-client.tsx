@@ -206,7 +206,7 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
 
               {isAdmin && (
                 <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                  <Link href="/dashboard/consulta-subsecuente" style={{
+                  <Link href={`/dashboard/consulta-subsecuente?clienteId=${patient.id}`} style={{
                     background: 'none', color: '#C9A84C',
                     border: '1px solid rgba(201,168,76,0.5)',
                     padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',

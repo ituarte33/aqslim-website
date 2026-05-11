@@ -317,6 +317,13 @@ export async function getConsultasRevenueSummary(): Promise<ConsultasRevenueSumm
   return { total, cash, card, other, byMethod, consultaCount: consultas.length }
 }
 
+export async function createConsulta(fields: Record<string, unknown>): Promise<Consulta> {
+  return airtableFetch(`/Consultas`, {
+    method: 'POST',
+    body: JSON.stringify({ fields }),
+  })
+}
+
 export async function hasConsulta(nombreCliente: string): Promise<boolean> {
   const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&maxRecords=1`)

@@ -7,7 +7,13 @@ import { pt } from '@/lib/portal-type'
 
 function safeStr(val: unknown): string {
   if (val == null) return ''
-  if (Array.isArray(val)) return val.join(', ')
+  if (Array.isArray(val)) {
+    // Linked record fields return arrays of Airtable record IDs — show count
+    if (val.length > 0 && typeof val[0] === 'string' && val[0].startsWith('rec')) {
+      return String(val.length)
+    }
+    return val.join(', ')
+  }
   if (typeof val === 'object') return ''
   return String(val)
 }
