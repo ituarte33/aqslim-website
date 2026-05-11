@@ -2,6 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto, getClientesConCita } from '@/lib/airtable'
 import { getRole, getUserEmail } from '@/lib/auth'
+import { getMonthlyRevenue } from '@/lib/square'
 import { DashboardClient } from './dashboard-client'
 
 export default async function DashboardPage() {
@@ -36,18 +37,22 @@ export default async function DashboardPage() {
   const user = await currentUser()
   let patients: Awaited<ReturnType<typeof getClientes>> = []
   let upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>> = []
+  let monthlyRevenue: number | null = null
   let airtableError: string | null = null
   try {
     ;[patients, upcomingCitas] = await Promise.all([getClientes(), getClientesConCita()])
   } catch (e) {
     airtableError = e instanceof Error ? e.message : String(e)
   }
+  // Non-blocking — Square being down should not break the dashboard
+  monthlyRevenue = await getMonthlyRevenue().catch(() => null)
 
   return (
     <DashboardClient
       user={user ? { firstName: user.firstName, lastName: user.lastName } : null}
       patients={patients}
       upcomingCitas={upcomingCitas}
+      monthlyRevenue={monthlyRevenue}
       airtableError={airtableError}
     />
   )

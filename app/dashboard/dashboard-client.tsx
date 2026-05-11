@@ -10,6 +10,7 @@ type Props = {
   user: { firstName: string | null; lastName: string | null } | null
   patients: Awaited<ReturnType<typeof getClientes>>
   upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>>
+  monthlyRevenue: number | null
   airtableError: string | null
 }
 
@@ -28,7 +29,6 @@ const copy = {
     },
     finances: {
       label: 'Finanzas',
-      stat: '—',
       statUnit: 'ingresos este mes',
       desc: 'Revisa pagos, facturas y reportes financieros.',
       link: 'Ver finanzas →',
@@ -83,7 +83,11 @@ function formatCitaDate(iso: string | undefined, lang: 'es' | 'en'): string {
   }
 }
 
-export function DashboardClient({ user, patients, upcomingCitas, airtableError }: Props) {
+function formatUSD(amount: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
+}
+
+export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue, airtableError }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const t = copy[lang]
 
@@ -156,7 +160,7 @@ export function DashboardClient({ user, patients, upcomingCitas, airtableError }
         <SummaryCard
           href="/dashboard/finances"
           title={t.finances.label}
-          stat={t.finances.stat}
+          stat={monthlyRevenue !== null ? formatUSD(monthlyRevenue) : '—'}
           statUnit={t.finances.statUnit}
           description={t.finances.desc}
           linkLabel={t.finances.link}
