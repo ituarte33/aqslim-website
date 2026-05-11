@@ -4,37 +4,60 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
-import type { getClientesConCita } from '@/lib/airtable'
+import type { SquareBooking } from '@/lib/square'
 
-const SQUARE_MANAGE_URL  = 'https://app.squareup.com/dashboard/appointments/calendar'
+const SQUARE_MANAGE_URL   = 'https://app.squareup.com/dashboard/appointments/calendar'
 const GOOGLE_CALENDAR_SRC = 'https://calendar.google.com/calendar/embed?src=9d8c0344cef5ea1337d190292b059834d0cdbbee9b2282712a61f89dc804fbf7%40group.calendar.google.com&ctz=America%2FPhoenix'
 
 type Tab = 'list' | 'calendar'
 
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
-  upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>>
+  bookings: SquareBooking[]
+  airtableHrefs: Record<string, string>
+  squareError: string | null
 }
 
-function formatDate(iso: string | undefined, lang: 'es' | 'en'): string {
-  if (!iso) return lang === 'es' ? 'Fecha pendiente' : 'Date pending'
+function formatDate(iso: string, lang: 'es' | 'en'): string {
   try {
     return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
+      weekday: 'short',
+      month:   'short',
+      day:     'numeric',
+      hour:    'numeric',
+      minute:  '2-digit',
     }).format(new Date(iso))
   } catch {
     return iso
   }
 }
 
-export function AppointmentsClient({ user, upcomingCitas }: Props) {
-  const [lang, setLang]   = useState<'es' | 'en'>('es')
-  const [tab, setTab]     = useState<Tab>('list')
+function StatusBadge({ status, lang }: { status: string; lang: 'es' | 'en' }) {
+  const confirmed = status === 'ACCEPTED'
+  const label = confirmed
+    ? (lang === 'es' ? 'Confirmada' : 'Confirmed')
+    : (lang === 'es' ? 'Pendiente'  : 'Pending')
+
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '2px 10px',
+      fontSize: pt.xs,
+      fontFamily: pt.sans,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      border: `1px solid ${confirmed ? 'rgba(201,168,76,0.5)' : 'rgba(255,255,255,0.2)'}`,
+      color: confirmed ? '#C9A84C' : '#9A9590',
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  )
+}
+
+export function AppointmentsClient({ user, bookings, airtableHrefs, squareError }: Props) {
+  const [lang, setLang] = useState<'es' | 'en'>('es')
+  const [tab, setTab]   = useState<Tab>('list')
   const es = lang === 'es'
 
   return (
@@ -46,12 +69,9 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
             {es ? 'Citas' : 'Appointments'}
           </h1>
           <p style={{ fontSize: pt.base, color: '#6A6560', margin: 0 }}>
-            {es
-              ? 'Gestiona citas y consulta el calendario.'
-              : 'Manage appointments and view the calendar.'}
+            {es ? 'Citas próximas desde Square.' : 'Upcoming appointments from Square.'}
           </p>
         </div>
-
         <a
           href={SQUARE_MANAGE_URL}
           target="_blank"
@@ -77,12 +97,9 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(201,168,76,0.15)', marginBottom: 32 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(201,168,76,0.15)', marginBottom: 32 }}>
         {(['list', 'calendar'] as Tab[]).map(t => {
           const active = tab === t
-          const label  = t === 'list'
-            ? (es ? 'Lista' : 'List')
-            : (es ? 'Calendario' : 'Calendar')
           return (
             <button
               key={t}
@@ -102,7 +119,7 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
                 transition: 'color 0.15s',
               }}
             >
-              {label}
+              {t === 'list' ? (es ? 'Lista' : 'List') : (es ? 'Calendario' : 'Calendar')}
             </button>
           )
         })}
@@ -111,15 +128,17 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
       {/* Tab: List */}
       {tab === 'list' && (
         <>
-          {upcomingCitas.length === 0 ? (
+          {squareError && (
+            <div style={{ padding: '16px 20px', background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.25)', marginBottom: 24, fontSize: pt.sm, fontFamily: 'monospace', color: '#ff8080' }}>
+              {squareError}
+            </div>
+          )}
+
+          {bookings.length === 0 && !squareError ? (
             <div style={{
               border: '1px solid rgba(201,168,76,0.15)',
               padding: '80px 40px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 12,
-              textAlign: 'center',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center',
             }}>
               <div style={{ fontSize: 40, color: 'rgba(201,168,76,0.2)', lineHeight: 1 }}>◷</div>
               <p style={{ fontFamily: pt.serif, fontSize: pt.md, color: '#9A9590', margin: 0 }}>
@@ -127,8 +146,8 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
               </p>
               <p style={{ fontSize: pt.base, color: '#6A6560', margin: 0, maxWidth: 360 }}>
                 {es
-                  ? 'Las citas agendadas a través de Square aparecerán aquí automáticamente.'
-                  : 'Appointments booked via Square will appear here automatically.'}
+                  ? 'Las citas confirmadas en Square aparecerán aquí.'
+                  : 'Appointments confirmed in Square will appear here.'}
               </p>
             </div>
           ) : (
@@ -136,16 +155,17 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
               {/* Column headers */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr auto',
+                gridTemplateColumns: '1.2fr 1.2fr 1fr 1fr auto',
                 gap: 16,
                 padding: '0 20px 12px',
                 borderBottom: '1px solid rgba(201,168,76,0.15)',
               }}>
                 {[
-                  es ? 'Paciente' : 'Patient',
-                  es ? 'Fecha y Hora' : 'Date & Time',
-                  es ? 'Servicio' : 'Service',
-                  'Email',
+                  es ? 'Paciente'    : 'Patient',
+                  es ? 'Fecha'       : 'Date',
+                  es ? 'Servicio'    : 'Service',
+                  es ? 'Contacto'    : 'Contact',
+                  es ? 'Estado'      : 'Status',
                 ].map(h => (
                   <span key={h} style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans }}>
                     {h}
@@ -153,22 +173,18 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
                 ))}
               </div>
 
-              {/* Rows */}
-              {upcomingCitas.map((c, i) => (
-                <AppointmentRow
-                  key={c.id}
-                  href={`/dashboard/${c.id}`}
-                  nombre={c.fields['Nombre Completo'] ?? '—'}
-                  email={c.fields['Email'] ?? '—'}
-                  fecha={c.fields['Próxima Cita']}
-                  servicio={c.fields['Servicio Próxima Cita']}
+              {bookings.map((b, i) => (
+                <BookingRow
+                  key={b.id}
+                  booking={b}
+                  href={airtableHrefs[b.id]}
                   lang={lang}
                   zebra={i % 2 === 0}
                 />
               ))}
 
               <p style={{ fontSize: pt.xs, color: '#6A6560', marginTop: 20, fontFamily: pt.sans }}>
-                {upcomingCitas.length} {es ? 'cita(s) próxima(s)' : 'upcoming appointment(s)'}
+                {bookings.length} {es ? 'cita(s) próxima(s)' : 'upcoming appointment(s)'}
               </p>
             </>
           )}
@@ -191,51 +207,73 @@ export function AppointmentsClient({ user, upcomingCitas }: Props) {
   )
 }
 
-function AppointmentRow({ href, nombre, email, fecha, servicio, lang, zebra }: {
-  href: string
-  nombre: string
-  email: string
-  fecha: string | undefined
-  servicio: string | undefined
+function BookingRow({ booking, href, lang, zebra }: {
+  booking: SquareBooking
+  href: string | undefined
   lang: 'es' | 'en'
   zebra: boolean
 }) {
   const [hovered, setHovered] = useState(false)
 
-  return (
-    <Link
-      href={href}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr auto',
-        gap: 16,
-        padding: '16px 20px',
-        background: hovered
-          ? 'rgba(201,168,76,0.06)'
-          : zebra
-            ? 'rgba(255,255,255,0.02)'
-            : 'transparent',
-        borderBottom: '1px solid rgba(201,168,76,0.08)',
-        transition: 'background 0.15s',
-        alignItems: 'center',
-        textDecoration: 'none',
-        cursor: 'pointer',
-      }}
-    >
+  const inner = (
+    <>
       <span style={{ fontSize: pt.base, color: '#FAFAF8', fontFamily: pt.sans }}>
-        {nombre}
+        {booking.customer_name ?? (lang === 'es' ? 'Sin nombre' : 'No name')}
       </span>
+      <div>
+        <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans, display: 'block' }}>
+          {formatDate(booking.start_at, lang)}
+        </span>
+        {booking.duration_minutes > 0 && (
+          <span style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans }}>
+            {booking.duration_minutes} {lang === 'es' ? 'min' : 'min'}
+          </span>
+        )}
+      </div>
       <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
-        {formatDate(fecha, lang)}
-      </span>
-      <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
-        {servicio ?? (lang === 'es' ? 'Servicio pendiente' : 'Service pending')}
+        {booking.service_name ?? (lang === 'es' ? 'Servicio pendiente' : 'Service pending')}
       </span>
       <span style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans }}>
-        {email}
+        {booking.customer_email ?? booking.customer_phone ?? '—'}
       </span>
-    </Link>
+      <StatusBadge status={booking.status} lang={lang} />
+    </>
+  )
+
+  const rowStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '1.2fr 1.2fr 1fr 1fr auto',
+    gap: 16,
+    padding: '16px 20px',
+    background: hovered
+      ? 'rgba(201,168,76,0.06)'
+      : zebra ? 'rgba(255,255,255,0.02)' : 'transparent',
+    borderBottom: '1px solid rgba(201,168,76,0.08)',
+    transition: 'background 0.15s',
+    alignItems: 'center',
+    textDecoration: 'none',
+  }
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ ...rowStyle, cursor: 'pointer' }}
+      >
+        {inner}
+      </Link>
+    )
+  }
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={rowStyle}
+    >
+      {inner}
+    </div>
   )
 }

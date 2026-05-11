@@ -11,6 +11,7 @@ type Props = {
   patients: Awaited<ReturnType<typeof getClientes>>
   upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>>
   monthlyRevenue: number | null
+  todaysBookingCount: number | null
   airtableError: string | null
 }
 
@@ -21,7 +22,7 @@ const copy = {
     consultaSubsecuente: 'Consulta Subsecuente',
     appointments: {
       label: 'Citas',
-      statUnit: 'próximas citas',
+      statUnit: 'citas hoy',
       desc: 'Gestiona y programa citas con tus pacientes.',
       link: 'Ver citas →',
       none: 'Sin citas próximas',
@@ -46,7 +47,7 @@ const copy = {
     consultaSubsecuente: 'Follow-up Consultation',
     appointments: {
       label: 'Appointments',
-      statUnit: 'upcoming',
+      statUnit: 'appointments today',
       desc: 'Manage and schedule patient appointments.',
       link: 'View appointments →',
       none: 'No upcoming appointments',
@@ -87,7 +88,7 @@ function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
 }
 
-export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue, airtableError }: Props) {
+export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue, todaysBookingCount, airtableError }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const t = copy[lang]
 
@@ -128,7 +129,7 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
         <SummaryCard
           href="/dashboard/appointments"
           title={t.appointments.label}
-          stat={String(upcomingCitas.length)}
+          stat={todaysBookingCount !== null ? String(todaysBookingCount) : '—'}
           statUnit={t.appointments.statUnit}
           description={t.appointments.desc}
           linkLabel={t.appointments.link}

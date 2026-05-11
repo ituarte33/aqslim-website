@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto, getClientesConCita } from '@/lib/airtable'
 import { getRole, getUserEmail } from '@/lib/auth'
-import { getMonthlyRevenue } from '@/lib/square'
+import { getMonthlyRevenue, getTodaysBookingCount } from '@/lib/square'
 import { DashboardClient } from './dashboard-client'
 
 export default async function DashboardPage() {
@@ -38,6 +38,7 @@ export default async function DashboardPage() {
   let patients: Awaited<ReturnType<typeof getClientes>> = []
   let upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>> = []
   let monthlyRevenue: number | null = null
+  let todaysBookingCount: number | null = null
   let airtableError: string | null = null
   try {
     ;[patients, upcomingCitas] = await Promise.all([getClientes(), getClientesConCita()])
@@ -45,7 +46,10 @@ export default async function DashboardPage() {
     airtableError = e instanceof Error ? e.message : String(e)
   }
   // Non-blocking — Square being down should not break the dashboard
-  monthlyRevenue = await getMonthlyRevenue().catch(() => null)
+  ;[monthlyRevenue, todaysBookingCount] = await Promise.all([
+    getMonthlyRevenue().catch(() => null),
+    getTodaysBookingCount().catch(() => null),
+  ])
 
   return (
     <DashboardClient
@@ -53,6 +57,7 @@ export default async function DashboardPage() {
       patients={patients}
       upcomingCitas={upcomingCitas}
       monthlyRevenue={monthlyRevenue}
+      todaysBookingCount={todaysBookingCount}
       airtableError={airtableError}
     />
   )
