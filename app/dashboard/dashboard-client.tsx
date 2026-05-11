@@ -12,6 +12,8 @@ type Props = {
   upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>>
   monthlyRevenue: number | null
   todaysBookingCount: number | null
+  consultasCash: number | null
+  consultasCard: number | null
   airtableError: string | null
 }
 
@@ -88,9 +90,16 @@ function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
 }
 
-export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue, todaysBookingCount, airtableError }: Props) {
+export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue, todaysBookingCount, consultasCash, consultasCard, airtableError }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const t = copy[lang]
+  const es = lang === 'es'
+
+  const hasFinancesData = monthlyRevenue !== null || consultasCash !== null
+  const combinedTotal   = (monthlyRevenue ?? 0) + (consultasCash ?? 0)
+  const cardDiff        = monthlyRevenue !== null && consultasCard !== null
+    ? consultasCard - monthlyRevenue
+    : null
 
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang}>
@@ -161,10 +170,22 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
         <SummaryCard
           href="/dashboard/finances"
           title={t.finances.label}
-          stat={monthlyRevenue !== null ? formatUSD(monthlyRevenue) : '—'}
+          stat={hasFinancesData ? formatUSD(combinedTotal) : '—'}
           statUnit={t.finances.statUnit}
           description={t.finances.desc}
           linkLabel={t.finances.link}
+          preview={cardDiff !== null ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {es ? 'Dif. tarjeta AQSLIM vs Square' : 'Card diff AQSLIM vs Square'}
+              </span>
+              <span style={{ fontSize: pt.sm, fontFamily: pt.serif, color: cardDiff === 0 ? '#6fbf6f' : '#e88c4a' }}>
+                {cardDiff === 0
+                  ? (es ? 'Sin diferencia' : 'No difference')
+                  : formatUSD(Math.abs(cardDiff))}
+              </span>
+            </div>
+          ) : undefined}
         />
         <SummaryCard
           href="/dashboard/patients"

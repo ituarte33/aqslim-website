@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto, getClientesConCita } from '@/lib/airtable'
+import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto, getClientesConCita, getConsultasRevenueSummary } from '@/lib/airtable'
 import { getRole, getUserEmail } from '@/lib/auth'
 import { getMonthlyRevenue, getTodaysBookingCount } from '@/lib/square'
 import { DashboardClient } from './dashboard-client'
@@ -39,17 +39,24 @@ export default async function DashboardPage() {
   let upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>> = []
   let monthlyRevenue: number | null = null
   let todaysBookingCount: number | null = null
+  let consultasCash: number | null = null
+  let consultasCard: number | null = null
   let airtableError: string | null = null
   try {
     ;[patients, upcomingCitas] = await Promise.all([getClientes(), getClientesConCita()])
   } catch (e) {
     airtableError = e instanceof Error ? e.message : String(e)
   }
-  // Non-blocking — Square being down should not break the dashboard
-  ;[monthlyRevenue, todaysBookingCount] = await Promise.all([
-    getMonthlyRevenue().catch(() => null),
-    getTodaysBookingCount().catch(() => null),
+  // Non-blocking — Square or Airtable being down should not break the dashboard
+  const [_rev, _bookings, _consultas] = await Promise.all([
+    getMonthlyRevenue().catch((): null => null),
+    getTodaysBookingCount().catch((): null => null),
+    getConsultasRevenueSummary().catch((): null => null),
   ])
+  monthlyRevenue  = _rev
+  todaysBookingCount = _bookings
+  consultasCash  = _consultas?.cash ?? null
+  consultasCard  = _consultas?.card ?? null
 
   return (
     <DashboardClient
@@ -58,6 +65,8 @@ export default async function DashboardPage() {
       upcomingCitas={upcomingCitas}
       monthlyRevenue={monthlyRevenue}
       todaysBookingCount={todaysBookingCount}
+      consultasCash={consultasCash}
+      consultasCard={consultasCard}
       airtableError={airtableError}
     />
   )

@@ -257,6 +257,59 @@ export async function createCuestionario(fields: Record<string, unknown>): Promi
 
 // ---------- Consultas ----------
 
+export interface ConsultasRevenueSummary {
+  total: number
+  cash: number
+  card: number
+  other: number
+  byMethod: Array<{ method: string; total: number; count: number }>
+  consultaCount: number
+}
+
+function classifyPaymentMethod(method: string): 'cash' | 'card' | 'other' {
+  const lower = method.toLowerCase()
+  if (lower.includes('efectivo') || lower.includes('cash')) return 'cash'
+  if (
+    lower.includes('tarjeta') || lower.includes('card') ||
+    lower.includes('crédito') || lower.includes('credito') ||
+    lower.includes('débito')  || lower.includes('debito')
+  ) return 'card'
+  return 'other'
+}
+
+export async function getConsultasRevenueSummary(): Promise<ConsultasRevenueSummary> {
+  const now   = new Date()
+  const year  = now.getFullYear()
+  const month = now.getMonth() + 1
+
+  const formula = encodeURIComponent(
+    `AND(YEAR({Fecha Consulta}) = ${year}, MONTH({Fecha Consulta}) = ${month}, {Monto Cobrado ($)} > 0)`
+  )
+  const data = await airtableFetch(`/Consultas?filterByFormula=${formula}`)
+  const consultas: Consulta[] = data.records ?? []
+
+  const byMethodMap = new Map<string, { total: number; count: number }>()
+  for (const c of consultas) {
+    const method = (c.fields['Método de Pago'] as string | undefined) ?? 'Sin especificar'
+    const amount = (c.fields['Monto Cobrado ($)'] as number | undefined) ?? 0
+    const prev   = byMethodMap.get(method) ?? { total: 0, count: 0 }
+    byMethodMap.set(method, { total: prev.total + amount, count: prev.count + 1 })
+  }
+
+  const byMethod = Array.from(byMethodMap.entries()).map(([method, { total, count }]) => ({ method, total, count }))
+
+  let cash = 0, card = 0, other = 0, total = 0
+  for (const { method, total: amt } of byMethod) {
+    const cls = classifyPaymentMethod(method)
+    if (cls === 'cash') cash += amt
+    else if (cls === 'card') card += amt
+    else other += amt
+    total += amt
+  }
+
+  return { total, cash, card, other, byMethod, consultaCount: consultas.length }
+}
+
 export async function hasConsulta(nombreCliente: string): Promise<boolean> {
   const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&maxRecords=1`)
