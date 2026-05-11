@@ -2,18 +2,35 @@
 
 import { useState, useTransition } from 'react'
 import { UserButton } from '@clerk/nextjs'
-import { saveProfile } from './actions'
+import { saveProfile, acceptTerminos, updateProfileAndAcceptTerminos } from './actions'
 import { pt } from '@/lib/portal-type'
 
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
+type ClienteData = {
+  nombre?: string
+  telefono?: string
+  fechaNacimiento?: string
+  sexo?: string
+  direccion?: string
+  ciudad?: string
+  zip?: number
+  idioma?: string
+  unidadDePeso?: string
+  pesoMeta?: number
+  metaDelCliente?: string
+  condiciones?: string
+  comoNosConocio?: string
+}
+
 type Props = {
   defaultFirstName: string
   defaultLastName: string
-  initialStep?: 'profile' | 'next-steps'
+  initialStep?: 'profile' | 'confirm' | 'next-steps'
   step1Done?: boolean
   cuestionarioDone?: boolean
   allDone?: boolean
+  clienteData?: ClienteData
 }
 
 const inputStyle = {
@@ -56,8 +73,8 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
-export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false, cuestionarioDone = false, allDone = false }: Props) {
-  const [step, setStep] = useState<'profile' | 'next-steps'>(initialStep)
+export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false, cuestionarioDone = false, allDone = false, clienteData }: Props) {
+  const [step, setStep] = useState<'profile' | 'confirm' | 'next-steps'>(initialStep)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -411,6 +428,14 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
             </>
           )}
 
+          {step === 'confirm' && (
+            <ConfirmStep
+              clienteData={clienteData ?? {}}
+              idioma={idioma}
+              onConfirmed={() => setStep('next-steps')}
+            />
+          )}
+
           {step === 'next-steps' && (
             <>
               <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
@@ -508,5 +533,441 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
 
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400&family=Montserrat:wght@300;400;500&display=swap" />
     </div>
+  )
+}
+
+function ConfirmStep({
+  clienteData,
+  idioma,
+  onConfirmed,
+}: {
+  clienteData: ClienteData
+  idioma: 'English' | 'Español' | null
+  onConfirmed: () => void
+}) {
+  const es = idioma !== 'English'
+  const [isEditing, setIsEditing] = useState(false)
+
+  return isEditing ? (
+    <EditProfileForm
+      clienteData={clienteData}
+      es={es}
+      onSaved={onConfirmed}
+      onCancel={() => setIsEditing(false)}
+    />
+  ) : (
+    <ViewProfile
+      clienteData={clienteData}
+      es={es}
+      onEdit={() => setIsEditing(true)}
+      onConfirmed={onConfirmed}
+    />
+  )
+}
+
+function ViewProfile({
+  clienteData,
+  es,
+  onEdit,
+  onConfirmed,
+}: {
+  clienteData: ClienteData
+  es: boolean
+  onEdit: () => void
+  onConfirmed: () => void
+}) {
+  const [accepted, setAccepted] = useState(false)
+  const [error, setError]       = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function InfoField({ label, value }: { label: string; value?: string | number }) {
+    return (
+      <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: labelStyle.fontFamily as string, marginBottom: 4 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: pt.base, color: value ? '#FAFAF8' : '#3A3530' }}>
+          {value ?? (es ? 'No especificado' : 'Not specified')}
+        </div>
+      </div>
+    )
+  }
+
+  const pesoDisplay = clienteData.pesoMeta
+    ? `${clienteData.pesoMeta} ${clienteData.unidadDePeso ?? ''}`
+    : undefined
+
+  function handleConfirm() {
+    if (!accepted) {
+      setError(es ? 'Debes aceptar los términos para continuar.' : 'You must accept the terms to continue.')
+      return
+    }
+    setError(null)
+    startTransition(async () => {
+      try {
+        await acceptTerminos()
+        onConfirmed()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : (es ? 'Error al confirmar.' : 'Error confirming.'))
+      }
+    })
+  }
+
+  return (
+    <>
+      <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
+        {es ? 'Bienvenido a AQSLIM' : 'Welcome to AQSLIM'}
+      </p>
+      <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8 }}>
+        {es ? 'Verifica tu información' : 'Verify your information'}
+      </h1>
+      <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 32, lineHeight: 1.7 }}>
+        {es
+          ? 'Tu perfil ya está creado. Revisa que tus datos estén correctos y acepta los términos para continuar.'
+          : 'Your profile is already set up. Please review your information and accept the terms to continue.'}
+      </p>
+
+      <div style={{ border: '1px solid rgba(201,168,76,0.2)', padding: '0 24px', marginBottom: 12 }}>
+        <InfoField label={es ? 'Nombre Completo' : 'Full Name'}          value={clienteData.nombre} />
+        <InfoField label={es ? 'Teléfono' : 'Phone'}                     value={clienteData.telefono} />
+        <InfoField label={es ? 'Fecha de Nacimiento' : 'Date of Birth'}  value={clienteData.fechaNacimiento} />
+        <InfoField label={es ? 'Sexo' : 'Sex'}                           value={clienteData.sexo} />
+        <InfoField label={es ? 'Dirección' : 'Address'}                  value={[clienteData.direccion, clienteData.ciudad, clienteData.zip].filter(Boolean).join(', ') || undefined} />
+        <InfoField label={es ? 'Idioma Preferido' : 'Preferred Language'} value={clienteData.idioma} />
+        <InfoField label={es ? 'Peso Meta' : 'Goal Weight'}              value={pesoDisplay} />
+        <InfoField label={es ? 'Meta del Cliente' : 'Client Goal'}       value={clienteData.metaDelCliente} />
+        {clienteData.condiciones && (
+          <InfoField label={es ? 'Condiciones / Alergias' : 'Conditions / Allergies'} value={clienteData.condiciones} />
+        )}
+      </div>
+
+      <button
+        onClick={onEdit}
+        style={{
+          background: 'none', border: '1px solid rgba(201,168,76,0.4)',
+          color: '#C9A84C', padding: '9px 20px', fontSize: pt.sm,
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+          fontFamily: labelStyle.fontFamily as string, cursor: 'pointer',
+          fontWeight: 500, marginBottom: 28, display: 'inline-block',
+        }}
+      >
+        {es ? 'Editar información' : 'Edit information'}
+      </button>
+
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        padding: '16px', fontSize: pt.base, color: '#9A9590',
+        lineHeight: 1.8, marginBottom: 16,
+      }}>
+        {es
+          ? 'Al confirmar, autorizo a AQSLIM a utilizar la información mostrada para coordinar mi programa de salud y acepto sus términos y condiciones. (Los términos completos estarán disponibles próximamente.)'
+          : 'By confirming, I authorize AQSLIM to use the information shown to coordinate my health program and I accept their terms and conditions. (Full terms will be available soon.)'}
+      </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 20 }}>
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          style={{ width: 16, height: 16, accentColor: '#C9A84C', cursor: 'pointer', flexShrink: 0 }}
+        />
+        <span style={{ fontSize: pt.base, color: accepted ? '#FAFAF8' : '#9A9590' }}>
+          {es ? 'La información es correcta y acepto los términos' : 'The information is correct and I accept the terms'}
+        </span>
+      </label>
+
+      {error && <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: '0 0 16px' }}>{error}</p>}
+
+      <button
+        onClick={handleConfirm}
+        disabled={isPending}
+        style={{
+          background: isPending ? 'rgba(201,168,76,0.4)' : '#C9A84C',
+          color: '#0A0A0A', border: 'none',
+          padding: '14px 32px', fontSize: pt.sm,
+          letterSpacing: '0.14em', textTransform: 'uppercase',
+          fontFamily: labelStyle.fontFamily as string, cursor: isPending ? 'not-allowed' : 'pointer',
+          fontWeight: 500,
+        }}
+      >
+        {isPending
+          ? (es ? 'Confirmando...' : 'Confirming...')
+          : (es ? 'Confirmar y continuar' : 'Confirm and continue')}
+      </button>
+    </>
+  )
+}
+
+function isoToMmddyyyy(iso?: string): string {
+  if (!iso) return ''
+  const [yyyy, mm, dd] = iso.split('-')
+  if (!yyyy || !mm || !dd) return ''
+  return `${mm}/${dd}/${yyyy}`
+}
+
+function EditProfileForm({
+  clienteData,
+  es,
+  onSaved,
+  onCancel,
+}: {
+  clienteData: ClienteData
+  es: boolean
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const nameParts = (clienteData.nombre ?? '').split(' ')
+  const [defaultFirst] = nameParts
+  const defaultLast = nameParts.slice(1).join(' ')
+
+  const [sexo, setSexo]                     = useState<'Masculino' | 'Femenino' | 'Otro' | null>(
+    (clienteData.sexo as 'Masculino' | 'Femenino' | 'Otro') ?? null
+  )
+  const [idioma, setIdioma]                 = useState<'English' | 'Español' | null>(
+    (clienteData.idioma as 'English' | 'Español') ?? null
+  )
+  const [unidadDePeso, setUnidadDePeso]     = useState<'Lbs' | 'Kg'>(
+    (clienteData.unidadDePeso as 'Lbs' | 'Kg') ?? 'Lbs'
+  )
+  const [comoNosConocio, setComoNosConocio] = useState<string | null>(clienteData.comoNosConocio ?? null)
+  const [telefono, setTelefono]             = useState(clienteData.telefono ?? '')
+  const [fechaNacimiento, setFechaNacimiento] = useState(isoToMmddyyyy(clienteData.fechaNacimiento))
+  const [error, setError]                   = useState<string | null>(null)
+  const [isPending, startTransition]        = useTransition()
+
+  function formatPhone(raw: string) {
+    const digits = raw.replace(/\D/g, '').slice(0, 10)
+    if (digits.length < 4) return digits.length ? `(${digits}` : ''
+    if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
+  function formatDate(raw: string) {
+    const digits = raw.replace(/\D/g, '').slice(0, 8)
+    if (digits.length < 3) return digits
+    if (digits.length < 5) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+  }
+
+  function toggleBtn(selected: boolean): React.CSSProperties {
+    return {
+      flex: 1, padding: '11px 14px', fontSize: pt.base,
+      fontFamily: labelStyle.fontFamily as string, fontWeight: 500, cursor: 'pointer',
+      border: selected ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)',
+      background: selected ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.05)',
+      color: selected ? '#C9A84C' : '#9A9590', transition: 'all 0.15s',
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError(null)
+
+    if (!sexo)  { setError(es ? 'Por favor selecciona tu sexo.' : 'Please select your sex.'); return }
+    if (!idioma) { setError(es ? 'Por favor selecciona tu idioma preferido.' : 'Please select your preferred language.'); return }
+    if (fechaNacimiento.length < 10) { setError(es ? 'Por favor ingresa tu fecha de nacimiento completa (mm/dd/aaaa).' : 'Please enter your complete date of birth (mm/dd/yyyy).'); return }
+    if (!comoNosConocio) { setError(es ? 'Por favor indícanos cómo nos conociste.' : 'Please tell us how you found us.'); return }
+
+    const formData = new FormData(e.currentTarget)
+    formData.set('telefono', telefono)
+    formData.set('fechaNacimiento', fechaNacimiento)
+    formData.set('sexo', sexo)
+    formData.set('idioma', idioma)
+    formData.set('unidadDePeso', unidadDePeso)
+    formData.set('comoNosConocio', comoNosConocio)
+
+    startTransition(async () => {
+      try {
+        await updateProfileAndAcceptTerminos(formData)
+        onSaved()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : (es ? 'Error al guardar.' : 'Error saving.'))
+      }
+    })
+  }
+
+  return (
+    <>
+      <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
+        {es ? 'Editar información' : 'Edit information'}
+      </p>
+      <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8 }}>
+        {es ? 'Actualiza tu perfil' : 'Update your profile'}
+      </h1>
+      <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 32, lineHeight: 1.7 }}>
+        {es ? 'Corrige cualquier dato incorrecto. Al guardar aceptas nuestros términos y condiciones.' : 'Correct any incorrect information. By saving you accept our terms and conditions.'}
+      </p>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        <SectionDivider label={es ? 'Información Personal' : 'Personal Information'} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <label htmlFor="ef-firstName" style={labelStyle}>{es ? 'Nombre' : 'First Name'}</label>
+            <input id="ef-firstName" name="firstName" type="text" required defaultValue={defaultFirst} style={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="ef-lastName" style={labelStyle}>{es ? 'Apellido' : 'Last Name'}</label>
+            <input id="ef-lastName" name="lastName" type="text" required defaultValue={defaultLast} style={inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <label htmlFor="ef-telefono" style={labelStyle}>{es ? 'Teléfono' : 'Phone'}</label>
+            <input
+              id="ef-telefono" name="telefono" type="tel" required
+              placeholder="(619) 555-0100"
+              value={telefono}
+              onChange={(e) => setTelefono(formatPhone(e.target.value))}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label htmlFor="ef-fechaNacimiento" style={labelStyle}>{es ? 'Fecha de Nacimiento' : 'Date of Birth'}</label>
+            <input
+              id="ef-fechaNacimiento" name="fechaNacimiento" type="text" required
+              placeholder="mm/dd/yyyy"
+              value={fechaNacimiento}
+              onChange={(e) => setFechaNacimiento(formatDate(e.target.value))}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div>
+          <span style={labelStyle}>{es ? 'Sexo' : 'Sex'}</span>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {(['Masculino', 'Femenino', 'Otro'] as const).map((s) => (
+              <button key={s} type="button" onClick={() => setSexo(s)} style={toggleBtn(sexo === s)}>
+                {s === 'Masculino' ? (es ? 'Masculino' : 'Male') : s === 'Femenino' ? (es ? 'Femenino' : 'Female') : (es ? 'Otro' : 'Other')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <SectionDivider label={es ? 'Contacto y Ubicación' : 'Contact & Location'} />
+
+        <div>
+          <label htmlFor="ef-direccion" style={labelStyle}>{es ? 'Dirección' : 'Address'}</label>
+          <input id="ef-direccion" name="direccion" type="text" defaultValue={clienteData.direccion ?? ''} style={inputStyle} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <label htmlFor="ef-ciudad" style={labelStyle}>{es ? 'Ciudad' : 'City'}</label>
+            <input id="ef-ciudad" name="ciudad" type="text" defaultValue={clienteData.ciudad ?? ''} style={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="ef-zip" style={labelStyle}>ZIP</label>
+            <input id="ef-zip" name="zip" type="text" inputMode="numeric" pattern="[0-9]*" defaultValue={clienteData.zip ?? ''} style={inputStyle} />
+          </div>
+        </div>
+
+        <SectionDivider label={es ? 'Programa' : 'Program'} />
+
+        <div>
+          <span style={labelStyle}>{es ? 'Idioma Preferido' : 'Preferred Language'}</span>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {(['English', 'Español'] as const).map((l) => (
+              <button key={l} type="button" onClick={() => setIdioma(l)} style={toggleBtn(idioma === l)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <span style={labelStyle}>{es ? 'Unidad de Peso' : 'Weight Unit'}</span>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {(['Lbs', 'Kg'] as const).map((u) => (
+                <button key={u} type="button" onClick={() => setUnidadDePeso(u)} style={toggleBtn(unidadDePeso === u)}>{u}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="ef-pesoMeta" style={labelStyle}>{es ? 'Peso Meta' : 'Goal Weight'} ({unidadDePeso})</label>
+            <input
+              id="ef-pesoMeta" name="pesoMeta" type="number" min="0" required
+              defaultValue={clienteData.pesoMeta ?? ''}
+              placeholder={unidadDePeso === 'Lbs' ? '150' : '68'}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div>
+          <span style={labelStyle}>{es ? '¿Cómo Nos Conociste?' : 'How Did You Find Us?'}</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {([
+              ['Referido',       es ? 'Referido'       : 'Referral'],
+              ['Anuncio',        es ? 'Anuncio'        : 'Ad'],
+              ['Google search',  'Google Search'],
+              ['Redes Sociales', es ? 'Redes Sociales' : 'Social Media'],
+            ] as [string, string][]).map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setComoNosConocio(value)}
+                style={{ ...toggleBtn(comoNosConocio === value), flex: 'none' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <SectionDivider label={es ? 'Metas y Salud' : 'Goals & Health'} />
+
+        <div>
+          <label htmlFor="ef-metaDelCliente" style={labelStyle}>{es ? 'Meta del Cliente' : 'Client Goal'}</label>
+          <textarea
+            id="ef-metaDelCliente" name="metaDelCliente" required
+            defaultValue={clienteData.metaDelCliente ?? ''}
+            placeholder={es ? 'Describe tu meta principal...' : 'Describe your main goal...'}
+            style={textareaStyle}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="ef-condiciones" style={labelStyle}>{es ? 'Condiciones / Alergias' : 'Conditions / Allergies'}</label>
+          <textarea
+            id="ef-condiciones" name="condiciones"
+            defaultValue={clienteData.condiciones ?? ''}
+            placeholder={es ? 'Opcional...' : 'Optional...'}
+            style={textareaStyle}
+          />
+        </div>
+
+        {error && <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>}
+
+        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+          <button
+            type="submit"
+            disabled={isPending}
+            style={{
+              background: isPending ? 'rgba(201,168,76,0.4)' : '#C9A84C',
+              color: '#0A0A0A', border: 'none',
+              padding: '14px 32px', fontSize: pt.sm,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              fontFamily: labelStyle.fontFamily as string,
+              cursor: isPending ? 'not-allowed' : 'pointer', fontWeight: 500,
+            }}
+          >
+            {isPending ? (es ? 'Guardando...' : 'Saving...') : (es ? 'Guardar y continuar' : 'Save and continue')}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              background: 'none', color: '#9A9590',
+              border: '1px solid rgba(255,255,255,0.12)',
+              padding: '14px 24px', fontSize: pt.sm,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              fontFamily: labelStyle.fontFamily as string, cursor: 'pointer',
+            }}
+          >
+            {es ? 'Cancelar' : 'Cancel'}
+          </button>
+        </div>
+      </form>
+    </>
   )
 }

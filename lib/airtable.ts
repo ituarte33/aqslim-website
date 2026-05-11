@@ -164,6 +164,13 @@ export async function getClientesConCita(): Promise<Cliente[]> {
   return data.records
 }
 
+export async function createCliente(fields: Record<string, unknown>): Promise<Cliente> {
+  return airtableFetch(`/${CLIENTES_TABLE}`, {
+    method: 'POST',
+    body: JSON.stringify({ fields }),
+  })
+}
+
 export async function createProspecto(nombre: string, email: string): Promise<Cliente> {
   return airtableFetch(`/${CLIENTES_TABLE}`, {
     method: 'POST',

@@ -26,14 +26,37 @@ export default async function OnboardingPage() {
 
   const allDone = step1Done && cuestionarioDone
 
+  // Patient was pre-registered by admin (has data filled in but hasn't confirmed T&C yet)
+  const isPreRegistered = !profileFilled && (
+    cliente.fields['Estado del Cliente'] === 'Activo' ||
+    Boolean(cliente.fields['Teléfono'])
+  )
+
+  const clienteData = isPreRegistered ? {
+    nombre:          cliente.fields['Nombre Completo'],
+    telefono:        cliente.fields['Teléfono'],
+    fechaNacimiento: cliente.fields['Fecha Nacimiento'],
+    sexo:            cliente.fields['Sexo'],
+    direccion:       cliente.fields['Dirección'],
+    ciudad:          cliente.fields['Ciudad'],
+    zip:             typeof cliente.fields['ZIP'] === 'number' ? cliente.fields['ZIP'] : undefined,
+    idioma:          cliente.fields['Idioma Preferido'],
+    unidadDePeso:    cliente.fields['Unidad de Peso'],
+    pesoMeta:        typeof cliente.fields['Peso Meta'] === 'number' ? cliente.fields['Peso Meta'] : undefined,
+    metaDelCliente:  cliente.fields['Meta del Cliente'],
+    condiciones:     cliente.fields['Condiciones Especiales / Alergias'],
+    comoNosConocio:  cliente.fields['Cómo Nos Conoció'],
+  } : undefined
+
   return (
     <OnboardingClient
       defaultFirstName={user?.firstName ?? ''}
       defaultLastName={user?.lastName ?? ''}
-      initialStep={profileFilled ? 'next-steps' : 'profile'}
+      initialStep={profileFilled ? 'next-steps' : isPreRegistered ? 'confirm' : 'profile'}
       step1Done={step1Done}
       cuestionarioDone={cuestionarioDone}
       allDone={allDone}
+      clienteData={clienteData}
     />
   )
 }

@@ -20,7 +20,7 @@ type Props = {
 const copy = {
   es: {
     title: 'Panel de Control',
-    nuevaConsulta: 'Nueva Consulta',
+    nuevaConsulta: 'Registra Paciente Nuevo',
     consultaSubsecuente: 'Consulta Subsecuente',
     appointments: {
       label: 'Citas',
@@ -45,7 +45,7 @@ const copy = {
   },
   en: {
     title: 'Dashboard',
-    nuevaConsulta: 'New Consultation',
+    nuevaConsulta: 'Register New Patient',
     consultaSubsecuente: 'Follow-up Consultation',
     appointments: {
       label: 'Appointments',
