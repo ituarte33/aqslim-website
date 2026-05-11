@@ -6,7 +6,7 @@ import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
 import type { getClientesConCita } from '@/lib/airtable'
 
-const SQUARE_MANAGE_URL  = 'https://squareup.com/appointments/manage'
+const SQUARE_MANAGE_URL  = 'https://app.squareup.com/dashboard/appointments/calendar'
 const GOOGLE_CALENDAR_SRC = 'https://calendar.google.com/calendar/embed?src=9d8c0344cef5ea1337d190292b059834d0cdbbee9b2282712a61f89dc804fbf7%40group.calendar.google.com&ctz=America%2FPhoenix'
 
 type Tab = 'list' | 'calendar'
