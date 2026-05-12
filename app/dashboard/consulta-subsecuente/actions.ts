@@ -55,7 +55,10 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   if (nivelEnergia)    fields['Nivel de Energía']           = nivelEnergia
   if (calidadSueno)    fields['Calidad de Sueño']           = calidadSueno
   if (recomendaciones) fields['Recomendaciones al Cliente'] = recomendaciones
-  if (proximaCita)     fields['Próxima Cita']               = proximaCita
+  if (proximaCita) {
+    const d = new Date(proximaCita)
+    fields['Próxima Cita'] = isNaN(d.getTime()) ? proximaCita : d.toISOString()
+  }
   if (metodoPago)      fields['Método de Pago']             = metodoPago
 
   const consulta = await createConsulta(fields)
