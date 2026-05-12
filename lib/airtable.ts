@@ -269,6 +269,8 @@ export interface ConsultasRevenueSummary {
   cash: number
   card: number
   other: number
+  today: number
+  week: number
   byMethod: Array<{ method: string; total: number; count: number }>
   consultaCount: number
 }
@@ -286,20 +288,30 @@ function classifyPaymentMethod(method: string): 'cash' | 'card' | 'other' {
 
 export async function getConsultasRevenueSummary(): Promise<ConsultasRevenueSummary> {
   const now   = new Date()
-  const year  = now.getFullYear()
-  const month = now.getMonth() + 1
+
+  // Use Pacific time for today/week so dates match the business timezone.
+  const ptTodayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(now) // YYYY-MM-DD
+  const [ptYear, ptMonth, ptDay] = ptTodayStr.split('-').map(Number)
+  const dow = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay, 12)).getUTCDay() // 0=Sun…6=Sat
+  const ptMondayDate = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay - (dow === 0 ? 6 : dow - 1), 12))
+  const ptWeekStart = ptMondayDate.toISOString().slice(0, 10) // YYYY-MM-DD
 
   const formula = encodeURIComponent(
-    `AND(YEAR({Fecha Consulta}) = ${year}, MONTH({Fecha Consulta}) = ${month}, {Monto Cobrado ($)} > 0)`
+    `AND(YEAR({Fecha Consulta}) = ${ptYear}, MONTH({Fecha Consulta}) = ${ptMonth}, {Monto Cobrado ($)} > 0)`
   )
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}`)
   const consultas: Consulta[] = data.records ?? []
 
   const byMethodMap = new Map<string, { total: number; count: number }>()
+  let today = 0, week = 0
   for (const c of consultas) {
     const method = (c.fields['Método de Pago'] as string | undefined) ?? 'Sin especificar'
     const amount = (c.fields['Monto Cobrado ($)'] as number | undefined) ?? 0
-    const prev   = byMethodMap.get(method) ?? { total: 0, count: 0 }
+    const fechaRaw = (c.fields['Fecha Consulta'] as string | undefined) ?? ''
+    const fecha = fechaRaw.slice(0, 10) // YYYY-MM-DD
+    if (fecha === ptTodayStr) today += amount
+    if (fecha >= ptWeekStart) week  += amount
+    const prev = byMethodMap.get(method) ?? { total: 0, count: 0 }
     byMethodMap.set(method, { total: prev.total + amount, count: prev.count + 1 })
   }
 
@@ -314,7 +326,7 @@ export async function getConsultasRevenueSummary(): Promise<ConsultasRevenueSumm
     total += amt
   }
 
-  return { total, cash, card, other, byMethod, consultaCount: consultas.length }
+  return { total, cash, card, other, today, week, byMethod, consultaCount: consultas.length }
 }
 
 export async function createConsulta(fields: Record<string, unknown>): Promise<Consulta> {

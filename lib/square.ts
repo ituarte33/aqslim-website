@@ -66,12 +66,28 @@ function sum(payments: SquarePayment[]): number {
 export async function getFinancesSummary() {
   const now = new Date()
 
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  const dow = now.getUTCDay() // 0=Sun … 6=Sat — use Monday as week start
-  const weekStart = new Date(todayStart)
-  weekStart.setUTCDate(todayStart.getUTCDate() - (dow === 0 ? 6 : dow - 1))
+  // Derive current date in Pacific time so "today" / "this week" match the business timezone.
+  const ptParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+    hour12: false,
+  }).formatToParts(now)
+  const ptGet = (t: string) => Number(ptParts.find(p => p.type === t)?.value ?? 0)
+  const ptYear = ptGet('year'), ptMonth = ptGet('month'), ptDay = ptGet('day')
 
+  // "PT clock treated as UTC" lets us recover the real PT→UTC offset at this instant.
+  const ptAsUTC  = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay, ptGet('hour'), ptGet('minute'), ptGet('second')))
+  const offsetMs = now.getTime() - ptAsUTC.getTime()
+
+  // PT midnight → UTC instant
+  const todayStart = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay) + offsetMs)
+
+  // Day of week in PT (0=Sun…6=Sat); use noon UTC on that date to avoid DST edge cases.
+  const dow = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay, 12)).getUTCDay()
+  const weekStart = new Date(todayStart.getTime() - (dow === 0 ? 6 : dow - 1) * 86_400_000)
+
+  const monthStart = new Date(Date.UTC(ptYear, ptMonth - 1, 1) + offsetMs)
   const all = await fetchAllPayments(monthStart.toISOString())
 
   const todayISO = todayStart.toISOString()

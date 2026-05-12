@@ -97,17 +97,35 @@ export function FinancesClient({ user, squareSummary, consultasSummary, squareEr
             : es ? 'Cargando...' : 'Loading...'}
         </SectionSubtitle>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
           {[
-            { label: es ? 'Efectivo' : 'Cash',    value: consultasSummary?.cash  ?? null, note: es ? 'Solo en AQSLIM' : 'AQSLIM only' },
-            { label: es ? 'Tarjeta'  : 'Card',    value: consultasSummary?.card  ?? null, note: es ? 'Ver comparación ↓' : 'See comparison ↓' },
-            { label: es ? 'Total'    : 'Total',   value: consultasSummary?.total ?? null, note: es ? 'Efectivo + Tarjeta' : 'Cash + Card' },
+            { label: es ? 'Hoy'         : 'Today',      value: consultasSummary?.today ?? null, note: '' },
+            { label: es ? 'Esta semana' : 'This week',  value: consultasSummary?.week  ?? null, note: '' },
+            { label: es ? 'Este mes'    : 'This month', value: consultasSummary?.total ?? null, note: '' },
           ].map(({ label, value, note }) => (
             <div key={label} style={{ border: '1px solid rgba(201,168,76,0.22)', padding: '24px 28px' }}>
               <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: pt.sans, marginBottom: 10 }}>
                 {label}
               </div>
               <div style={{ fontSize: 32, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1, marginBottom: 6 }}>
+                {value !== null ? formatUSD(value) : '—'}
+              </div>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans }}>{note}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          {[
+            { label: es ? 'Efectivo' : 'Cash',  value: consultasSummary?.cash  ?? null, note: es ? 'Solo en AQSLIM' : 'AQSLIM only' },
+            { label: es ? 'Tarjeta'  : 'Card',  value: consultasSummary?.card  ?? null, note: es ? 'Ver comparación ↓' : 'See comparison ↓' },
+            { label: es ? 'Total'    : 'Total', value: consultasSummary?.total ?? null, note: es ? 'Efectivo + Tarjeta' : 'Cash + Card' },
+          ].map(({ label, value, note }) => (
+            <div key={label} style={{ border: '1px solid rgba(201,168,76,0.12)', padding: '20px 28px' }}>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: pt.sans, marginBottom: 10 }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 28, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1, marginBottom: 6 }}>
                 {value !== null ? formatUSD(value) : '—'}
               </div>
               <div style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans }}>{note}</div>
