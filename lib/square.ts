@@ -131,15 +131,14 @@ export async function getUpcomingBookings(): Promise<SquareBooking[]> {
   })
 
   const data = await squareFetch(`/bookings?${params}`)
+  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_MERCHANT', 'DECLINED', 'NO_SHOW'])
   const raw: {
     id: string
     status: string
     start_at: string
     customer_id?: string
     appointment_segments?: { duration_minutes?: number; service_variation_id?: string }[]
-  }[] = (data.bookings ?? []).filter(
-    (b: { status: string }) => b.status === 'ACCEPTED' || b.status === 'PENDING'
-  )
+  }[] = (data.bookings ?? []).filter((b: { status: string }) => !CANCELLED.has(b.status))
 
   // Deduplicate IDs before fetching to avoid redundant API calls
   const customerIds   = [...new Set(raw.map(b => b.customer_id).filter(Boolean) as string[])]
@@ -204,8 +203,9 @@ export async function getTodaysBookingCount(): Promise<number> {
   })
 
   const data = await squareFetch(`/bookings?${params}`)
+  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_MERCHANT', 'DECLINED', 'NO_SHOW'])
   return (data.bookings ?? []).filter(
-    (b: { status: string }) => b.status === 'ACCEPTED' || b.status === 'PENDING'
+    (b: { status: string }) => !CANCELLED.has(b.status)
   ).length
 }
 
