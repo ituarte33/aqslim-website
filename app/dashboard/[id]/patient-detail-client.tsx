@@ -215,6 +215,15 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
                   }}>
                     + Consulta Subsecuente
                   </Link>
+                  <Link href={`/dashboard/${patient.id}/edit`} style={{
+                  background: 'none', color: '#C9A84C',
+                  border: '1px solid rgba(201,168,76,0.5)',
+                  padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+                  textDecoration: 'none', display: 'inline-block',
+                }}>
+                  Editar Paciente
+                </Link>
                 </div>
               )}
             </div>
