@@ -1,6 +1,6 @@
 'use server'
 
-import { createConsulta } from '@/lib/airtable'
+import { createConsulta, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
   const clienteRecordId = (formData.get('clienteRecordId') as string).trim()
@@ -55,12 +55,16 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   if (nivelEnergia)    fields['Nivel de Energía']           = nivelEnergia
   if (calidadSueno)    fields['Calidad de Sueño']           = calidadSueno
   if (recomendaciones) fields['Recomendaciones al Cliente'] = recomendaciones
-  if (proximaCita) {
-    const d = new Date(proximaCita)
-    fields['Próxima Cita'] = isNaN(d.getTime()) ? proximaCita : d.toISOString()
-  }
   if (metodoPago)      fields['Método de Pago']             = metodoPago
 
   const consulta = await createConsulta(fields)
+
+  // Próxima Cita lives on the Cliente record (the Consultas field is a lookup — read-only).
+  if (proximaCita) {
+    const d = new Date(proximaCita)
+    const isoDate = isNaN(d.getTime()) ? proximaCita : d.toISOString()
+    await updateCliente(clienteRecordId, { [CLIENTES_FIELDS.PROXIMA_CITA]: isoDate })
+  }
+
   return { id: consulta.id }
 }
