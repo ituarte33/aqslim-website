@@ -73,6 +73,92 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
+function DisclaimerBox({ lang }: { lang: 'en' | 'es' }) {
+  const en = lang === 'en'
+  const sections = [
+    {
+      num: '1',
+      title: en ? 'Nutritional & Supplementation Program' : 'Programa Nutricional y de Suplementación',
+      text: en
+        ? 'All dietary guidance and supplement recommendations provided by AQSLIM Wellness Center are for educational purposes only and are not intended to treat, cure, diagnose, or prevent any disease or medical condition. Individual results may vary. AQSLIM coaches are wellness educators — not licensed dietitians, nutritionists, or medical professionals. You agree to consult your physician before making any dietary or supplementation changes, particularly if you have a pre-existing medical condition, are pregnant, nursing, or taking prescription medications.'
+        : 'Todas las recomendaciones dietéticas y de suplementos proporcionadas por AQSLIM Wellness Center son únicamente con fines educativos y no están destinadas a tratar, curar, diagnosticar ni prevenir ninguna enfermedad o condición médica. Los resultados individuales pueden variar. Los coaches de AQSLIM son educadores de bienestar — no son dietistas, nutriólogos ni médicos con licencia. Usted se compromete a consultar a su médico antes de hacer cambios en su dieta o suplementación, especialmente si tiene alguna condición médica preexistente, está embarazada, en período de lactancia o tomando medicamentos recetados.',
+    },
+    {
+      num: '2',
+      title: en ? 'Auriculotherapy' : 'Auriculoterapia',
+      text: en
+        ? 'Auriculotherapy is a complementary wellness technique involving the placement of small pellets (balines) on specific points of the outer ear. It is not a substitute for medical treatment and is offered solely as a complementary wellness service. By proceeding, you confirm that you have informed your AQSLIM coach of any known allergies, skin sensitivities, or medical conditions relevant to this service, and that you consent to receive auriculotherapy sessions voluntarily. You understand you may discontinue at any time.'
+        : 'La auriculoterapia es una técnica de bienestar complementaria que consiste en la colocación de pequeños balines en puntos específicos del oído externo. No es un sustituto del tratamiento médico y se ofrece únicamente como un servicio de bienestar complementario. Al continuar, confirma que ha informado a su coach de AQSLIM sobre cualquier alergia, sensibilidad en la piel o condición médica relevante para este servicio, y que consiente voluntariamente recibir sesiones de auriculoterapia. Entiende que puede interrumpirlas en cualquier momento.',
+    },
+    {
+      num: '3',
+      title: en ? 'Privacy & Data Collection' : 'Privacidad y Recopilación de Datos',
+      text: en
+        ? 'The personal and health information you provide is collected solely for the purpose of delivering wellness services at AQSLIM Wellness Center. Your information will not be sold, shared, or disclosed to third parties without your consent, except as required by law. By submitting this form, you consent to the collection and use of your information for the purposes described above.'
+        : 'La información personal y de salud que proporciona se recopila únicamente para brindarle los servicios de bienestar de AQSLIM Wellness Center. Su información no será vendida, compartida ni divulgada a terceros sin su consentimiento, salvo cuando lo exija la ley. Al enviar este formulario, usted consiente la recopilación y uso de su información para los fines descritos anteriormente.',
+    },
+    {
+      num: '4',
+      title: en ? 'Assumption of Responsibility' : 'Asunción de Responsabilidad',
+      text: en
+        ? "By checking the box below, you acknowledge that you have read and understood this policy in its entirety, that you voluntarily choose to participate in AQSLIM's wellness programs, and that you release AQSLIM Wellness Center, its coaches, employees, and affiliates from liability for outcomes resulting from your participation. You confirm that all information provided is accurate and complete."
+        : 'Al marcar la casilla a continuación, usted reconoce que ha leído y comprendido esta política en su totalidad, que elige voluntariamente participar en los programas de bienestar de AQSLIM, y que exonera a AQSLIM Wellness Center, sus coaches, empleados y afiliados de cualquier responsabilidad por los resultados derivados de su participación. Confirma que toda la información proporcionada es verídica y completa.',
+    },
+  ]
+
+  return (
+    <div style={{
+      maxHeight: 320,
+      overflowY: 'auto',
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(201,168,76,0.25)',
+      padding: '20px 22px',
+      fontSize: pt.sm,
+      lineHeight: 1.75,
+    }}>
+      {/* Important notice */}
+      <div style={{
+        borderLeft: '3px solid #C9A84C',
+        background: 'rgba(201,168,76,0.06)',
+        padding: '10px 14px',
+        marginBottom: 18,
+      }}>
+        <div style={{ fontSize: pt.xs, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C', marginBottom: 6 }}>
+          ⚠ {en ? 'Important Notice — Not Medical Advice' : 'Aviso Importante — No es Consejo Médico'}
+        </div>
+        <p style={{ margin: 0, color: '#9A9590' }}>
+          {en
+            ? (<><strong style={{ color: '#FAFAF8' }}>AQSLIM Wellness Center coaches are not licensed medical doctors, physicians, or healthcare providers.</strong> All programs, recommendations, and information provided are strictly <strong style={{ color: '#FAFAF8' }}>educational and informational in nature</strong>. Nothing presented at AQSLIM constitutes medical advice, a medical diagnosis, or a prescription of any kind. Before beginning any program, consult your licensed physician.</>)
+            : (<><strong style={{ color: '#FAFAF8' }}>Los coaches de AQSLIM Wellness Center no son médicos, doctores ni proveedores de servicios de salud con licencia.</strong> Todos los programas, recomendaciones e información proporcionados son de carácter estrictamente <strong style={{ color: '#FAFAF8' }}>educativo e informativo</strong>. Nada de lo presentado en AQSLIM constituye consejo médico, diagnóstico médico ni prescripción de ningún tipo. Antes de comenzar cualquier programa, consulte a su médico.</>)
+          }
+        </p>
+      </div>
+
+      {/* Numbered sections */}
+      {sections.map((s, i) => (
+        <div key={s.num}>
+          {i > 0 && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '14px 0' }} />}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{
+              width: 20, height: 20, background: '#C9A84C', color: '#0A0A0A',
+              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
+            }}>
+              {s.num}
+            </div>
+            <div>
+              <div style={{ fontSize: pt.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#FAFAF8', marginBottom: 5 }}>
+                {s.title}
+              </div>
+              <p style={{ margin: 0, color: '#9A9590' }}>{s.text}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false, cuestionarioDone = false, allDone = false, clienteData }: Props) {
   const [step, setStep] = useState<'profile' | 'confirm' | 'next-steps'>(initialStep)
   const [error, setError] = useState<string | null>(null)
@@ -370,24 +456,10 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                   />
                 </div>
 
-                <SectionDivider label={t('Términos', 'Terms')} />
+                <SectionDivider label={t('Política de Privacidad y Consentimiento', 'Privacy Policy & Consent')} />
 
-                {/* Terms box */}
-                <div style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  padding: '16px',
-                  fontSize: pt.base,
-                  color: '#9A9590',
-                  lineHeight: 1.8,
-                }}>
-                  {t(
-                    'Al completar este registro, confirmo que la información proporcionada es verídica. Autorizo a AQSLIM a contactarme para coordinar mi programa de salud y acepto su política de privacidad.',
-                    'By completing this registration, I confirm that the provided information is truthful. I authorize AQSLIM to contact me to coordinate my health program and accept their privacy policy.'
-                  )}
-                </div>
+                <DisclaimerBox lang={idioma === 'English' ? 'en' : 'es'} />
 
-                {/* Terms checkbox */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -396,7 +468,7 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                     style={{ width: 16, height: 16, accentColor: '#C9A84C', cursor: 'pointer', flexShrink: 0 }}
                   />
                   <span style={{ fontSize: pt.base, color: aceptoTerminos ? '#FAFAF8' : '#9A9590' }}>
-                    {t('He leído y acepto los términos anteriores', 'I have read and accept the terms above')}
+                    {t('He leído y acepto los términos anteriores', 'I have read and accept the above terms')}
                   </span>
                 </label>
 
@@ -654,18 +726,9 @@ function ViewProfile({
         {es ? 'Editar información' : 'Edit information'}
       </button>
 
-      <div style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        padding: '16px', fontSize: pt.base, color: '#9A9590',
-        lineHeight: 1.8, marginBottom: 16,
-      }}>
-        {es
-          ? 'Al confirmar, autorizo a AQSLIM a utilizar la información mostrada para coordinar mi programa de salud y acepto sus términos y condiciones. (Los términos completos estarán disponibles próximamente.)'
-          : 'By confirming, I authorize AQSLIM to use the information shown to coordinate my health program and I accept their terms and conditions. (Full terms will be available soon.)'}
-      </div>
+      <DisclaimerBox lang={es ? 'es' : 'en'} />
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 20 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginTop: 16, marginBottom: 20 }}>
         <input
           type="checkbox"
           checked={accepted}
@@ -673,7 +736,7 @@ function ViewProfile({
           style={{ width: 16, height: 16, accentColor: '#C9A84C', cursor: 'pointer', flexShrink: 0 }}
         />
         <span style={{ fontSize: pt.base, color: accepted ? '#FAFAF8' : '#9A9590' }}>
-          {es ? 'La información es correcta y acepto los términos' : 'The information is correct and I accept the terms'}
+          {es ? 'La información es correcta y acepto los términos anteriores' : 'The information is correct and I accept the above terms'}
         </span>
       </label>
 
@@ -733,6 +796,7 @@ function EditProfileForm({
   const [comoNosConocio, setComoNosConocio] = useState<string | null>(clienteData.comoNosConocio ?? null)
   const [telefono, setTelefono]             = useState(clienteData.telefono ?? '')
   const [fechaNacimiento, setFechaNacimiento] = useState(isoToMmddyyyy(clienteData.fechaNacimiento))
+  const [aceptoTerminos, setAceptoTerminos]  = useState(false)
   const [error, setError]                   = useState<string | null>(null)
   const [isPending, startTransition]        = useTransition()
 
@@ -768,6 +832,7 @@ function EditProfileForm({
     if (!idioma) { setError(es ? 'Por favor selecciona tu idioma preferido.' : 'Please select your preferred language.'); return }
     if (fechaNacimiento.length < 10) { setError(es ? 'Por favor ingresa tu fecha de nacimiento completa (mm/dd/aaaa).' : 'Please enter your complete date of birth (mm/dd/yyyy).'); return }
     if (!comoNosConocio) { setError(es ? 'Por favor indícanos cómo nos conociste.' : 'Please tell us how you found us.'); return }
+    if (!aceptoTerminos) { setError(es ? 'Debes aceptar los términos para continuar.' : 'You must accept the terms to continue.'); return }
 
     const formData = new FormData(e.currentTarget)
     formData.set('telefono', telefono)
@@ -796,7 +861,7 @@ function EditProfileForm({
         {es ? 'Actualiza tu perfil' : 'Update your profile'}
       </h1>
       <p style={{ fontSize: pt.base, color: '#9A9590', marginBottom: 32, lineHeight: 1.7 }}>
-        {es ? 'Corrige cualquier dato incorrecto. Al guardar aceptas nuestros términos y condiciones.' : 'Correct any incorrect information. By saving you accept our terms and conditions.'}
+        {es ? 'Corrige cualquier dato incorrecto antes de continuar.' : 'Correct any incorrect information before continuing.'}
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -935,6 +1000,22 @@ function EditProfileForm({
             style={textareaStyle}
           />
         </div>
+
+        <SectionDivider label={es ? 'Política de Privacidad y Consentimiento' : 'Privacy Policy & Consent'} />
+
+        <DisclaimerBox lang={es ? 'es' : 'en'} />
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={aceptoTerminos}
+            onChange={(e) => setAceptoTerminos(e.target.checked)}
+            style={{ width: 16, height: 16, accentColor: '#C9A84C', cursor: 'pointer', flexShrink: 0 }}
+          />
+          <span style={{ fontSize: pt.base, color: aceptoTerminos ? '#FAFAF8' : '#9A9590' }}>
+            {es ? 'He leído y acepto los términos anteriores' : 'I have read and accept the above terms'}
+          </span>
+        </label>
 
         {error && <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>}
 
