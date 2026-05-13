@@ -188,6 +188,20 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
   const patient = selectedPatient
 
+  // Weight unit toggle
+  const [pesoUnit,  setPesoUnit]  = useState<'kg' | 'lbs'>('kg')
+  const [pesoValue, setPesoValue] = useState('')
+
+  function handlePesoUnitChange(newUnit: 'kg' | 'lbs') {
+    if (newUnit === pesoUnit) return
+    const v = parseFloat(pesoValue)
+    if (!isNaN(v) && pesoValue !== '') {
+      const converted = newUnit === 'lbs' ? v / 0.453592 : v * 0.453592
+      setPesoValue(converted.toFixed(1))
+    }
+    setPesoUnit(newUnit)
+  }
+
   // Form state
   const [tipoConsulta,    setTipoConsulta]    = useState<string | null>(null)
   const [nivelEnergia,    setNivelEnergia]    = useState<string | null>(null)
@@ -236,6 +250,12 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     setError(null)
 
     const formData = new FormData(e.currentTarget)
+    // Always store peso in kg regardless of which unit admin entered
+    const pesoKgVal = pesoValue !== '' && !isNaN(parseFloat(pesoValue))
+      ? (pesoUnit === 'lbs' ? parseFloat(pesoValue) * 0.453592 : parseFloat(pesoValue))
+      : null
+    if (pesoKgVal !== null) formData.set('pesoKg', String(pesoKgVal))
+    else formData.delete('pesoKg')
     formData.set('clienteRecordId', patient.id)
     formData.set('tipoConsulta', tipoConsulta)
     formData.set('montoCobrado', montoCobradoTotal > 0 ? String(montoCobradoTotal) : '')
@@ -423,10 +443,33 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label htmlFor="cs-peso" style={labelStyle}>
-                {es ? 'Peso' : 'Weight'} ({patient.fields['Unidad de Peso'] ?? 'Lbs'})
-              </label>
-              <input id="cs-peso" name="pesoKg" type="number" step="0.1" min="0" style={inputStyle} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ ...labelStyle, display: 'inline', marginBottom: 0 }}>{es ? 'Peso' : 'Weight'}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['kg', 'lbs'] as const).map(unit => (
+                    <button
+                      key={unit} type="button"
+                      onClick={() => handlePesoUnitChange(unit)}
+                      style={{
+                        padding: '3px 8px', fontSize: pt.xs, fontFamily: pt.sans, cursor: 'pointer',
+                        letterSpacing: '0.1em', textTransform: 'uppercase',
+                        border: pesoUnit === unit ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+                        background: pesoUnit === unit ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.03)',
+                        color: pesoUnit === unit ? '#C9A84C' : '#9A9590',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      {unit.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <input
+                id="cs-peso" name="pesoKg" type="number" step="0.1" min="0"
+                value={pesoValue}
+                onChange={e => setPesoValue(e.target.value)}
+                style={inputStyle}
+              />
             </div>
             <div>
               <label htmlFor="cs-grasa" style={labelStyle}>% {es ? 'Grasa Corporal' : 'Body Fat'}</label>
