@@ -6,6 +6,28 @@ import { DashboardShell } from '../dashboard-shell'
 import { saveConsultaSubsecuente } from './actions'
 import type { Cliente } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
+import { BookingWidget } from '@/app/onboarding/booking-widget'
+import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
+
+// One week from now as a datetime-local string (YYYY-MM-DDTHH:MM) in local time
+function nextWeekDatetimeLocal(): string {
+  const d = new Date(Date.now() + 7 * 24 * 3_600_000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Convert a UTC ISO string from Square to datetime-local in Pacific time
+function utcToPtDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(d)
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '00'
+  const h = get('hour') === '24' ? '00' : get('hour')
+  return `${get('year')}-${get('month')}-${get('day')}T${h}:${get('minute')}`
+}
 
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
@@ -171,6 +193,9 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [tuvoHambre,      setTuvoHambre]      = useState<string | null>(null)
   const [cumplimiento,    setCumplimiento]    = useState<number | null>(null)
   const [comoSeSiente,    setComoSeSiente]    = useState<number | null>(null)
+
+  const [proximaCita, setProximaCita] = useState(nextWeekDatetimeLocal)
+  const [showBooking, setShowBooking] = useState(false)
 
   const [saved,      setSaved]      = useState<{ id: string } | null>(null)
   const [error,      setError]      = useState<string | null>(null)
@@ -453,12 +478,59 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
               <label htmlFor="cs-proxima" style={labelStyle}>{es ? 'Próxima Cita' : 'Next Appointment'}</label>
-              <input id="cs-proxima" name="proximaCita" type="datetime-local" style={inputStyle} />
+              <input
+                id="cs-proxima" name="proximaCita" type="datetime-local"
+                value={proximaCita}
+                onChange={e => setProximaCita(e.target.value)}
+                style={inputStyle}
+              />
             </div>
             <div>
               <label htmlFor="cs-monto" style={labelStyle}>{es ? 'Monto Cobrado ($)' : 'Amount Charged ($)'}</label>
               <input id="cs-monto" name="montoCobrado" type="number" step="0.01" min="0" placeholder="0.00" style={inputStyle} />
             </div>
+          </div>
+
+          {/* Book next appointment via Square */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowBooking(v => !v)}
+              style={{
+                background: showBooking ? 'rgba(201,168,76,0.1)' : 'none',
+                color: '#C9A84C',
+                border: '1px solid rgba(201,168,76,0.4)',
+                padding: '10px 20px',
+                fontSize: pt.sm,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                fontFamily: pt.sans,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {showBooking
+                ? (es ? '✕ Cerrar agenda' : '✕ Close booking')
+                : (es ? '+ Agendar en Square' : '+ Book in Square')}
+            </button>
+
+            {showBooking && patient && (
+              <div style={{ marginTop: 16, border: '1px solid rgba(201,168,76,0.15)', padding: '20px 24px' }}>
+                <BookingWidget
+                  clienteId={patient.id}
+                  nombre={String(patient.fields['Nombre Completo'] ?? '')}
+                  email={String(patient.fields['Email'] ?? '')}
+                  telefono={patient.fields['Teléfono'] ? String(patient.fields['Teléfono']) : undefined}
+                  allowedServices={ADMIN_SERVICES}
+                  isAdmin
+                  lang={es ? 'es' : 'en'}
+                  onBooked={(startAt) => {
+                    setProximaCita(utcToPtDatetimeLocal(startAt))
+                    setShowBooking(false)
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <ToggleGroup

@@ -160,25 +160,36 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
 
       {registered ? (
         <div style={{ maxWidth: 560 }}>
-          <div style={{
-            border: '1px solid rgba(111,191,111,0.4)',
-            background: 'rgba(111,191,111,0.06)',
-            padding: '28px 32px',
-            marginBottom: 24,
-          }}>
-            <div style={{ fontSize: pt.xs, color: '#6fbf6f', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8, fontFamily: pt.sans }}>
-              {es ? 'Registro exitoso' : 'Registration successful'}
+          <Link
+            href={`/dashboard/${registered.id}`}
+            style={{ textDecoration: 'none', display: 'block', marginBottom: 24 }}
+          >
+            <div style={{
+              border: '1px solid rgba(111,191,111,0.4)',
+              background: 'rgba(111,191,111,0.06)',
+              padding: '28px 32px',
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                <span style={{ fontSize: pt.xs, color: '#6fbf6f', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans }}>
+                  {es ? 'Registro exitoso' : 'Registration successful'}
+                </span>
+                <span style={{ fontSize: pt.xs, color: '#6fbf6f', fontFamily: pt.sans, letterSpacing: '0.08em' }}>
+                  {es ? 'Ver expediente →' : 'View record →'}
+                </span>
+              </div>
+              <div style={{ fontFamily: pt.serif, fontSize: 22, color: '#FAFAF8', marginBottom: 6 }}>
+                {registered.nombre}
+              </div>
+              <div style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
+                {es
+                  ? 'El paciente ha sido registrado y se le envió un correo de bienvenida con los siguientes pasos.'
+                  : 'The patient has been registered and sent a welcome email with next steps.'}
+              </div>
             </div>
-            <div style={{ fontFamily: pt.serif, fontSize: 22, color: '#FAFAF8', marginBottom: 6 }}>
-              {registered.nombre}
-            </div>
-            <div style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
-              {es
-                ? 'El paciente ha sido registrado y se le envió un correo de bienvenida con los siguientes pasos.'
-                : 'The patient has been registered and sent a welcome email with next steps.'}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12 }}>
+          </Link>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <button
               onClick={resetForm}
               style={{
@@ -190,7 +201,7 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
               {es ? '+ Registrar otro' : '+ Register another'}
             </button>
             <Link
-              href="/dashboard/patients"
+              href={`/dashboard/consulta-subsecuente?clienteId=${registered.id}`}
               style={{
                 background: 'none', color: '#C9A84C',
                 border: '1px solid rgba(201,168,76,0.5)',
@@ -199,7 +210,7 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
                 textDecoration: 'none', display: 'inline-block',
               }}
             >
-              {es ? 'Ver pacientes →' : 'View patients →'}
+              {es ? 'Registrar Consulta →' : 'Register Consult →'}
             </Link>
           </div>
         </div>
