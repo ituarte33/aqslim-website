@@ -147,7 +147,7 @@ export async function getUpcomingBookings(): Promise<SquareBooking[]> {
   })
 
   const data = await squareFetch(`/bookings?${params}`)
-  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_MERCHANT', 'DECLINED', 'NO_SHOW'])
+  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_SELLER', 'DECLINED', 'NO_SHOW'])
   const raw: {
     id: string
     status: string
@@ -369,7 +369,7 @@ export async function hasUpcomingBookingByEmail(email: string): Promise<boolean>
       limit:         '5',
     })
     const bookings = await squareFetch(`/bookings?${params}`)
-    const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_MERCHANT', 'DECLINED', 'NO_SHOW'])
+    const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_SELLER', 'DECLINED', 'NO_SHOW'])
     return (bookings.bookings ?? []).some((b: { status: string }) => !CANCELLED.has(b.status))
   } catch {
     return false
@@ -406,7 +406,7 @@ export async function getTodaysBookingCount(): Promise<number> {
   })
 
   const data = await squareFetch(`/bookings?${params}`)
-  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_MERCHANT', 'DECLINED', 'NO_SHOW'])
+  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_SELLER', 'DECLINED', 'NO_SHOW'])
   return (data.bookings ?? []).filter(
     (b: { status: string }) => !CANCELLED.has(b.status)
   ).length

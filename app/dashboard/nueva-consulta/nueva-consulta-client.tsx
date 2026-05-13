@@ -8,6 +8,8 @@ import { pt } from '@/lib/portal-type'
 
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
+  prefillNombre?: string
+  prefillEmail?: string
 }
 
 const inputStyle: React.CSSProperties = {
@@ -50,7 +52,7 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
-export function NuevaConsultaClient({ user }: Props) {
+export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const es = lang === 'es'
 
@@ -209,17 +211,20 @@ export function NuevaConsultaClient({ user }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
               <label htmlFor="firstName" style={labelStyle}>{es ? 'Nombre' : 'First Name'}</label>
-              <input id="firstName" name="firstName" type="text" required style={inputStyle} />
+              <input id="firstName" name="firstName" type="text" required style={inputStyle}
+                defaultValue={prefillNombre ? prefillNombre.split(' ')[0] : undefined} />
             </div>
             <div>
               <label htmlFor="lastName" style={labelStyle}>{es ? 'Apellido' : 'Last Name'}</label>
-              <input id="lastName" name="lastName" type="text" required style={inputStyle} />
+              <input id="lastName" name="lastName" type="text" required style={inputStyle}
+                defaultValue={prefillNombre ? prefillNombre.split(' ').slice(1).join(' ') : undefined} />
             </div>
           </div>
 
           <div>
             <label htmlFor="email" style={labelStyle}>Email</label>
-            <input id="email" name="email" type="email" required style={inputStyle} />
+            <input id="email" name="email" type="email" required style={inputStyle}
+              defaultValue={prefillEmail} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

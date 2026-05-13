@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
 import { saveConsultaSubsecuente } from './actions'
@@ -175,6 +175,13 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [saved,      setSaved]      = useState<{ id: string } | null>(null)
   const [error,      setError]      = useState<string | null>(null)
   const [isPending,  startTransition] = useTransition()
+
+  // When opened from a patient's expediente, auto-redirect back after saving
+  useEffect(() => {
+    if (saved && initialPatient) {
+      router.push(`/dashboard/${initialPatient.id}`)
+    }
+  }, [saved, initialPatient, router])
 
   // Today in YYYY-MM-DD local
   const todayISO = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
