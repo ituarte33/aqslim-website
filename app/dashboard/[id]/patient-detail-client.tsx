@@ -42,18 +42,63 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
   )
 }
 
-const WEIGHT_FIELDS: (keyof Consulta['fields'])[] = [
-  'Fecha Consulta', 'Peso (kg)', 'Diferencia vs Semana Anterior (kg)',
-  '% Grasa Corporal', 'IMC',
+type ColDef = {
+  field: keyof Consulta['fields']
+  label?: string
+  render?: (c: Consulta) => string
+}
+
+function weightColumns(unidad: string | undefined): ColDef[] {
+  const isLB = unidad?.toUpperCase() === 'LB'
+  const weightLabel = isLB ? 'Peso (lb)' : 'Peso (kg)'
+  const diffLabel   = isLB ? 'Dif. vs Sem. Ant. (lb)' : 'Dif. vs Sem. Ant. (kg)'
+
+  return [
+    { field: 'Fecha Consulta' },
+    {
+      field: 'Peso (kg)',
+      label: weightLabel,
+      render: (c) => {
+        // Prefer the pre-formatted "con unidad" field stored by Airtable
+        if (c.fields['Peso (con unidad)']) return String(c.fields['Peso (con unidad)'])
+        const kg = c.fields['Peso (kg)']
+        if (kg == null) return '—'
+        return isLB ? `${(kg * 2.20462).toFixed(1)} lb` : `${kg} kg`
+      },
+    },
+    {
+      field: 'Diferencia vs Semana Anterior (kg)',
+      label: diffLabel,
+      render: (c) => {
+        const diff = c.fields['Diferencia vs Semana Anterior (kg)']
+        if (diff == null) return '—'
+        const val = isLB ? diff * 2.20462 : diff
+        const sign = val > 0 ? '+' : ''
+        return `${sign}${val.toFixed(1)} ${isLB ? 'lb' : 'kg'}`
+      },
+    },
+    { field: '% Grasa Corporal' },
+    { field: 'IMC' },
+  ]
+}
+
+const MEASUREMENTS_COLS: ColDef[] = [
+  { field: 'Fecha Consulta' },
+  { field: 'Cintura (cm)' },
+  { field: 'Cadera (cm)' },
+  { field: 'Brazos (cm)' },
+  { field: 'Muslos (cm)' },
+  { field: 'Pecho/Busto (cm)' },
 ]
 
-const MEASUREMENTS_FIELDS: (keyof Consulta['fields'])[] = [
-  'Fecha Consulta', 'Cintura (cm)', 'Cadera (cm)', 'Brazos (cm)', 'Muslos (cm)', 'Pecho/Busto (cm)',
-]
-
-const WELLNESS_FIELDS: (keyof Consulta['fields'])[] = [
-  'Fecha Consulta', 'Cumplimiento Dieta (1-10)', 'Cómo Se Siente (1-10)',
-  'Nivel de Energía', 'Calidad de Sueño', '¿Ansiedad?', '¿Tuvo Hambre?',
+const WELLNESS_COLS: ColDef[] = [
+  { field: 'Fecha Consulta' },
+  { field: 'Cumplimiento Dieta (1-10)' },
+  { field: 'Cómo Se Siente (1-10)' },
+  { field: 'Nivel de Energía' },
+  { field: 'Calidad de Sueño' },
+  { field: '¿Ansiedad?' },
+  { field: '¿Tuvo Hambre?' },
 ]
 
 type TabId = 'weight' | 'measurements' | 'wellness' | 'notes'
@@ -65,7 +110,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'notes', label: 'Notas' },
 ]
 
-function ConsultaTable({ consultations, fields }: { consultations: Consulta[]; fields: (keyof Consulta['fields'])[] }) {
+function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; columns: ColDef[] }) {
   if (consultations.length === 0) {
     return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin consultas registradas.</p>
   }
@@ -74,12 +119,12 @@ function ConsultaTable({ consultations, fields }: { consultations: Consulta[]; f
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
         <thead>
           <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
-            {fields.map(f => (
-              <th key={String(f)} style={{
+            {columns.map(col => (
+              <th key={String(col.field)} style={{
                 textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
                 fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
               }}>
-                {String(f)}
+                {col.label ?? String(col.field)}
               </th>
             ))}
           </tr>
@@ -90,12 +135,12 @@ function ConsultaTable({ consultations, fields }: { consultations: Consulta[]; f
               borderBottom: '1px solid rgba(255,255,255,0.06)',
               background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
             }}>
-              {fields.map(f => (
-                <td key={String(f)} style={{
+              {columns.map(col => (
+                <td key={String(col.field)} style={{
                   padding: '12px 16px', whiteSpace: 'nowrap',
-                  color: f === 'Fecha Consulta' ? '#FAFAF8' : '#9A9590',
+                  color: col.field === 'Fecha Consulta' ? '#FAFAF8' : '#9A9590',
                 }}>
-                  {fmt(c.fields[f])}
+                  {col.render ? col.render(c) : fmt(c.fields[col.field])}
                 </td>
               ))}
             </tr>
@@ -270,9 +315,9 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
               ))}
             </div>
 
-            {activeTab === 'weight' && <ConsultaTable consultations={consultations} fields={WEIGHT_FIELDS} />}
-            {activeTab === 'measurements' && <ConsultaTable consultations={consultations} fields={MEASUREMENTS_FIELDS} />}
-            {activeTab === 'wellness' && <ConsultaTable consultations={consultations} fields={WELLNESS_FIELDS} />}
+            {activeTab === 'weight' && <ConsultaTable consultations={consultations} columns={weightColumns(patient.fields['Unidad de Peso'])} />}
+            {activeTab === 'measurements' && <ConsultaTable consultations={consultations} columns={MEASUREMENTS_COLS} />}
+            {activeTab === 'wellness' && <ConsultaTable consultations={consultations} columns={WELLNESS_COLS} />}
             {activeTab === 'notes' && <NotesTab consultations={consultations} />}
           </>
         )}
