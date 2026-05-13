@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
 import { saveConsultaSubsecuente } from './actions'
-import type { Cliente } from '@/lib/airtable'
+import type { Cliente, Suplemento } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
@@ -29,10 +29,13 @@ function utcToPtDatetimeLocal(iso: string): string {
   return `${get('year')}-${get('month')}-${get('day')}T${h}:${get('minute')}`
 }
 
+type CartItem = { key: number; id: string; nombre: string; precio: number }
+
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
   patient: Cliente | null
   allPatients: Cliente[]
+  supplementos: Suplemento[]
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -124,7 +127,7 @@ function ToggleGroup<T extends string>({
 function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
   const nombre    = patient.fields['Nombre Completo'] ?? '—'
   const idCliente = patient.fields['ID Cliente']
-  const edad      = patient.fields['Edad']
+  const edad      = typeof patient.fields['Edad'] === 'number' ? patient.fields['Edad'] : null
   const unidad    = patient.fields['Unidad de Peso'] ?? 'Lbs'
   const pesoMeta  = patient.fields['Peso Meta (con unidad)'] ?? patient.fields['Peso Meta']
   const idioma    = patient.fields['Idioma Preferido']
@@ -174,7 +177,7 @@ function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients }: Props) {
+export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients, supplementos }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const es = lang === 'es'
   const router = useRouter()
@@ -186,6 +189,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const patient = selectedPatient
 
   // Form state
+  const [tipoConsulta,    setTipoConsulta]    = useState<string | null>(null)
   const [nivelEnergia,    setNivelEnergia]    = useState<string | null>(null)
   const [calidadSueno,    setCalidadSueno]    = useState<string | null>(null)
   const [metodoPago,      setMetodoPago]      = useState<string | null>(null)
@@ -193,6 +197,15 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [tuvoHambre,      setTuvoHambre]      = useState<string | null>(null)
   const [cumplimiento,    setCumplimiento]    = useState<number | null>(null)
   const [comoSeSiente,    setComoSeSiente]    = useState<number | null>(null)
+
+  // Supplement cart
+  const [cart, setCart]                   = useState<CartItem[]>([])
+  const [cartKeySeq, setCartKeySeq]       = useState(0)
+  const [consultaFee, setConsultaFee]     = useState('')
+  const [suppSearch, setSuppSearch]       = useState('')
+
+  const supplementTotal = cart.reduce((s, i) => s + i.precio, 0)
+  const montoCobradoTotal = supplementTotal + (parseFloat(consultaFee) || 0)
 
   const [proximaCita, setProximaCita] = useState(nextWeekDatetimeLocal)
   const [showBooking, setShowBooking] = useState(false)
@@ -219,10 +232,13 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!patient) { setError(es ? 'Selecciona un paciente.' : 'Select a patient.'); return }
+    if (!tipoConsulta) { setError(es ? 'Selecciona el tipo de consulta.' : 'Select the consultation type.'); return }
     setError(null)
 
     const formData = new FormData(e.currentTarget)
     formData.set('clienteRecordId', patient.id)
+    formData.set('tipoConsulta', tipoConsulta)
+    formData.set('montoCobrado', montoCobradoTotal > 0 ? String(montoCobradoTotal) : '')
     if (ansiedad)   formData.set('ansiedad',   ansiedad)
     if (tuvoHambre) formData.set('tuvoHambre', tuvoHambre)
     if (nivelEnergia)  formData.set('nivelEnergia',       nivelEnergia)
@@ -230,6 +246,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     if (metodoPago)    formData.set('metodoPago',         metodoPago)
     if (cumplimiento !== null) formData.set('cumplimientoDieta', String(cumplimiento))
     if (comoSeSiente !== null) formData.set('comoSeSiente',      String(comoSeSiente))
+    if (cart.length > 0) {
+      const lines = cart.map(i => `- ${i.nombre} ($${i.precio.toFixed(2)})`).join('\n')
+      formData.set('notasSuplemento', `Suplementos vendidos:\n${lines}\nTotal: $${supplementTotal.toFixed(2)}`)
+    }
 
     startTransition(async () => {
       try {
@@ -360,6 +380,35 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
       {patient && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 620 }}>
 
+          <SectionDivider label={es ? 'Tipo de Consulta' : 'Consultation Type'} />
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {([
+              ['Cliente Nuevo',       es ? 'Cliente Nuevo'       : 'New Client'      ],
+              ['Cliente subsecuente', es ? 'Cliente Subsecuente' : 'Returning Client'],
+              ['Cliente Re-Inicio',   es ? 'Cliente Re-Inicio'   : 'Re-Start Client' ],
+            ] as [string, string][]).map(([value, label]) => (
+              <button
+                key={value} type="button"
+                onClick={() => {
+                  setTipoConsulta(value)
+                  const fee = value === 'Cliente Nuevo' ? '40' : value === 'Cliente Re-Inicio' ? '35' : '30'
+                  setConsultaFee(fee)
+                }}
+                style={{
+                  padding: '11px 20px', fontSize: pt.base, fontFamily: pt.sans, fontWeight: 500,
+                  cursor: 'pointer', flex: 'none',
+                  border: tipoConsulta === value ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)',
+                  background: tipoConsulta === value ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.05)',
+                  color: tipoConsulta === value ? '#C9A84C' : '#9A9590',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <SectionDivider label={es ? 'Fecha' : 'Date'} />
 
           <div>
@@ -461,6 +510,127 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             />
           </div>
 
+          <SectionDivider label={es ? 'Suplementos' : 'Supplements'} />
+
+          {/* Supplement search + grouped picker */}
+          {supplementos.length === 0 ? (
+            <p style={{ fontSize: pt.sm, color: '#6A6560', margin: 0, fontFamily: pt.sans }}>
+              {es ? 'No hay suplementos activos registrados.' : 'No active supplements found.'}
+            </p>
+          ) : (() => {
+            const q = suppSearch.toLowerCase()
+            const filtered = q
+              ? supplementos.filter(s => String(s.fields['Nombre'] ?? '').toLowerCase().includes(q))
+              : supplementos
+
+            // Group by category, preserving sort order within each group
+            const groups = new Map<string, typeof supplementos>()
+            for (const s of filtered) {
+              const cat = String(s.fields['Categoría'] ?? '').trim() || 'Sin Categoría'
+              if (!groups.has(cat)) groups.set(cat, [])
+              groups.get(cat)!.push(s)
+            }
+            // Sort: specific system categories first (alphabetical), then Suplemento, then Sin Categoría
+            const sortedGroups = [...groups.entries()].sort(([a], [b]) => {
+              const rank = (c: string) => c === 'Sin Categoría' ? 2 : c === 'Suplemento' ? 1 : 0
+              return rank(a) - rank(b) || a.localeCompare(b)
+            })
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <input
+                  type="text"
+                  placeholder={es ? 'Buscar suplemento...' : 'Search supplement...'}
+                  value={suppSearch}
+                  onChange={e => setSuppSearch(e.target.value)}
+                  style={{ ...inputStyle, maxWidth: 340 }}
+                />
+                {filtered.length === 0 ? (
+                  <p style={{ fontSize: pt.sm, color: '#6A6560', margin: 0, fontFamily: pt.sans }}>
+                    {es ? 'Sin resultados.' : 'No results.'}
+                  </p>
+                ) : sortedGroups.map(([cat, items]) => (
+                  <div key={cat}>
+                    <div style={{
+                      fontSize: pt.xs, color: '#6A6560', letterSpacing: '0.14em',
+                      textTransform: 'uppercase', fontFamily: pt.sans, marginBottom: 8,
+                    }}>
+                      {cat}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {items.map(s => {
+                        const nombre = String(s.fields['Nombre'] ?? '')
+                        const precio = s.fields['Precio de Venta ($)'] ?? 0
+                        return (
+                          <button
+                            key={s.id} type="button"
+                            onClick={() => {
+                              const key = cartKeySeq
+                              setCartKeySeq(k => k + 1)
+                              setCart(prev => [...prev, { key, id: s.id, nombre, precio }])
+                            }}
+                            style={{
+                              padding: '7px 12px', fontSize: pt.sm, fontFamily: pt.sans,
+                              cursor: 'pointer', border: '1px solid rgba(201,168,76,0.3)',
+                              background: 'rgba(255,255,255,0.04)', color: '#FAFAF8',
+                              transition: 'all 0.12s', textAlign: 'left',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#C9A84C'; e.currentTarget.style.background = 'rgba(201,168,76,0.08)' }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(201,168,76,0.3)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                          >
+                            <span style={{ display: 'block', fontWeight: 500 }}>{nombre}</span>
+                            <span style={{ fontSize: pt.xs, color: '#C9A84C' }}>${precio.toFixed(2)}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Cart */}
+          {cart.length > 0 && (
+            <div style={{ border: '1px solid rgba(201,168,76,0.2)', overflow: 'hidden' }}>
+              {cart.map(item => (
+                <div key={item.key} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  background: 'rgba(255,255,255,0.02)',
+                }}>
+                  <span style={{ fontSize: pt.sm, color: '#FAFAF8', fontFamily: pt.sans }}>{item.nombre}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <span style={{ fontSize: pt.sm, color: '#C9A84C', fontFamily: pt.sans, minWidth: 60, textAlign: 'right' }}>
+                      ${item.precio.toFixed(2)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCart(prev => prev.filter(i => i.key !== item.key))}
+                      style={{
+                        background: 'none', border: 'none', color: '#6A6560',
+                        cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 4px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '10px 16px', background: 'rgba(201,168,76,0.06)',
+              }}>
+                <span style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans }}>
+                  {es ? 'Subtotal suplementos' : 'Supplements subtotal'}
+                </span>
+                <span style={{ fontSize: pt.base, color: '#C9A84C', fontFamily: pt.sans, fontWeight: 500 }}>
+                  ${supplementTotal.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+
           <SectionDivider label={es ? 'Notas y Pago' : 'Notes & Payment'} />
 
           <div>
@@ -475,19 +645,45 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div>
-              <label htmlFor="cs-proxima" style={labelStyle}>{es ? 'Próxima Cita' : 'Next Appointment'}</label>
+          <div>
+            <label htmlFor="cs-proxima" style={labelStyle}>{es ? 'Próxima Cita' : 'Next Appointment'}</label>
+            <input
+              id="cs-proxima" name="proximaCita" type="datetime-local"
+              value={proximaCita}
+              onChange={e => setProximaCita(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 280 }}
+            />
+          </div>
+
+          {/* Payment breakdown */}
+          <div style={{ border: '1px solid rgba(201,168,76,0.2)', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="cs-fee" style={{ ...labelStyle, margin: 0 }}>
+                {es ? 'Cargo de Consulta ($)' : 'Consultation Fee ($)'}
+              </label>
               <input
-                id="cs-proxima" name="proximaCita" type="datetime-local"
-                value={proximaCita}
-                onChange={e => setProximaCita(e.target.value)}
-                style={inputStyle}
+                id="cs-fee"
+                type="number" step="0.01" min="0" placeholder="0.00"
+                value={consultaFee}
+                onChange={e => setConsultaFee(e.target.value)}
+                style={{ ...inputStyle, width: 120, textAlign: 'right' }}
               />
             </div>
-            <div>
-              <label htmlFor="cs-monto" style={labelStyle}>{es ? 'Monto Cobrado ($)' : 'Amount Charged ($)'}</label>
-              <input id="cs-monto" name="montoCobrado" type="number" step="0.01" min="0" placeholder="0.00" style={inputStyle} />
+            {cart.length > 0 && (
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
+                  {es ? 'Suplementos' : 'Supplements'}
+                </span>
+                <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>${supplementTotal.toFixed(2)}</span>
+              </div>
+            )}
+            <div style={{ padding: '14px 16px', background: 'rgba(201,168,76,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: pt.sm, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, fontWeight: 500 }}>
+                {es ? 'Monto Cobrado' : 'Total Charged'}
+              </span>
+              <span style={{ fontSize: pt.lg, color: '#C9A84C', fontFamily: pt.serif }}>
+                ${montoCobradoTotal.toFixed(2)}
+              </span>
             </div>
           </div>
 

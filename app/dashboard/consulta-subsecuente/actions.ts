@@ -20,11 +20,16 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
     return isNaN(v) ? undefined : v
   }
 
+  const tipoConsulta     = (formData.get('tipoConsulta')     as string | null)?.trim() || 'Cliente subsecuente'
+  const notasSuplemento  = (formData.get('notasSuplemento')  as string | null)?.trim() ?? ''
+
   const fields: Record<string, unknown> = {
-    'ID Cliente':       [clienteRecordId],   // linked record field — must be array of record IDs
+    'ID Cliente':       [clienteRecordId],
     'Fecha Consulta':   fechaConsulta,
-    'Tipo de Consulta': 'Cliente subsecuente',
+    'Tipo de Consulta': tipoConsulta,
   }
+
+  if (notasSuplemento) fields['Notas del Terapeuta'] = notasSuplemento
 
 
   const peso             = num('pesoKg')

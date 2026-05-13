@@ -1,7 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getRole } from '@/lib/auth'
-import { getClienteById, getClientes, type Cliente } from '@/lib/airtable'
+import { getClienteById, getClientes, getSupplementos, type Cliente, type Suplemento } from '@/lib/airtable'
 import { ConsultaSubsecuenteClient } from './consulta-subsecuente-client'
 
 export default async function ConsultaSubsecuentePage({
@@ -20,11 +20,19 @@ export default async function ConsultaSubsecuentePage({
 
   let patient: Cliente | null = null
   let allPatients: Cliente[] = []
+  let supplementos: Suplemento[] = []
 
-  if (clienteId) {
-    try { patient = await getClienteById(clienteId) } catch {}
-  } else {
-    try { allPatients = await getClientes() } catch {}
+  const [patientsResult, supplementosResult] = await Promise.allSettled([
+    clienteId ? getClienteById(clienteId) : getClientes(),
+    getSupplementos(),
+  ])
+
+  if (patientsResult.status === 'fulfilled') {
+    if (clienteId) { patient = patientsResult.value as Cliente }
+    else { allPatients = patientsResult.value as Cliente[] }
+  }
+  if (supplementosResult.status === 'fulfilled') {
+    supplementos = supplementosResult.value as Suplemento[]
   }
 
   return (
@@ -32,6 +40,7 @@ export default async function ConsultaSubsecuentePage({
       user={user ? { firstName: user.firstName, lastName: user.lastName } : null}
       patient={patient}
       allPatients={allPatients}
+      supplementos={supplementos}
     />
   )
 }

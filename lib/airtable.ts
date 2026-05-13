@@ -356,3 +356,24 @@ export async function getConsultasByCliente(nombreCliente: string): Promise<Cons
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
   return data.records
 }
+
+// ---------- Suplementos ----------
+
+export interface Suplemento {
+  id: string
+  fields: {
+    'Nombre'?: string
+    'Precio de Venta ($)'?: number
+    'Categoría'?: string
+    'SKU'?: number
+    'Activo'?: string
+  }
+}
+
+export async function getSupplementos(): Promise<Suplemento[]> {
+  const formula = encodeURIComponent(`{Activo} = "Sí"`)
+  const data = await airtableFetch(
+    `/Suplementos_AQSLIM?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Nombre&sort%5B0%5D%5Bdirection%5D=asc`
+  )
+  return data.records ?? []
+}
