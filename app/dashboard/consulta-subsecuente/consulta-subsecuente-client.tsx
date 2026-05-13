@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
 import { saveConsultaSubsecuente } from './actions'
+import { sendReinitiationEmail } from '@/app/dashboard/[id]/edit/actions'
 import type { Cliente, Suplemento } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
@@ -261,6 +262,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [saved,      setSaved]      = useState<{ id: string } | null>(null)
   const [error,      setError]      = useState<string | null>(null)
   const [isPending,  startTransition] = useTransition()
+
+  const [emailPending, startEmailTransition] = useTransition()
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'error'>('idle')
+  const [emailError,  setEmailError]  = useState<string | null>(null)
 
   // When opened from a patient's expediente, auto-redirect back after saving
   useEffect(() => {
@@ -818,6 +823,64 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             value={metodoPago}
             onChange={setMetodoPago}
           />
+
+          <SectionDivider label={es ? 'Email de Re-Inicio' : 'Re-Start Email'} />
+
+          <div>
+            <p style={{ fontSize: pt.sm, color: '#9A9590', margin: '0 0 12px', fontFamily: pt.sans, lineHeight: 1.6 }}>
+              {es
+                ? 'Envía un correo de bienvenida de regreso con enlace para agendar cita y cuestionario de síntomas.'
+                : 'Send a welcome-back email with a booking link and symptom questionnaire.'}
+            </p>
+
+            {emailStatus === 'sent' && (
+              <div style={{
+                padding: '10px 14px', background: 'rgba(111,191,111,0.08)',
+                border: '1px solid rgba(111,191,111,0.35)', marginBottom: 12,
+                fontSize: pt.sm, color: '#6fbf6f', fontFamily: pt.sans,
+              }}>
+                {es ? `Email enviado a ${patient?.fields['Email'] ?? ''}.` : `Email sent to ${patient?.fields['Email'] ?? ''}.`}
+              </div>
+            )}
+            {emailStatus === 'error' && emailError && (
+              <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: '0 0 12px' }}>{emailError}</p>
+            )}
+
+            <button
+              type="button"
+              disabled={emailPending || emailStatus === 'sent'}
+              onClick={() => {
+                if (!patient) return
+                setEmailStatus('idle')
+                setEmailError(null)
+                startEmailTransition(async () => {
+                  try {
+                    await sendReinitiationEmail(patient.id)
+                    setEmailStatus('sent')
+                  } catch (err) {
+                    setEmailStatus('error')
+                    setEmailError(err instanceof Error ? err.message : (es ? 'Error al enviar.' : 'Error sending.'))
+                  }
+                })
+              }}
+              style={{
+                background: 'none',
+                color: emailStatus === 'sent' ? '#6fbf6f' : '#C9A84C',
+                border: `1px solid ${emailStatus === 'sent' ? 'rgba(111,191,111,0.4)' : 'rgba(201,168,76,0.4)'}`,
+                padding: '10px 20px', fontSize: pt.sm,
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+                fontFamily: pt.sans, fontWeight: 500,
+                cursor: (emailPending || emailStatus === 'sent') ? 'not-allowed' : 'pointer',
+                opacity: (emailPending || emailStatus === 'sent') ? 0.6 : 1,
+              }}
+            >
+              {emailPending
+                ? (es ? 'Enviando...' : 'Sending...')
+                : emailStatus === 'sent'
+                  ? (es ? '✓ Email enviado' : '✓ Email sent')
+                  : (es ? 'Enviar Email de Re-Inicio' : 'Send Re-Start Email')}
+            </button>
+          </div>
 
           {error && <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>}
 

@@ -13,6 +13,53 @@ function mmddyyyyToISO(date: string): string | undefined {
   return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
 }
 
+function reinitiationEmailHtml(nombre: string, lang: 'es' | 'en'): string {
+  const es = lang === 'es'
+
+  const card  = 'background:#1A1A1A;border:1px solid rgba(201,168,76,0.18);padding:24px;margin-bottom:16px;'
+  const num   = 'font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A84C;font-family:Arial,sans-serif;margin:0 0 6px;'
+  const title = 'font-size:17px;font-weight:400;color:#FAFAF8;font-family:Georgia,serif;margin:0 0 10px;'
+  const desc  = 'font-size:13px;line-height:1.75;color:#9A9590;font-family:Arial,sans-serif;margin:0 0 18px;'
+  const btn   = 'display:inline-block;padding:11px 22px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#0A0A0A;text-decoration:none;font-family:Arial,sans-serif;font-weight:700;background:#C9A84C;'
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0A0A0A;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+        <tr><td style="padding-bottom:32px;text-align:center;">
+          <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:0.1em;color:#FAFAF8;">AQ<span style="color:#C9A84C;">SLIM</span></span>
+        </td></tr>
+        <tr><td style="background:#111111;border:1px solid rgba(201,168,76,0.25);padding:40px;">
+          <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A84C;font-family:Arial,sans-serif;">${es ? 'Bienvenido de regreso' : 'Welcome back'}</p>
+          <h1 style="margin:0 0 16px;font-size:26px;font-weight:400;color:#FAFAF8;font-family:Georgia,serif;line-height:1.3;">${es ? `¡Nos alegra verte de regreso, ${nombre}!` : `Great to have you back, ${nombre}!`}</h1>
+          <p style="margin:0 0 28px;font-size:15px;line-height:1.8;color:#9A9590;font-family:Arial,sans-serif;">${es ? 'Estamos listos para apoyarte en retomar tu camino hacia tu meta. Completa los siguientes pasos para tu cita de re-inicio:' : "We're ready to support you in getting back on track. Complete the following steps for your re-start appointment:"}</p>
+          <div style="${card}">
+            <p style="${num}">${es ? 'Paso 1 — Agenda tu cita de re-inicio' : 'Step 1 — Book your re-start appointment'}</p>
+            <p style="${title}">${es ? 'Reserva tu cita' : 'Reserve your appointment'}</p>
+            <p style="${desc}">${es ? 'Selecciona el día y horario que mejor se adapte a ti para tu cita de regreso.' : 'Choose a day and time that works best for you for your return visit.'}</p>
+            <a href="${SQUARE_BOOKING_URL}" style="${btn}">${es ? 'Agendar cita →' : 'Book appointment →'}</a>
+          </div>
+          <div style="${card}margin-bottom:0;">
+            <p style="${num}">${es ? 'Paso 2 — Cuestionario de síntomas' : 'Step 2 — Symptom questionnaire'}</p>
+            <p style="${title}">${es ? 'Actualiza tu cuestionario' : 'Update your questionnaire'}</p>
+            <p style="${desc}">${es ? 'Cuéntanos cómo te has sentido desde tu última visita para que podamos ajustar tu programa.' : 'Tell us how you have been feeling since your last visit so we can update your program.'}</p>
+            <a href="${CUESTIONARIO_URL}" style="${btn}">${es ? 'Completar cuestionario →' : 'Complete questionnaire →'}</a>
+          </div>
+        </td></tr>
+        <tr><td style="padding:24px 0 0;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#6A6560;font-family:Arial,sans-serif;">${es ? 'Si tienes preguntas, responde a este correo.' : 'If you have any questions, reply to this email.'}</p>
+          <p style="margin:8px 0 0;font-size:11px;color:#3A3530;font-family:Arial,sans-serif;">© AQSLIM · aqslim.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
 function welcomeEmailHtml(nombre: string, lang: 'es' | 'en'): string {
   const es = lang === 'es'
   const heading  = es ? `¡Bienvenido a AQSLIM, ${nombre}!` : `Welcome to AQSLIM, ${nombre}!`
@@ -91,6 +138,7 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones')    as string) ?? '').trim()
   const estaturaCm      = ((formData.get('estaturaCm')     as string) ?? '').trim()
+  const emailType       = ((formData.get('emailType')      as string) ?? 'bienvenida').trim()
 
   const nombre = [firstName, lastName].filter(Boolean).join(' ')
 
@@ -118,18 +166,21 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
 
   const cliente = await createCliente(fields)
 
-  // Send welcome email — non-blocking
+  // Send email — non-blocking; type determined by admin selection
   const lang: 'es' | 'en' = idioma === 'English' ? 'en' : 'es'
+  const isReinicio = emailType === 'reinicio'
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
     await resend.emails.send({
       from: 'AQSLIM <contact@aqslim.com>',
       to: email,
-      subject: lang === 'es' ? 'Tu cuestionario de síntomas — AQSLIM' : 'Your symptom questionnaire — AQSLIM',
-      html: welcomeEmailHtml(nombre, lang),
+      subject: isReinicio
+        ? (lang === 'es' ? 'Bienvenido de regreso a AQSLIM' : 'Welcome back to AQSLIM')
+        : (lang === 'es' ? 'Tu cuestionario de síntomas — AQSLIM' : 'Your symptom questionnaire — AQSLIM'),
+      html: isReinicio ? reinitiationEmailHtml(nombre, lang) : welcomeEmailHtml(nombre, lang),
     })
   } catch (err) {
-    console.error('[registerPaciente] Failed to send welcome email:', err)
+    console.error('[registerPaciente] Failed to send email:', err)
   }
 
   return { id: cliente.id, nombre }

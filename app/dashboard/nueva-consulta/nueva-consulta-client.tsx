@@ -68,6 +68,9 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
   const [telefono, setTelefono]           = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
 
+  // Email type
+  const [emailType, setEmailType] = useState<'bienvenida' | 'reinicio'>('bienvenida')
+
   // Height state
   const [estaturaUnit, setEstaturaUnit] = useState<'ft-in' | 'cm'>('ft-in')
   const [estaturaFt, setEstaturaFt]     = useState('')
@@ -129,6 +132,7 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
     setComoNosConocio(null)
     setTelefono('')
     setFechaNacimiento('')
+    setEmailType('bienvenida')
     setEstaturaUnit('ft-in')
     setEstaturaFt('')
     setEstaturaIn('')
@@ -171,6 +175,7 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
           return (!isNaN(ft) && !isNaN(inches)) ? String(Math.round((ft * 12 + inches) * 2.54)) : ''
         })()
     if (estaturaCmVal) formData.set('estaturaCm', estaturaCmVal)
+    formData.set('emailType', emailType)
 
     startTransition(async () => {
       try {
@@ -445,6 +450,25 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
                 : 'List any relevant medical conditions or allergies (optional)...'}
               style={textareaStyle}
             />
+          </div>
+
+          <SectionDivider label={es ? 'Email de Bienvenida' : 'Welcome Email'} />
+
+          <div>
+            <span style={labelStyle}>{es ? 'Tipo de Email' : 'Email Type'}</span>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button type="button" onClick={() => setEmailType('bienvenida')} style={toggleBtnStyle(emailType === 'bienvenida')}>
+                {es ? 'Nuevo Cliente' : 'New Client'}
+              </button>
+              <button type="button" onClick={() => setEmailType('reinicio')} style={toggleBtnStyle(emailType === 'reinicio')}>
+                {es ? 'Re-Inicio' : 'Re-Start'}
+              </button>
+            </div>
+            <p style={{ fontSize: pt.xs, color: '#6A6560', marginTop: 8, marginBottom: 0, fontFamily: pt.sans, lineHeight: 1.5 }}>
+              {emailType === 'reinicio'
+                ? (es ? 'Se enviará un correo de bienvenida de regreso con enlace para agendar y cuestionario.' : 'A welcome-back email with booking link and questionnaire will be sent.')
+                : (es ? 'Se enviará el correo estándar de nuevo cliente con los pasos a seguir.' : 'The standard new-client email with next steps will be sent.')}
+            </p>
           </div>
 
           {error && (

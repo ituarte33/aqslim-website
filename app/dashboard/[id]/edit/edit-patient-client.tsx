@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
-import { updatePaciente } from './actions'
+import { updatePaciente, sendReinitiationEmail } from './actions'
 
 type Props = {
   patient: Cliente
@@ -77,6 +77,10 @@ export function EditPatientClient({ patient }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+
+  const [emailPending, startEmailTransition] = useTransition()
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'error'>('idle')
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   const f = patient.fields
   const nameParts = (f['Nombre Completo'] ?? '').split(' ')
@@ -466,6 +470,66 @@ export function EditPatientClient({ patient }: Props) {
             </button>
           </div>
         </form>
+
+        {/* Re-initiation email */}
+        <div style={{
+          marginTop: 40,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          paddingTop: 32,
+        }}>
+          <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Comunicaciones
+          </p>
+          <h2 style={{ fontFamily: pt.serif, fontSize: pt.lg, fontWeight: 400, marginBottom: 8 }}>
+            Email de Re-Inicio
+          </h2>
+          <p style={{ fontSize: pt.sm, color: '#9A9590', marginBottom: 20, lineHeight: 1.6 }}>
+            Envía un correo de bienvenida de regreso con un enlace para agendar cita y completar el cuestionario de síntomas.
+          </p>
+
+          {emailStatus === 'sent' && (
+            <div style={{
+              padding: '12px 16px', background: 'rgba(111,191,111,0.08)',
+              border: '1px solid rgba(111,191,111,0.35)', marginBottom: 16,
+              fontSize: pt.sm, color: '#6fbf6f', fontFamily: pt.sans,
+            }}>
+              Email enviado correctamente a {f['Email']}.
+            </div>
+          )}
+          {emailStatus === 'error' && emailError && (
+            <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: '0 0 16px' }}>{emailError}</p>
+          )}
+
+          <button
+            type="button"
+            disabled={emailPending || emailStatus === 'sent'}
+            onClick={() => {
+              setEmailStatus('idle')
+              setEmailError(null)
+              startEmailTransition(async () => {
+                try {
+                  await sendReinitiationEmail(patient.id)
+                  setEmailStatus('sent')
+                } catch (err) {
+                  setEmailStatus('error')
+                  setEmailError(err instanceof Error ? err.message : 'Error al enviar.')
+                }
+              })
+            }}
+            style={{
+              background: 'none',
+              color: emailStatus === 'sent' ? '#6fbf6f' : '#C9A84C',
+              border: `1px solid ${emailStatus === 'sent' ? 'rgba(111,191,111,0.4)' : 'rgba(201,168,76,0.5)'}`,
+              padding: '12px 24px', fontSize: pt.sm,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              fontFamily: pt.sans, fontWeight: 500,
+              cursor: (emailPending || emailStatus === 'sent') ? 'not-allowed' : 'pointer',
+              opacity: (emailPending || emailStatus === 'sent') ? 0.6 : 1,
+            }}
+          >
+            {emailPending ? 'Enviando...' : emailStatus === 'sent' ? '✓ Email enviado' : 'Enviar Email de Re-Inicio'}
+          </button>
+        </div>
       </main>
 
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400&family=Montserrat:wght@300;400;500&display=swap" />
