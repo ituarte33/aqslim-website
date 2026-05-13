@@ -79,43 +79,57 @@ function EstaturaCard({ cm }: { cm: number }) {
 
 type ColDef = {
   field: keyof Consulta['fields']
+  colKey?: string
   label?: string
   render?: (c: Consulta) => string
 }
 
-function weightColumns(unidad: string | undefined): ColDef[] {
-  const isLB = unidad?.toUpperCase() === 'LB'
-  const weightLabel = isLB ? 'Peso (lb)' : 'Peso (kg)'
-  const diffLabel   = isLB ? 'Dif. vs Sem. Ant. (lb)' : 'Dif. vs Sem. Ant. (kg)'
-
-  return [
-    { field: 'Fecha Consulta' },
-    {
-      field: 'Peso (kg)',
-      label: weightLabel,
-      render: (c) => {
-        // Prefer the pre-formatted "con unidad" field stored by Airtable
-        if (c.fields['Peso (con unidad)']) return String(c.fields['Peso (con unidad)'])
-        const kg = c.fields['Peso (kg)']
-        if (kg == null) return '—'
-        return isLB ? `${(kg * 2.20462).toFixed(1)} lb` : `${kg} kg`
-      },
+const WEIGHT_COLS: ColDef[] = [
+  { field: 'Fecha Consulta' },
+  {
+    field: 'Peso (kg)',
+    colKey: 'peso-kg',
+    label: 'Peso (kg)',
+    render: (c) => {
+      const kg = c.fields['Peso (kg)']
+      return kg == null ? '—' : Number(kg).toFixed(1)
     },
-    {
-      field: 'Diferencia vs Semana Anterior (kg)',
-      label: diffLabel,
-      render: (c) => {
-        const diff = c.fields['Diferencia vs Semana Anterior (kg)']
-        if (diff == null) return '—'
-        const val = isLB ? diff * 2.20462 : diff
-        const sign = val > 0 ? '+' : ''
-        return `${sign}${val.toFixed(1)} ${isLB ? 'lb' : 'kg'}`
-      },
+  },
+  {
+    field: 'Peso (kg)',
+    colKey: 'peso-lbs',
+    label: 'Peso (lbs)',
+    render: (c) => {
+      const kg = c.fields['Peso (kg)']
+      return kg == null ? '—' : (Number(kg) * 2.20462).toFixed(1)
     },
-    { field: '% Grasa Corporal' },
-    { field: 'IMC' },
-  ]
-}
+  },
+  {
+    field: 'Diferencia vs Semana Anterior (kg)',
+    colKey: 'dif-kg',
+    label: 'Dif. (kg)',
+    render: (c) => {
+      const diff = c.fields['Diferencia vs Semana Anterior (kg)']
+      if (diff == null) return '—'
+      const sign = diff > 0 ? '+' : ''
+      return `${sign}${Number(diff).toFixed(1)}`
+    },
+  },
+  {
+    field: 'Diferencia vs Semana Anterior (kg)',
+    colKey: 'dif-lbs',
+    label: 'Dif. (lbs)',
+    render: (c) => {
+      const diff = c.fields['Diferencia vs Semana Anterior (kg)']
+      if (diff == null) return '—'
+      const val = Number(diff) * 2.20462
+      const sign = val > 0 ? '+' : ''
+      return `${sign}${val.toFixed(1)}`
+    },
+  },
+  { field: '% Grasa Corporal' },
+  { field: 'IMC' },
+]
 
 const MEASUREMENTS_COLS: ColDef[] = [
   { field: 'Fecha Consulta' },
@@ -155,7 +169,7 @@ function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; 
         <thead>
           <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
             {columns.map(col => (
-              <th key={String(col.field)} style={{
+              <th key={col.colKey ?? String(col.field)} style={{
                 textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
                 fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
               }}>
@@ -171,7 +185,7 @@ function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; 
               background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
             }}>
               {columns.map(col => (
-                <td key={String(col.field)} style={{
+                <td key={col.colKey ?? String(col.field)} style={{
                   padding: '12px 16px', whiteSpace: 'nowrap',
                   color: col.field === 'Fecha Consulta' ? '#FAFAF8' : '#9A9590',
                 }}>
@@ -353,7 +367,7 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
               ))}
             </div>
 
-            {activeTab === 'weight' && <ConsultaTable consultations={consultations} columns={weightColumns(patient.fields['Unidad de Peso'])} />}
+            {activeTab === 'weight' && <ConsultaTable consultations={consultations} columns={WEIGHT_COLS} />}
             {activeTab === 'measurements' && <ConsultaTable consultations={consultations} columns={MEASUREMENTS_COLS} />}
             {activeTab === 'wellness' && <ConsultaTable consultations={consultations} columns={WELLNESS_COLS} />}
             {activeTab === 'notes' && <NotesTab consultations={consultations} />}
