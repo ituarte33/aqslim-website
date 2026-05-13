@@ -1,6 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getClienteByEmail, hasCuestionario, hasConsulta } from '@/lib/airtable'
+import { hasUpcomingBookingByEmail } from '@/lib/square'
 import { OnboardingClient } from './onboarding-client'
 
 export default async function OnboardingPage() {
@@ -14,11 +15,18 @@ export default async function OnboardingPage() {
   const cliente = await getClienteByEmail(email)
   if (!cliente) redirect('/dashboard')
 
-  const profileFilled = cliente.fields['He leído y acepto los términos anteriores'] === true
-  const step1Done = cliente.fields['Cita Agendada'] === true
-  const cuestionarioDone = profileFilled ? await hasCuestionario(cliente.fields['Nombre Completo'] ?? '') : false
+  const profileFilled  = cliente.fields['He leído y acepto los términos anteriores'] === true
+  const airtableBooked = cliente.fields['Cita Agendada'] === true
+  const nombreCliente  = cliente.fields['Nombre Completo'] ?? ''
 
-  const nombreCliente = cliente.fields['Nombre Completo'] ?? ''
+  // Run Square check + cuestionario check in parallel to avoid sequential latency.
+  const [cuestionarioDone, squareBooked] = await Promise.all([
+    profileFilled && nombreCliente ? hasCuestionario(nombreCliente) : Promise.resolve(false),
+    hasUpcomingBookingByEmail(email).catch(() => false),
+  ])
+
+  const step1Done = airtableBooked || squareBooked
+
   if (nombreCliente) {
     const consulta = await hasConsulta(nombreCliente)
     if (consulta) redirect(`/dashboard/${cliente.id}`)
@@ -26,7 +34,6 @@ export default async function OnboardingPage() {
 
   const allDone = step1Done && cuestionarioDone
 
-  // Patient was pre-registered by admin (has data filled in but hasn't confirmed T&C yet)
   const isPreRegistered = !profileFilled && (
     cliente.fields['Estado del Cliente'] === 'Activo' ||
     Boolean(cliente.fields['Teléfono'])
@@ -57,6 +64,12 @@ export default async function OnboardingPage() {
       cuestionarioDone={cuestionarioDone}
       allDone={allDone}
       clienteData={clienteData}
+      bookingInfo={{
+        clienteId: cliente.id,
+        nombre:    nombreCliente || `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
+        email,
+        telefono:  cliente.fields['Teléfono'] || undefined,
+      }}
     />
   )
 }

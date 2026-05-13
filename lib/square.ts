@@ -189,6 +189,193 @@ export async function getUpcomingBookings(): Promise<SquareBooking[]> {
     .sort((a, b) => a.start_at.localeCompare(b.start_at))
 }
 
+// ---------- Booking API types ----------
+
+export interface SquareService {
+  id: string            // catalog ITEM id
+  variationId: string   // ITEM_VARIATION id
+  name: string
+  description?: string
+  durationMinutes: number
+  priceCents: number
+}
+
+export interface AvailableSlot {
+  startAt: string
+  teamMemberId: string
+  serviceVariationId: string
+  serviceVariationVersion: number
+}
+
+// ---------- Booking API helpers ----------
+
+// Convert a YYYY-MM-DD Pacific date to UTC start/end for that calendar day.
+function ptDateToUtcRange(dateStr: string): { start: string; end: string } {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  // Sample noon UTC to determine the Pacific offset (PST=-8, PDT=-7)
+  const sampleUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  const ptHour = parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      hour12: false,
+    }).format(sampleUtc),
+    10
+  ) // 4 (PST) or 5 (PDT) when UTC=12
+  const utcOffsetHours = ptHour - 12  // -8 or -7
+  const startMs = Date.UTC(y, m - 1, d) - utcOffsetHours * 3_600_000
+  return {
+    start: new Date(startMs).toISOString(),
+    end:   new Date(startMs + 24 * 3_600_000 - 1_000).toISOString(),
+  }
+}
+
+// Fetch bookable catalog items. Pass allowedNames to filter by name (case-insensitive);
+// omit or pass undefined to return every bookable service.
+export async function getBookableServices(allowedNames?: string[]): Promise<SquareService[]> {
+  const lower = allowedNames?.map(n => n.toLowerCase()) ?? null
+  const services: SquareService[] = []
+  let cursor: string | undefined
+
+  do {
+    const params = new URLSearchParams({ types: 'ITEM' })
+    if (cursor) params.set('cursor', cursor)
+    const data = await squareFetch(`/catalog/list?${params}`)
+
+    for (const obj of data.objects ?? []) {
+      if (obj.type !== 'ITEM') continue
+      const item = obj.item_data
+      if (lower && !lower.includes((item?.name ?? '').toLowerCase())) continue
+
+      for (const variation of item?.variations ?? []) {
+        const vd = variation.item_variation_data
+        if (vd?.available_for_booking === false) continue
+        services.push({
+          id:              obj.id,
+          variationId:     variation.id,
+          name:            item.name,
+          description:     item.description,
+          durationMinutes: Math.round((vd?.service_duration ?? 0) / 60_000),
+          priceCents:      vd?.price_money?.amount ?? 0,
+        })
+      }
+    }
+    cursor = data.cursor
+  } while (cursor)
+
+  return services
+}
+
+// Return available time slots for a service variation on a given Pacific date.
+export async function searchAvailability(
+  serviceVariationId: string,
+  dateStr: string,
+  locationId: string,
+): Promise<AvailableSlot[]> {
+  const { start, end } = ptDateToUtcRange(dateStr)
+  const data = await squareFetch('/bookings/availability/search', {
+    method: 'POST',
+    body: JSON.stringify({
+      query: {
+        filter: {
+          start_at_range: { start_at: start, end_at: end },
+          location_id: locationId,
+          segment_filters: [{ service_variation_id: serviceVariationId }],
+        },
+      },
+    }),
+  })
+
+  return (data.availabilities ?? [])
+    .filter((a: { appointment_segments?: unknown[] }) => (a.appointment_segments ?? []).length > 0)
+    .map((a: {
+      start_at: string
+      appointment_segments: { team_member_id: string; service_variation_id: string; service_variation_version: number }[]
+    }) => {
+      const seg = a.appointment_segments[0]
+      return {
+        startAt:                seg.team_member_id ? a.start_at : a.start_at,
+        teamMemberId:           seg.team_member_id,
+        serviceVariationId:     seg.service_variation_id,
+        serviceVariationVersion:seg.service_variation_version,
+      } satisfies AvailableSlot
+    })
+}
+
+// Find a Square customer by email, or create one if not found. Returns customer_id.
+export async function findOrCreateSquareCustomer(
+  email: string,
+  givenName: string,
+  familyName?: string,
+  phone?: string,
+): Promise<string> {
+  const search = await squareFetch('/customers/search', {
+    method: 'POST',
+    body: JSON.stringify({ query: { filter: { email_address: { exact: email } } } }),
+  })
+  if (search.customers?.length > 0) return search.customers[0].id as string
+
+  const body: Record<string, string> = {
+    idempotency_key: `create-${email}-${Date.now()}`,
+    given_name:      givenName,
+    email_address:   email,
+  }
+  if (familyName) body.family_name = familyName
+  if (phone)      body.phone_number = phone
+
+  const created = await squareFetch('/customers', { method: 'POST', body: JSON.stringify(body) })
+  return created.customer.id as string
+}
+
+// Create a booking for a customer using a slot from searchAvailability.
+export async function createSquareBooking(
+  customerId: string,
+  slot: AvailableSlot,
+  locationId: string,
+): Promise<{ bookingId: string; startAt: string }> {
+  const data = await squareFetch('/bookings', {
+    method: 'POST',
+    body: JSON.stringify({
+      idempotency_key: `book-${customerId}-${slot.startAt}-${slot.serviceVariationId}`,
+      booking: {
+        start_at:    slot.startAt,
+        location_id: locationId,
+        customer_id: customerId,
+        appointment_segments: [{
+          service_variation_id:      slot.serviceVariationId,
+          service_variation_version: slot.serviceVariationVersion,
+          team_member_id:            slot.teamMemberId,
+        }],
+      },
+    }),
+  })
+  return { bookingId: data.booking.id as string, startAt: data.booking.start_at as string }
+}
+
+// Return true if the customer with this email has any upcoming (non-cancelled) Square booking.
+export async function hasUpcomingBookingByEmail(email: string): Promise<boolean> {
+  try {
+    const search = await squareFetch('/customers/search', {
+      method: 'POST',
+      body: JSON.stringify({ query: { filter: { email_address: { exact: email } } } }),
+    })
+    if (!search.customers?.length) return false
+    const customerId = search.customers[0].id as string
+
+    const params = new URLSearchParams({
+      customer_id:   customerId,
+      location_id:   process.env.SQUARE_LOCATION_ID!,
+      start_at_min:  new Date().toISOString(),
+      limit:         '5',
+    })
+    const bookings = await squareFetch(`/bookings?${params}`)
+    const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_MERCHANT', 'DECLINED', 'NO_SHOW'])
+    return (bookings.bookings ?? []).some((b: { status: string }) => !CANCELLED.has(b.status))
+  } catch {
+    return false
+  }
+}
+
 // Returns the count of remaining bookings for today (Pacific time, from now onward).
 export async function getTodaysBookingCount(): Promise<number> {
   const now = new Date()
@@ -223,6 +410,37 @@ export async function getTodaysBookingCount(): Promise<number> {
   return (data.bookings ?? []).filter(
     (b: { status: string }) => !CANCELLED.has(b.status)
   ).length
+}
+
+// Search Square customers by email (fuzzy) or phone. Returns raw customer objects.
+export async function searchSquareCustomers(query: string): Promise<{
+  id: string
+  given_name?: string
+  family_name?: string
+  email_address?: string
+  phone_number?: string
+}[]> {
+  const q = query.trim()
+  if (!q) return []
+
+  // Try email fuzzy first, then phone exact — run in parallel and merge
+  const [byEmail, byPhone] = await Promise.all([
+    squareFetch('/customers/search', {
+      method: 'POST',
+      body: JSON.stringify({ query: { filter: { email_address: { fuzzy: q } } }, limit: 10 }),
+    }).then(d => d.customers ?? []).catch(() => [] as unknown[]),
+    squareFetch('/customers/search', {
+      method: 'POST',
+      body: JSON.stringify({ query: { filter: { phone_number: { exact: q } } }, limit: 5 }),
+    }).then(d => d.customers ?? []).catch(() => [] as unknown[]),
+  ])
+
+  const seen = new Set<string>()
+  const results: { id: string; given_name?: string; family_name?: string; email_address?: string; phone_number?: string }[] = []
+  for (const c of [...byEmail, ...byPhone] as { id: string; given_name?: string; family_name?: string; email_address?: string; phone_number?: string }[]) {
+    if (!seen.has(c.id)) { seen.add(c.id); results.push(c) }
+  }
+  return results
 }
 
 // ---------- Revenue ----------

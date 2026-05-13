@@ -4,8 +4,7 @@ import { useState, useTransition } from 'react'
 import { UserButton } from '@clerk/nextjs'
 import { saveProfile, acceptTerminos, updateProfileAndAcceptTerminos } from './actions'
 import { pt } from '@/lib/portal-type'
-
-const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
+import { BookingWidget } from './booking-widget'
 
 type ClienteData = {
   nombre?: string
@@ -23,6 +22,13 @@ type ClienteData = {
   comoNosConocio?: string
 }
 
+type BookingInfo = {
+  clienteId: string
+  nombre: string
+  email?: string
+  telefono?: string
+}
+
 type Props = {
   defaultFirstName: string
   defaultLastName: string
@@ -31,6 +37,7 @@ type Props = {
   cuestionarioDone?: boolean
   allDone?: boolean
   clienteData?: ClienteData
+  bookingInfo?: BookingInfo
 }
 
 const inputStyle = {
@@ -159,8 +166,9 @@ function DisclaimerBox({ lang }: { lang: 'en' | 'es' }) {
   )
 }
 
-export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done = false, cuestionarioDone = false, allDone = false, clienteData }: Props) {
+export function OnboardingClient({ defaultFirstName, defaultLastName, initialStep = 'profile', step1Done: initStep1Done = false, cuestionarioDone = false, allDone = false, clienteData, bookingInfo }: Props) {
   const [step, setStep] = useState<'profile' | 'confirm' | 'next-steps'>(initialStep)
+  const [step1Done, setStep1Done] = useState(initStep1Done)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -546,19 +554,18 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                     </div>
                   </div>
 
-                  {/* Square booking iframe */}
-                  {!step1Done && (
-                    <iframe
-                      src={SQUARE_BOOKING_URL}
-                      title="Agendar consulta"
-                      style={{
-                        width: '100%',
-                        height: 600,
-                        border: 'none',
-                        display: 'block',
-                        borderTop: '1px solid rgba(201,168,76,0.15)',
-                      }}
-                    />
+                  {!step1Done && bookingInfo && (
+                    <div style={{ padding: '0 24px 24px' }}>
+                      <BookingWidget
+                        clienteId={bookingInfo.clienteId}
+                        nombre={bookingInfo.nombre}
+                        email={bookingInfo.email}
+                        telefono={bookingInfo.telefono}
+                        allowedServices={['New Client', 'New Beggining']}
+                        lang={(idioma === 'English' || clienteData?.idioma === 'English') ? 'en' : 'es'}
+                        onBooked={() => setStep1Done(true)}
+                      />
+                    </div>
                   )}
                 </div>
 

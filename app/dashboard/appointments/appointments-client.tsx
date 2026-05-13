@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
 import type { SquareBooking } from '@/lib/square'
+import { BookingWidget } from '@/app/onboarding/booking-widget'
+import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 
 const SQUARE_MANAGE_URL   = 'https://app.squareup.com/dashboard/appointments/calendar'
 const GOOGLE_CALENDAR_SRC = 'https://calendar.google.com/calendar/embed?src=9d8c0344cef5ea1337d190292b059834d0cdbbee9b2282712a61f89dc804fbf7%40group.calendar.google.com&ctz=America%2FPhoenix'
@@ -21,6 +23,7 @@ type Props = {
 function formatDate(iso: string, lang: 'es' | 'en'): string {
   try {
     return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
+      timeZone: 'America/Los_Angeles',
       weekday: 'short',
       month:   'short',
       day:     'numeric',
@@ -58,12 +61,13 @@ function StatusBadge({ status, lang }: { status: string; lang: 'es' | 'en' }) {
 export function AppointmentsClient({ user, bookings, airtableHrefs, squareError }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [tab, setTab]   = useState<Tab>('list')
+  const [showBooking, setShowBooking] = useState(false)
   const es = lang === 'es'
 
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 24, marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 24, marginTop: 8, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontFamily: pt.serif, fontSize: pt.h1, fontWeight: 400, marginBottom: 8, marginTop: 0 }}>
             {es ? 'Citas' : 'Appointments'}
@@ -72,29 +76,57 @@ export function AppointmentsClient({ user, bookings, airtableHrefs, squareError 
             {es ? 'Citas próximas desde Square.' : 'Upcoming appointments from Square.'}
           </p>
         </div>
-        <a
-          href={SQUARE_MANAGE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            flexShrink: 0,
-            background: 'none',
-            color: '#C9A84C',
-            border: '1px solid rgba(201,168,76,0.5)',
-            padding: '10px 20px',
-            fontSize: pt.sm,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            fontFamily: pt.sans,
-            fontWeight: 500,
-            textDecoration: 'none',
-            display: 'inline-block',
-            marginTop: 4,
-          }}
-        >
-          {es ? 'Abrir Square →' : 'Open Square →'}
-        </a>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0, marginTop: 4 }}>
+          <button
+            onClick={() => setShowBooking(v => !v)}
+            style={{
+              background: showBooking ? 'rgba(201,168,76,0.12)' : 'none',
+              color: '#C9A84C',
+              border: '1px solid rgba(201,168,76,0.5)',
+              padding: '10px 20px',
+              fontSize: pt.sm,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              fontFamily: pt.sans,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            {showBooking ? (es ? '✕ Cerrar' : '✕ Close') : (es ? '+ Agendar Cita' : '+ New Appointment')}
+          </button>
+          <a
+            href={SQUARE_MANAGE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'none',
+              color: '#C9A84C',
+              border: '1px solid rgba(201,168,76,0.5)',
+              padding: '10px 20px',
+              fontSize: pt.sm,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              fontFamily: pt.sans,
+              fontWeight: 500,
+              textDecoration: 'none',
+              display: 'inline-block',
+            }}
+          >
+            {es ? 'Abrir Square →' : 'Open Square →'}
+          </a>
+        </div>
       </div>
+
+      {showBooking && (
+        <div style={{ border: '1px solid rgba(201,168,76,0.2)', padding: '24px 28px', marginBottom: 32 }}>
+          <BookingWidget
+            allowedServices={ADMIN_SERVICES}
+            isAdmin
+            lang={lang}
+            onBooked={() => setShowBooking(false)}
+          />
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(201,168,76,0.15)', marginBottom: 32 }}>

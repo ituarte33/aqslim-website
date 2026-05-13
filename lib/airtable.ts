@@ -148,6 +148,15 @@ export async function getClienteById(id: string): Promise<Cliente> {
   return airtableFetch(`/${CLIENTES_TABLE}/${id}`)
 }
 
+export async function searchClientes(query: string): Promise<Cliente[]> {
+  const q = query.replace(/"/g, '')
+  const formula = encodeURIComponent(
+    `OR(SEARCH("${q.toLowerCase()}",LOWER({Nombre Completo})),SEARCH("${q.toLowerCase()}",LOWER({Email})))`
+  )
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}&maxRecords=10`)
+  return data.records ?? []
+}
+
 export async function updateCliente(id: string, fields: Record<string, unknown>): Promise<Cliente> {
   return airtableFetch(`/${CLIENTES_TABLE}/${id}`, {
     method: 'PATCH',

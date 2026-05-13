@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { DashboardShell } from './dashboard-shell'
 import type { getClientes, getClientesConCita } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
+import { BookingWidget } from '@/app/onboarding/booking-widget'
+import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
@@ -75,6 +77,7 @@ function formatCitaDate(iso: string | undefined, lang: 'es' | 'en'): string {
   if (!iso) return lang === 'es' ? 'Fecha pendiente' : 'Date pending'
   try {
     return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
+      timeZone: 'America/Los_Angeles',
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -94,6 +97,7 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const t = copy[lang]
   const es = lang === 'es'
+  const [showBooking, setShowBooking] = useState(false)
 
   const hasFinancesData = monthlyRevenue !== null || consultasCash !== null
   const combinedTotal   = (monthlyRevenue ?? 0) + (consultasCash ?? 0)
@@ -107,7 +111,7 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
         {t.title}
       </h1>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 48 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: showBooking ? 24 : 48, flexWrap: 'wrap' }}>
         <Link href="/dashboard/nueva-consulta" style={{
           background: '#C9A84C', color: '#0A0A0A', border: 'none',
           padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
@@ -125,7 +129,31 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
         }}>
           + {t.consultaSubsecuente}
         </Link>
+        <button
+          onClick={() => setShowBooking(v => !v)}
+          style={{
+            background: showBooking ? 'rgba(201,168,76,0.12)' : 'none',
+            color: '#C9A84C',
+            border: '1px solid rgba(201,168,76,0.5)',
+            padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+            textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          {showBooking ? (es ? '✕ Cerrar' : '✕ Close') : (es ? '+ Agendar Cita' : '+ New Appointment')}
+        </button>
       </div>
+
+      {showBooking && (
+        <div style={{ border: '1px solid rgba(201,168,76,0.2)', padding: '24px 28px', marginBottom: 48 }}>
+          <BookingWidget
+            allowedServices={ADMIN_SERVICES}
+            isAdmin
+            lang={lang}
+            onBooked={() => setShowBooking(false)}
+          />
+        </div>
+      )}
 
       {airtableError && (
         <div style={{ padding: '16px 20px', background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', marginBottom: 32, fontSize: pt.base, fontFamily: 'monospace' }}>

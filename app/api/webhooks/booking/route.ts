@@ -96,14 +96,21 @@ function extractCustomerEmail(text: string): string | null {
 //   "Monday, May 11, 2026"  (one line)
 //   "5:15 PM - 5:45 PM PDT" (next line)
 function extractAppointmentDatetime(text: string): string | null {
+  // Capture date, start time, and optional timezone abbreviation (PDT/PST).
   const m = text.match(
-    /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(\w+ \d{1,2},\s+\d{4})\s*[\r\n]+\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i
+    /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(\w+ \d{1,2},\s+\d{4})\s*[\r\n]+\s*(\d{1,2}:\d{2}\s*(?:AM|PM))(?:[^\n]*(PDT|PST))?/i
   )
-  if (m) {
-    const d = new Date(`${m[1]} ${m[2]}`)
-    if (!isNaN(d.getTime())) return d.toISOString()
-  }
-  return null
+  if (!m) return null
+
+  // new Date("May 11, 2026 5:15 PM") on Vercel's UTC server treats the time as
+  // UTC. The appointment is actually Pacific time, so we must add the PT offset
+  // to shift from the incorrectly-UTC-treated value back to true UTC.
+  const d = new Date(`${m[1]} ${m[2]}`)
+  if (isNaN(d.getTime())) return null
+
+  const tz = (m[3] ?? 'PDT').toUpperCase()
+  const ptOffsetMs = (tz === 'PST' ? 8 : 7) * 3_600_000  // PST=UTC-8, PDT=UTC-7
+  return new Date(d.getTime() + ptOffsetMs).toISOString()
 }
 
 // Service name appears on its own line immediately after the time range line:

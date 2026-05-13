@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, Consulta } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
+import { BookingWidget } from '@/app/onboarding/booking-widget'
+import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 
 type Props = {
   patient: Cliente | null
@@ -132,6 +134,7 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
 export function PatientDetailClient({ patient, consultations, error, isAdmin }: Props) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabId>('weight')
+  const [showBooking, setShowBooking] = useState(false)
 
   const tabBtn = (id: TabId) => ({
     background: 'none' as const,
@@ -204,26 +207,56 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
                 <StatCard label="Consultas" value={String(consultations.length)} />
               </div>
 
-              {isAdmin && (
-                <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                  <Link href={`/dashboard/consulta-subsecuente?clienteId=${patient.id}`} style={{
-                    background: 'none', color: '#C9A84C',
+              <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
+                {isAdmin && (
+                  <>
+                    <Link href={`/dashboard/consulta-subsecuente?clienteId=${patient.id}`} style={{
+                      background: 'none', color: '#C9A84C',
+                      border: '1px solid rgba(201,168,76,0.5)',
+                      padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                      textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+                      textDecoration: 'none', display: 'inline-block',
+                    }}>
+                      + Consulta Subsecuente
+                    </Link>
+                    <Link href={`/dashboard/${patient.id}/edit`} style={{
+                      background: 'none', color: '#C9A84C',
+                      border: '1px solid rgba(201,168,76,0.5)',
+                      padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                      textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+                      textDecoration: 'none', display: 'inline-block',
+                    }}>
+                      Editar Paciente
+                    </Link>
+                  </>
+                )}
+                <button
+                  onClick={() => setShowBooking(v => !v)}
+                  style={{
+                    background: showBooking ? 'rgba(201,168,76,0.12)' : 'none',
+                    color: '#C9A84C',
                     border: '1px solid rgba(201,168,76,0.5)',
                     padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
                     textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
-                    textDecoration: 'none', display: 'inline-block',
-                  }}>
-                    + Consulta Subsecuente
-                  </Link>
-                  <Link href={`/dashboard/${patient.id}/edit`} style={{
-                  background: 'none', color: '#C9A84C',
-                  border: '1px solid rgba(201,168,76,0.5)',
-                  padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
-                  textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
-                  textDecoration: 'none', display: 'inline-block',
-                }}>
-                  Editar Paciente
-                </Link>
+                    cursor: 'pointer',
+                  }}
+                >
+                  {showBooking ? '✕ Cerrar' : '+ Agendar Cita'}
+                </button>
+              </div>
+
+              {showBooking && (
+                <div style={{ marginTop: 24, border: '1px solid rgba(201,168,76,0.2)', padding: '24px 28px' }}>
+                  <BookingWidget
+                    clienteId={patient.id}
+                    nombre={String(patient.fields['Nombre Completo'] ?? '')}
+                    email={String(patient.fields['Email'] ?? '')}
+                    telefono={patient.fields['Teléfono'] ? String(patient.fields['Teléfono']) : undefined}
+                    allowedServices={isAdmin ? ADMIN_SERVICES : ['Returning Client', 'New Beggining']}
+                    isAdmin={isAdmin}
+                    lang="es"
+                    onBooked={() => setShowBooking(false)}
+                  />
                 </div>
               )}
             </div>
