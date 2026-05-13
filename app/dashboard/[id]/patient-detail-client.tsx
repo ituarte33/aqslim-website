@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
@@ -8,6 +8,7 @@ import type { Cliente, Consulta } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
+import { sendNoShowEmail } from '@/app/dashboard/[id]/edit/actions'
 
 type Props = {
   patient: Cliente | null
@@ -229,6 +230,9 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabId>('weight')
   const [showBooking, setShowBooking] = useState(false)
+  const [noShowPending, startNoShowTransition] = useTransition()
+  const [noShowStatus, setNoShowStatus] = useState<'idle' | 'sent' | 'error'>('idle')
+  const [noShowError, setNoShowError]   = useState<string | null>(null)
 
   const tabBtn = (id: TabId) => ({
     background: 'none' as const,
@@ -340,7 +344,44 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
                 >
                   {showBooking ? '✕ Cerrar' : '+ Agendar Cita'}
                 </button>
+                {isAdmin && (
+                  <button
+                    disabled={noShowPending || noShowStatus === 'sent'}
+                    onClick={() => {
+                      setNoShowStatus('idle')
+                      setNoShowError(null)
+                      startNoShowTransition(async () => {
+                        try {
+                          await sendNoShowEmail(patient.id)
+                          setNoShowStatus('sent')
+                        } catch (err) {
+                          setNoShowStatus('error')
+                          setNoShowError(err instanceof Error ? err.message : 'Error al enviar el email.')
+                        }
+                      })
+                    }}
+                    style={{
+                      background: noShowStatus === 'sent' ? 'rgba(111,191,111,0.1)' : 'none',
+                      color: noShowStatus === 'sent' ? '#6fbf6f' : '#C9A84C',
+                      border: `1px solid ${noShowStatus === 'sent' ? 'rgba(111,191,111,0.4)' : 'rgba(201,168,76,0.5)'}`,
+                      padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                      textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+                      cursor: (noShowPending || noShowStatus === 'sent') ? 'not-allowed' : 'pointer',
+                      opacity: (noShowPending || noShowStatus === 'sent') ? 0.6 : 1,
+                    }}
+                  >
+                    {noShowPending ? 'Enviando...' : noShowStatus === 'sent' ? '✓ Email Enviado' : 'Send No-Show Email'}
+                  </button>
+                )}
               </div>
+              {noShowStatus === 'error' && noShowError && (
+                <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: '12px 0 0' }}>{noShowError}</p>
+              )}
+              {noShowStatus === 'sent' && (
+                <p style={{ fontSize: pt.sm, color: '#6fbf6f', margin: '12px 0 0' }}>
+                  Email de no-show enviado a {String(patient.fields['Email'] ?? '')}.
+                </p>
+              )}
 
               {showBooking && (
                 <div style={{ marginTop: 24, border: '1px solid rgba(201,168,76,0.2)', padding: '24px 28px' }}>
