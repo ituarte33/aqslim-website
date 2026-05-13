@@ -50,6 +50,7 @@ export default async function OnboardingPage() {
     idioma:          cliente.fields['Idioma Preferido'],
     unidadDePeso:    cliente.fields['Unidad de Peso'],
     pesoMeta:        typeof cliente.fields['Peso Meta'] === 'number' ? cliente.fields['Peso Meta'] : undefined,
+    estaturaCm:      typeof cliente.fields['Estatura (cm)'] === 'number' ? cliente.fields['Estatura (cm)'] : undefined,
     metaDelCliente:  cliente.fields['Meta del Cliente'],
     condiciones:     cliente.fields['Condiciones Especiales / Alergias'],
     comoNosConocio:  cliente.fields['Cómo Nos Conoció'],

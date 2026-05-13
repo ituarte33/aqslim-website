@@ -42,6 +42,41 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
   )
 }
 
+function EstaturaCard({ cm }: { cm: number }) {
+  const [unit, setUnit] = useState<'ft-in' | 'cm'>('ft-in')
+  const totalIn = cm / 2.54
+  const ft = Math.floor(totalIn / 12)
+  const inches = Math.round(totalIn % 12)
+  const display = unit === 'ft-in' ? `${ft}'${inches}"` : `${cm} cm`
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      padding: '16px 20px', minWidth: 140,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontSize: pt.sm, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9A9590' }}>
+          Estatura
+        </div>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {(['ft-in', 'cm'] as const).map(u => (
+            <button key={u} type="button" onClick={() => setUnit(u)} style={{
+              padding: '2px 6px', fontSize: 9, fontFamily: pt.sans, cursor: 'pointer',
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              border: unit === u ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.2)',
+              background: unit === u ? 'rgba(201,168,76,0.12)' : 'transparent',
+              color: unit === u ? '#C9A84C' : '#6A6560', transition: 'all 0.1s',
+            }}>
+              {u === 'ft-in' ? 'ft' : 'cm'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ fontSize: pt.lg, color: '#FAFAF8', fontFamily: pt.serif }}>{display}</div>
+    </div>
+  )
+}
+
 type ColDef = {
   field: keyof Consulta['fields']
   label?: string
@@ -248,6 +283,9 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <StatCard label="ID Cliente" value={fmt(patient.fields['ID Cliente'])} />
                 <StatCard label="Edad" value={fmt(patient.fields['Edad'])} />
+                {typeof patient.fields['Estatura (cm)'] === 'number' && (
+                  <EstaturaCard cm={patient.fields['Estatura (cm)'] as number} />
+                )}
                 <StatCard label="Peso Meta" value={fmt(patient.fields['Peso Meta (con unidad)'])} highlight />
                 <StatCard label="Consultas" value={String(consultations.length)} />
               </div>

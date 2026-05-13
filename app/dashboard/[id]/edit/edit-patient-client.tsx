@@ -96,6 +96,38 @@ export function EditPatientClient({ patient }: Props) {
   const [telefono, setTelefono]             = useState(f['Teléfono'] ?? '')
   const [fechaNacimiento, setFechaNacimiento] = useState(isoToMmddyyyy(f['Fecha Nacimiento']))
 
+  // Height state — initialize from existing record if available
+  const [estaturaUnit, setEstaturaUnit] = useState<'ft-in' | 'cm'>('ft-in')
+  const [estaturaFt, setEstaturaFt] = useState(() => {
+    const cm = f['Estatura (cm)']
+    return typeof cm === 'number' ? String(Math.floor(cm / 2.54 / 12)) : ''
+  })
+  const [estaturaIn, setEstaturaIn] = useState(() => {
+    const cm = f['Estatura (cm)']
+    return typeof cm === 'number' ? String(Math.round((cm / 2.54) % 12)) : ''
+  })
+  const [estaturaCm, setEstaturaCm] = useState(() => {
+    const cm = f['Estatura (cm)']
+    return typeof cm === 'number' ? String(cm) : ''
+  })
+
+  function handleEstaturaUnitChange(newUnit: 'ft-in' | 'cm') {
+    if (newUnit === estaturaUnit) return
+    if (newUnit === 'cm') {
+      const ft = parseInt(estaturaFt || '0')
+      const inches = parseInt(estaturaIn || '0')
+      if (!isNaN(ft) && !isNaN(inches)) setEstaturaCm(String(Math.round((ft * 12 + inches) * 2.54)))
+    } else {
+      const cm = parseInt(estaturaCm)
+      if (!isNaN(cm) && cm > 0) {
+        const totalIn = cm / 2.54
+        setEstaturaFt(String(Math.floor(totalIn / 12)))
+        setEstaturaIn(String(Math.round(totalIn % 12)))
+      }
+    }
+    setEstaturaUnit(newUnit)
+  }
+
   function toggleBtn(selected: boolean): React.CSSProperties {
     return {
       flex: 1,
@@ -130,6 +162,14 @@ export function EditPatientClient({ patient }: Props) {
     formData.set('idioma',          idioma)
     formData.set('unidadDePeso',    unidadDePeso)
     formData.set('comoNosConocio',  comoNosConocio ?? '')
+    const estaturaCmVal = estaturaUnit === 'cm'
+      ? estaturaCm
+      : (() => {
+          const ft = parseInt(estaturaFt || '0')
+          const inches = parseInt(estaturaIn || '0')
+          return (!isNaN(ft) && !isNaN(inches)) ? String(Math.round((ft * 12 + inches) * 2.54)) : ''
+        })()
+    if (estaturaCmVal) formData.set('estaturaCm', estaturaCmVal)
 
     startTransition(async () => {
       try {
@@ -259,6 +299,46 @@ export function EditPatientClient({ patient }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Height */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ ...labelStyle, display: 'inline', marginBottom: 0 }}>Estatura</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {(['ft-in', 'cm'] as const).map(unit => (
+                  <button key={unit} type="button" onClick={() => handleEstaturaUnitChange(unit)} style={{
+                    padding: '3px 8px', fontSize: pt.xs, fontFamily: pt.sans, cursor: 'pointer',
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    border: estaturaUnit === unit ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+                    background: estaturaUnit === unit ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.03)',
+                    color: estaturaUnit === unit ? '#C9A84C' : '#9A9590', transition: 'all 0.12s',
+                  }}>
+                    {unit === 'ft-in' ? 'ft / in' : 'cm'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {estaturaUnit === 'ft-in' ? (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <input type="number" min="0" max="8" placeholder="5" value={estaturaFt}
+                    onChange={e => setEstaturaFt(e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                  <span style={{ color: '#9A9590', fontSize: pt.sm, whiteSpace: 'nowrap', fontFamily: pt.sans }}>ft</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <input type="number" min="0" max="11" placeholder="8" value={estaturaIn}
+                    onChange={e => setEstaturaIn(e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                  <span style={{ color: '#9A9590', fontSize: pt.sm, whiteSpace: 'nowrap', fontFamily: pt.sans }}>in</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" min="0" max="300" placeholder="170" value={estaturaCm}
+                  onChange={e => setEstaturaCm(e.target.value)} style={{ ...inputStyle, maxWidth: 160, textAlign: 'center' }} />
+                <span style={{ color: '#9A9590', fontSize: pt.sm, fontFamily: pt.sans }}>cm</span>
+              </div>
+            )}
           </div>
 
           <SectionDivider label="Contacto y Ubicación" />

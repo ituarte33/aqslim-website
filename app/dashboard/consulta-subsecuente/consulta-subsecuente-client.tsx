@@ -131,6 +131,17 @@ function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
   const unidad    = patient.fields['Unidad de Peso'] ?? 'Lbs'
   const pesoMeta  = patient.fields['Peso Meta (con unidad)'] ?? patient.fields['Peso Meta']
   const idioma    = patient.fields['Idioma Preferido']
+  const estaturaCm = typeof patient.fields['Estatura (cm)'] === 'number' ? patient.fields['Estatura (cm)'] as number : null
+
+  const [estaturaUnit, setEstaturaUnit] = useState<'ft-in' | 'cm'>('ft-in')
+  const estaturaDisplay = estaturaCm
+    ? estaturaUnit === 'cm'
+      ? `${estaturaCm} cm`
+      : (() => {
+          const totalIn = estaturaCm / 2.54
+          return `${Math.floor(totalIn / 12)}'${Math.round(totalIn % 12)}"`
+        })()
+    : null
 
   return (
     <div style={{
@@ -148,6 +159,29 @@ function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        {estaturaDisplay && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans }}>
+                {es ? 'Estatura' : 'Height'}
+              </div>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {(['ft-in', 'cm'] as const).map(u => (
+                  <button key={u} type="button" onClick={() => setEstaturaUnit(u)} style={{
+                    padding: '1px 5px', fontSize: 9, fontFamily: pt.sans, cursor: 'pointer',
+                    letterSpacing: '0.06em', textTransform: 'uppercase',
+                    border: estaturaUnit === u ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.2)',
+                    background: estaturaUnit === u ? 'rgba(201,168,76,0.12)' : 'transparent',
+                    color: estaturaUnit === u ? '#C9A84C' : '#6A6560', transition: 'all 0.1s',
+                  }}>
+                    {u === 'ft-in' ? 'ft' : 'cm'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{estaturaDisplay}</div>
+          </div>
+        )}
         {pesoMeta && (
           <div>
             <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>

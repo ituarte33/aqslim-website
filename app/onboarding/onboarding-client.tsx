@@ -17,6 +17,7 @@ type ClienteData = {
   idioma?: string
   unidadDePeso?: string
   pesoMeta?: number
+  estaturaCm?: number
   metaDelCliente?: string
   condiciones?: string
   comoNosConocio?: string
@@ -178,6 +179,12 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
   const [unidadDePeso, setUnidadDePeso] = useState<'Lbs' | 'Kg'>('Lbs')
   const [comoNosConocio, setComoNosConocio] = useState<string | null>(null)
 
+  // Height state
+  const [estaturaUnit, setEstaturaUnit] = useState<'ft-in' | 'cm'>('ft-in')
+  const [estaturaFt, setEstaturaFt] = useState('')
+  const [estaturaIn, setEstaturaIn] = useState('')
+  const [estaturaCm, setEstaturaCm] = useState('')
+
   // Formatted inputs
   const [telefono, setTelefono] = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
@@ -202,6 +209,23 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
     if (digits.length < 3) return digits
     if (digits.length < 5) return `${digits.slice(0, 2)}/${digits.slice(2)}`
     return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+  }
+
+  function handleEstaturaUnitChange(newUnit: 'ft-in' | 'cm') {
+    if (newUnit === estaturaUnit) return
+    if (newUnit === 'cm') {
+      const ft = parseInt(estaturaFt || '0')
+      const inches = parseInt(estaturaIn || '0')
+      if (!isNaN(ft) && !isNaN(inches)) setEstaturaCm(String(Math.round((ft * 12 + inches) * 2.54)))
+    } else {
+      const cm = parseInt(estaturaCm)
+      if (!isNaN(cm) && cm > 0) {
+        const totalIn = cm / 2.54
+        setEstaturaFt(String(Math.floor(totalIn / 12)))
+        setEstaturaIn(String(Math.round(totalIn % 12)))
+      }
+    }
+    setEstaturaUnit(newUnit)
   }
 
   function toggleBtnStyle(selected: boolean): React.CSSProperties {
@@ -251,6 +275,14 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
     formData.set('idioma', idioma)
     formData.set('unidadDePeso', unidadDePeso)
     formData.set('comoNosConocio', comoNosConocio)
+    const estaturaCmVal = estaturaUnit === 'cm'
+      ? estaturaCm
+      : (() => {
+          const ft = parseInt(estaturaFt || '0')
+          const inches = parseInt(estaturaIn || '0')
+          return (!isNaN(ft) && !isNaN(inches)) ? String(Math.round((ft * 12 + inches) * 2.54)) : ''
+        })()
+    if (estaturaCmVal) formData.set('estaturaCm', estaturaCmVal)
 
     startTransition(async () => {
       try {
@@ -345,6 +377,46 @@ export function OnboardingClient({ defaultFirstName, defaultLastName, initialSte
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Height */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ ...labelStyle, display: 'inline', marginBottom: 0 }}>{t('Estatura', 'Height')}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['ft-in', 'cm'] as const).map(unit => (
+                        <button key={unit} type="button" onClick={() => handleEstaturaUnitChange(unit)} style={{
+                          padding: '3px 8px', fontSize: pt.xs, fontFamily: pt.sans, cursor: 'pointer',
+                          letterSpacing: '0.1em', textTransform: 'uppercase',
+                          border: estaturaUnit === unit ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+                          background: estaturaUnit === unit ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.03)',
+                          color: estaturaUnit === unit ? '#C9A84C' : '#9A9590', transition: 'all 0.12s',
+                        }}>
+                          {unit === 'ft-in' ? 'ft / in' : 'cm'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {estaturaUnit === 'ft-in' ? (
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <input type="number" min="0" max="8" placeholder="5" value={estaturaFt}
+                          onChange={e => setEstaturaFt(e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                        <span style={{ color: '#9A9590', fontSize: pt.sm, whiteSpace: 'nowrap', fontFamily: pt.sans }}>ft</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <input type="number" min="0" max="11" placeholder="8" value={estaturaIn}
+                          onChange={e => setEstaturaIn(e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                        <span style={{ color: '#9A9590', fontSize: pt.sm, whiteSpace: 'nowrap', fontFamily: pt.sans }}>in</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="number" min="0" max="300" placeholder="170" value={estaturaCm}
+                        onChange={e => setEstaturaCm(e.target.value)} style={{ ...inputStyle, maxWidth: 160, textAlign: 'center' }} />
+                      <span style={{ color: '#9A9590', fontSize: pt.sm, fontFamily: pt.sans }}>cm</span>
+                    </div>
+                  )}
                 </div>
 
                 <SectionDivider label={t('Contacto y Ubicación', 'Contact & Location')} />
@@ -676,6 +748,15 @@ function ViewProfile({
     ? `${clienteData.pesoMeta} ${clienteData.unidadDePeso ?? ''}`
     : undefined
 
+  const estaturaDisplay = clienteData.estaturaCm
+    ? (() => {
+        const totalIn = clienteData.estaturaCm! / 2.54
+        const ft = Math.floor(totalIn / 12)
+        const inches = Math.round(totalIn % 12)
+        return `${ft}'${inches}" · ${clienteData.estaturaCm} cm`
+      })()
+    : undefined
+
   function handleConfirm() {
     if (!accepted) {
       setError(es ? 'Debes aceptar los términos para continuar.' : 'You must accept the terms to continue.')
@@ -714,6 +795,7 @@ function ViewProfile({
         <InfoField label={es ? 'Dirección' : 'Address'}                  value={[clienteData.direccion, clienteData.ciudad, clienteData.zip].filter(Boolean).join(', ') || undefined} />
         <InfoField label={es ? 'Idioma Preferido' : 'Preferred Language'} value={clienteData.idioma} />
         <InfoField label={es ? 'Peso Meta' : 'Goal Weight'}              value={pesoDisplay} />
+        <InfoField label={es ? 'Estatura' : 'Height'}                   value={estaturaDisplay} />
         <InfoField label={es ? 'Meta del Cliente' : 'Client Goal'}       value={clienteData.metaDelCliente} />
         {clienteData.condiciones && (
           <InfoField label={es ? 'Condiciones / Alergias' : 'Conditions / Allergies'} value={clienteData.condiciones} />
@@ -807,6 +889,35 @@ function EditProfileForm({
   const [error, setError]                   = useState<string | null>(null)
   const [isPending, startTransition]        = useTransition()
 
+  // Height state — initialize from existing data if available
+  const [efEstaturaUnit, setEfEstaturaUnit] = useState<'ft-in' | 'cm'>('ft-in')
+  const [efEstaturaFt, setEfEstaturaFt] = useState(() => {
+    if (!clienteData.estaturaCm) return ''
+    return String(Math.floor(clienteData.estaturaCm / 2.54 / 12))
+  })
+  const [efEstaturaIn, setEfEstaturaIn] = useState(() => {
+    if (!clienteData.estaturaCm) return ''
+    return String(Math.round((clienteData.estaturaCm / 2.54) % 12))
+  })
+  const [efEstaturaCm, setEfEstaturaCm] = useState(clienteData.estaturaCm ? String(clienteData.estaturaCm) : '')
+
+  function handleEfEstaturaUnitChange(newUnit: 'ft-in' | 'cm') {
+    if (newUnit === efEstaturaUnit) return
+    if (newUnit === 'cm') {
+      const ft = parseInt(efEstaturaFt || '0')
+      const inches = parseInt(efEstaturaIn || '0')
+      if (!isNaN(ft) && !isNaN(inches)) setEfEstaturaCm(String(Math.round((ft * 12 + inches) * 2.54)))
+    } else {
+      const cm = parseInt(efEstaturaCm)
+      if (!isNaN(cm) && cm > 0) {
+        const totalIn = cm / 2.54
+        setEfEstaturaFt(String(Math.floor(totalIn / 12)))
+        setEfEstaturaIn(String(Math.round(totalIn % 12)))
+      }
+    }
+    setEfEstaturaUnit(newUnit)
+  }
+
   function formatPhone(raw: string) {
     const digits = raw.replace(/\D/g, '').slice(0, 10)
     if (digits.length < 4) return digits.length ? `(${digits}` : ''
@@ -848,6 +959,14 @@ function EditProfileForm({
     formData.set('idioma', idioma)
     formData.set('unidadDePeso', unidadDePeso)
     formData.set('comoNosConocio', comoNosConocio)
+    const efEstaturaCmVal = efEstaturaUnit === 'cm'
+      ? efEstaturaCm
+      : (() => {
+          const ft = parseInt(efEstaturaFt || '0')
+          const inches = parseInt(efEstaturaIn || '0')
+          return (!isNaN(ft) && !isNaN(inches)) ? String(Math.round((ft * 12 + inches) * 2.54)) : ''
+        })()
+    if (efEstaturaCmVal) formData.set('estaturaCm', efEstaturaCmVal)
 
     startTransition(async () => {
       try {
@@ -918,6 +1037,46 @@ function EditProfileForm({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Height */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ ...labelStyle, display: 'inline', marginBottom: 0 }}>{es ? 'Estatura' : 'Height'}</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['ft-in', 'cm'] as const).map(unit => (
+                <button key={unit} type="button" onClick={() => handleEfEstaturaUnitChange(unit)} style={{
+                  padding: '3px 8px', fontSize: pt.xs, fontFamily: pt.sans, cursor: 'pointer',
+                  letterSpacing: '0.1em', textTransform: 'uppercase',
+                  border: efEstaturaUnit === unit ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+                  background: efEstaturaUnit === unit ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.03)',
+                  color: efEstaturaUnit === unit ? '#C9A84C' : '#9A9590', transition: 'all 0.12s',
+                }}>
+                  {unit === 'ft-in' ? 'ft / in' : 'cm'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {efEstaturaUnit === 'ft-in' ? (
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                <input type="number" min="0" max="8" placeholder="5" value={efEstaturaFt}
+                  onChange={e => setEfEstaturaFt(e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                <span style={{ color: '#9A9590', fontSize: pt.sm, whiteSpace: 'nowrap', fontFamily: labelStyle.fontFamily as string }}>ft</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                <input type="number" min="0" max="11" placeholder="8" value={efEstaturaIn}
+                  onChange={e => setEfEstaturaIn(e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                <span style={{ color: '#9A9590', fontSize: pt.sm, whiteSpace: 'nowrap', fontFamily: labelStyle.fontFamily as string }}>in</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="number" min="0" max="300" placeholder="170" value={efEstaturaCm}
+                onChange={e => setEfEstaturaCm(e.target.value)} style={{ ...inputStyle, maxWidth: 160, textAlign: 'center' }} />
+              <span style={{ color: '#9A9590', fontSize: pt.sm, fontFamily: labelStyle.fontFamily as string }}>cm</span>
+            </div>
+          )}
         </div>
 
         <SectionDivider label={es ? 'Contacto y Ubicación' : 'Contact & Location'} />

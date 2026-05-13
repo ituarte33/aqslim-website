@@ -22,6 +22,7 @@ export const CLIENTES_FIELDS = {
   PESO_META:            'fldJOztXSqZKsmZV5',
   CONDICIONES_ALERGIAS: 'fldeWA9A4FvulirHk',
   ID_CLIENTE:           'fldeTMbkVItk4nPUW',
+  ESTATURA_CM:          'fldztTAylCfqvtraZ',
   CITA_AGENDADA:        'fldx8HY7jVOFV74cQ',
   PROXIMA_CITA:         'fldRXEdx8C11nXvjB',
   SERVICIO_PROXIMA_CITA:'fldPQkPl1h8fA04g0',
@@ -71,6 +72,7 @@ export interface Cliente {
     'He leído y acepto los términos anteriores'?: boolean
     'Meta del Cliente'?: string
     'Condiciones Especiales / Alergias'?: string
+    'Estatura (cm)'?: number
     'Cita Agendada'?: boolean
     'Próxima Cita'?: string
     'Servicio Próxima Cita'?: string

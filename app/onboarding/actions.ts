@@ -120,6 +120,7 @@ export async function updateProfileAndAcceptTerminos(formData: FormData) {
   const comoNosConocio  = (formData.get('comoNosConocio')  as string).trim()
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones')    as string) ?? '').trim()
+  const estaturaCm      = ((formData.get('estaturaCm')     as string) ?? '').trim()
 
   const cliente = await getClienteByEmail(email)
   if (!cliente) throw new Error('Registro no encontrado')
@@ -142,6 +143,7 @@ export async function updateProfileAndAcceptTerminos(formData: FormData) {
   if (zip)         fields[CLIENTES_FIELDS.ZIP]                  = parseInt(zip, 10)
   if (pesoMeta)    fields[CLIENTES_FIELDS.PESO_META]            = parseInt(pesoMeta, 10)
   if (condiciones) fields[CLIENTES_FIELDS.CONDICIONES_ALERGIAS] = condiciones
+  if (estaturaCm)  fields[CLIENTES_FIELDS.ESTATURA_CM]          = parseInt(estaturaCm, 10)
 
   await updateCliente(cliente.id, fields)
 }
@@ -177,6 +179,7 @@ export async function saveProfile(formData: FormData) {
   const comoNosConocio  = (formData.get('comoNosConocio') as string).trim()
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones') as string) ?? '').trim()
+  const estaturaCm      = ((formData.get('estaturaCm')  as string) ?? '').trim()
 
   const cliente = await getClienteByEmail(email)
   if (!cliente) throw new Error('Registro no encontrado')
@@ -200,6 +203,7 @@ export async function saveProfile(formData: FormData) {
   if (zip)         fields[CLIENTES_FIELDS.ZIP]                  = parseInt(zip, 10)
   if (pesoMeta)    fields[CLIENTES_FIELDS.PESO_META]            = parseInt(pesoMeta, 10)
   if (condiciones) fields[CLIENTES_FIELDS.CONDICIONES_ALERGIAS] = condiciones
+  if (estaturaCm)  fields[CLIENTES_FIELDS.ESTATURA_CM]          = parseInt(estaturaCm, 10)
 
   await updateCliente(cliente.id, fields)
 
