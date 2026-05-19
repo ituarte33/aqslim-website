@@ -113,6 +113,8 @@ export interface Consulta {
     'Idioma Preferido'?: string
     'Unidad Cliente'?: string
     'Email Post-Consulta Enviado'?: boolean
+    'Notas del Terapeuta'?: string
+    'Nombre Cliente'?: string | string[]
     [key: string]: unknown
   }
 }
@@ -338,6 +340,63 @@ export async function getConsultasRevenueSummary(): Promise<ConsultasRevenueSumm
   }
 
   return { total, cash, card, other, today, week, byMethod, consultaCount: consultas.length }
+}
+
+export interface FinanceRecord {
+  id: string
+  date: string
+  tipoConsulta: string
+  montoCobrado: number
+  metodoPago: string
+  suppTotal: number
+  suppItems: Array<{ nombre: string; precio: number }>
+  paciente: string
+}
+
+function parseSuppNotes(notes: string): { total: number; items: Array<{ nombre: string; precio: number }> } {
+  if (!notes || !notes.includes('Suplementos vendidos:')) return { total: 0, items: [] }
+  const items: Array<{ nombre: string; precio: number }> = []
+  let total = 0
+  for (const line of notes.split('\n')) {
+    const m = line.match(/^- (.+) \(\$([0-9.]+)\)$/)
+    if (m) items.push({ nombre: m[1], precio: parseFloat(m[2]) })
+    const t = line.match(/^Total: \$([0-9.]+)$/)
+    if (t) total = parseFloat(t[1])
+  }
+  if (total === 0 && items.length > 0) total = items.reduce((s, i) => s + i.precio, 0)
+  return { total, items }
+}
+
+export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
+  const allRecords: FinanceRecord[] = []
+  let offset: string | undefined
+  do {
+    const offsetParam = offset ? `&offset=${encodeURIComponent(offset)}` : ''
+    const data = await airtableFetch(
+      `/Consultas?pageSize=100&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc${offsetParam}`
+    )
+    for (const c of (data.records as Consulta[])) {
+      const fechaRaw = (c.fields['Fecha Consulta'] as string | undefined) ?? ''
+      const date = fechaRaw.slice(0, 10)
+      if (date.length < 10) continue
+
+      const montoCobrado = (c.fields['Monto Cobrado ($)'] as number | undefined) ?? 0
+      const metodoPago   = (c.fields['Método de Pago']    as string | undefined) ?? ''
+      const tipoConsulta = (c.fields['Tipo de Consulta']  as string | undefined) ?? ''
+      const notas        = (c.fields['Notas del Terapeuta'] as string | undefined) ?? ''
+
+      const nombreRaw = c.fields['Nombre Cliente']
+      const emailRaw  = c.fields['Email Cliente']
+      const nombre    = Array.isArray(nombreRaw) ? (nombreRaw[0] as string ?? '') : ((nombreRaw as string | undefined) ?? '')
+      const email     = Array.isArray(emailRaw)  ? (emailRaw[0]  as string ?? '') : ((emailRaw  as string | undefined) ?? '')
+      const paciente  = nombre || email || ''
+
+      const { total: suppTotal, items: suppItems } = parseSuppNotes(notas)
+      allRecords.push({ id: c.id, date, tipoConsulta, montoCobrado, metodoPago, suppTotal, suppItems, paciente })
+    }
+    offset = data.offset
+  } while (offset)
+  return allRecords
 }
 
 export async function createConsulta(fields: Record<string, unknown>): Promise<Consulta> {
