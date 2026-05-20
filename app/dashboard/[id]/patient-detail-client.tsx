@@ -82,7 +82,7 @@ type ColDef = {
   field: keyof Consulta['fields']
   colKey?: string
   label?: string
-  render?: (c: Consulta) => string
+  render?: (c: Consulta, i: number, all: Consulta[]) => string
 }
 
 const WEIGHT_COLS: ColDef[] = [
@@ -106,26 +106,27 @@ const WEIGHT_COLS: ColDef[] = [
     },
   },
   {
-    field: 'Diferencia vs Semana Anterior (kg)',
+    field: 'Peso (kg)',
     colKey: 'dif-kg',
     label: 'Dif. (kg)',
-    render: (c) => {
-      const diff = c.fields['Diferencia vs Semana Anterior (kg)']
-      if (diff == null) return '—'
-      const sign = diff > 0 ? '+' : ''
-      return `${sign}${Number(diff).toFixed(1)}`
+    render: (c, i, all) => {
+      const curr = c.fields['Peso (kg)']
+      const prev = all[i + 1]?.fields['Peso (kg)']
+      if (curr == null || prev == null) return '—'
+      const diff = Number(curr) - Number(prev)
+      return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`
     },
   },
   {
-    field: 'Diferencia vs Semana Anterior (kg)',
+    field: 'Peso (kg)',
     colKey: 'dif-lbs',
     label: 'Dif. (lbs)',
-    render: (c) => {
-      const diff = c.fields['Diferencia vs Semana Anterior (kg)']
-      if (diff == null) return '—'
-      const val = Number(diff) * 2.20462
-      const sign = val > 0 ? '+' : ''
-      return `${sign}${val.toFixed(1)}`
+    render: (c, i, all) => {
+      const curr = c.fields['Peso (kg)']
+      const prev = all[i + 1]?.fields['Peso (kg)']
+      if (curr == null || prev == null) return '—'
+      const diff = (Number(curr) - Number(prev)) * 2.20462
+      return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`
     },
   },
   { field: '% Grasa Corporal' },
@@ -190,7 +191,7 @@ function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; 
                   padding: '12px 16px', whiteSpace: 'nowrap',
                   color: col.field === 'Fecha Consulta' ? '#FAFAF8' : '#9A9590',
                 }}>
-                  {col.render ? col.render(c) : fmt(c.fields[col.field])}
+                  {col.render ? col.render(c, i, consultations) : fmt(c.fields[col.field])}
                 </td>
               ))}
             </tr>
