@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
-import type { Cliente, Consulta } from '@/lib/airtable'
+import type { Cliente, Consulta, CuestionarioSintoma } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
@@ -13,6 +13,7 @@ import { sendNoShowEmail } from '@/app/dashboard/[id]/edit/actions'
 type Props = {
   patient: Cliente | null
   consultations: Consulta[]
+  cuestionarios: CuestionarioSintoma[]
   error: string | null
   isAdmin: boolean
 }
@@ -152,14 +153,98 @@ const WELLNESS_COLS: ColDef[] = [
   { field: '¿Tuvo Hambre?' },
 ]
 
-type TabId = 'weight' | 'measurements' | 'wellness' | 'notes'
+type TabId = 'weight' | 'measurements' | 'wellness' | 'notes' | 'cuestionario'
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'weight', label: 'Peso' },
-  { id: 'measurements', label: 'Medidas' },
-  { id: 'wellness', label: 'Bienestar' },
-  { id: 'notes', label: 'Notas' },
+  { id: 'weight',       label: 'Peso'         },
+  { id: 'measurements', label: 'Medidas'       },
+  { id: 'wellness',     label: 'Bienestar'     },
+  { id: 'notes',        label: 'Notas'         },
+  { id: 'cuestionario', label: 'Cuestionario'  },
 ]
+
+function toxicidadColor(nivel: string | undefined): string {
+  if (!nivel) return '#9A9590'
+  const n = nivel.toLowerCase()
+  if (n.includes('crít')) return '#ff6b6b'
+  if (n.includes('moder')) return '#C9A84C'
+  if (n.includes('bajo')) return '#6fbf6f'
+  return '#9A9590'
+}
+
+function CuestionarioTab({ cuestionarios }: { cuestionarios: CuestionarioSintoma[] }) {
+  if (cuestionarios.length === 0) {
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin cuestionarios registrados.</p>
+  }
+
+  const cols = [
+    { key: 'fecha',     label: 'Fecha'              },
+    { key: 'total',     label: 'Total'              },
+    { key: 'nivel',     label: 'Nivel de Toxicidad' },
+    { key: 'sistema',   label: 'Sistema Prioritario' },
+    { key: 'secundario',label: 'Sistema Secundario'  },
+    { key: 'rec',       label: 'Protocolo'           },
+    { key: 'obs',       label: 'Observaciones'       },
+  ]
+
+  function cell(c: CuestionarioSintoma, key: string): string {
+    const f = c.fields
+    switch (key) {
+      case 'fecha':      return c.createdTime
+        ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeZone: 'America/Los_Angeles' }).format(new Date(c.createdTime))
+        : '—'
+      case 'total':      return f['TOTAL GENERAL'] != null ? String(f['TOTAL GENERAL']) : '—'
+      case 'nivel':      return f['Nivel de toxicidad'] ?? '—'
+      case 'sistema':    return f['Sistema Prioritarios'] ?? '—'
+      case 'secundario': return f['Sistema Secundario'] ?? '—'
+      case 'rec':        return f['Rec. de Protocolo'] ?? '—'
+      case 'obs':        return f['Observaciones'] ? String(f['Observaciones']) : '—'
+      default:           return '—'
+    }
+  }
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
+            {cols.map(col => (
+              <th key={col.key} style={{
+                textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
+                fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
+              }}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cuestionarios.map((c, i) => (
+            <tr key={c.id} style={{
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+            }}>
+              {cols.map(col => (
+                <td key={col.key} style={{
+                  padding: '12px 16px', whiteSpace: col.key === 'obs' ? 'normal' : 'nowrap',
+                  maxWidth: col.key === 'obs' ? 240 : undefined,
+                  color: col.key === 'nivel'
+                    ? toxicidadColor(c.fields['Nivel de toxicidad'])
+                    : col.key === 'fecha' ? '#FAFAF8'
+                    : col.key === 'total' ? '#C9A84C'
+                    : '#9A9590',
+                  fontWeight: col.key === 'total' ? 600 : 400,
+                }}>
+                  {cell(c, col.key)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; columns: ColDef[] }) {
   const router = useRouter()
@@ -238,7 +323,7 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
   )
 }
 
-export function PatientDetailClient({ patient, consultations, error, isAdmin }: Props) {
+export function PatientDetailClient({ patient, consultations, cuestionarios, error, isAdmin }: Props) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabId>('weight')
   const [showBooking, setShowBooking] = useState(false)
@@ -424,6 +509,7 @@ export function PatientDetailClient({ patient, consultations, error, isAdmin }: 
             {activeTab === 'measurements' && <ConsultaTable consultations={consultations} columns={MEASUREMENTS_COLS} />}
             {activeTab === 'wellness' && <ConsultaTable consultations={consultations} columns={WELLNESS_COLS} />}
             {activeTab === 'notes' && <NotesTab consultations={consultations} />}
+            {activeTab === 'cuestionario' && <CuestionarioTab cuestionarios={cuestionarios} />}
           </>
         )}
 

@@ -262,6 +262,28 @@ export const CUESTIONARIO_FIELDS = {
   G_AUMENTO_PESO:   'fld65YMBTMdVzDDdj',
 } as const
 
+export interface CuestionarioSintoma {
+  id: string
+  createdTime: string
+  fields: {
+    'TOTAL GENERAL'?: number
+    'Sistema Prioritarios'?: string
+    'Observaciones'?: string
+    'Nivel de toxicidad'?: string
+    'Sistema Secundario'?: string
+    'Rec. de Protocolo'?: string
+    [key: string]: unknown
+  }
+}
+
+export async function getCuestionariosByCliente(nombreCliente: string, limit = 6): Promise<CuestionarioSintoma[]> {
+  const formula = encodeURIComponent(`{${CUESTIONARIO_FIELDS.NOMBRE}} = "${nombreCliente}"`)
+  const data = await airtableFetch(
+    `/${CUESTIONARIO_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${CUESTIONARIO_FIELDS.FECHA}&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=${limit}`
+  )
+  return data.records ?? []
+}
+
 export async function hasCuestionario(nombreCliente: string): Promise<boolean> {
   const formula = encodeURIComponent(`{${CUESTIONARIO_FIELDS.NOMBRE}} = "${nombreCliente}"`)
   const data = await airtableFetch(`/${CUESTIONARIO_TABLE}?filterByFormula=${formula}&maxRecords=1`)

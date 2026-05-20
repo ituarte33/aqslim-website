@@ -1,6 +1,13 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
-import { getClienteById, getConsultasByCliente, type Cliente, type Consulta } from '@/lib/airtable'
+import {
+  getClienteById,
+  getConsultasByCliente,
+  getCuestionariosByCliente,
+  type Cliente,
+  type Consulta,
+  type CuestionarioSintoma,
+} from '@/lib/airtable'
 import { getRole, getUserEmail } from '@/lib/auth'
 import { PatientDetailClient } from './patient-detail-client'
 
@@ -13,12 +20,12 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
   let patient: Cliente | null = null
   let consultations: Consulta[] = []
+  let cuestionarios: CuestionarioSintoma[] = []
   let error: string | null = null
 
   try {
     patient = await getClienteById(id)
 
-    // Patients can only view their own record
     if (role === 'patient') {
       const email = await getUserEmail()
       if (!email || patient.fields['Email'] !== email) notFound()
@@ -26,7 +33,10 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
     const nombreCliente = patient.fields['Nombre Completo'] ?? ''
     if (nombreCliente) {
-      consultations = await getConsultasByCliente(nombreCliente)
+      ;[consultations, cuestionarios] = await Promise.all([
+        getConsultasByCliente(nombreCliente),
+        getCuestionariosByCliente(nombreCliente),
+      ])
     }
   } catch (e) {
     error = e instanceof Error ? e.message : String(e)
@@ -36,6 +46,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     <PatientDetailClient
       patient={patient}
       consultations={consultations}
+      cuestionarios={cuestionarios}
       error={error}
       isAdmin={role === 'admin'}
     />

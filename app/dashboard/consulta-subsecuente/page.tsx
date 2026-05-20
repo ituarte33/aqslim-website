@@ -5,9 +5,11 @@ import {
   getClienteById,
   getClientes,
   getConsultasByCliente,
+  getCuestionariosByCliente,
   getSupplementos,
   type Cliente,
   type Consulta,
+  type CuestionarioSintoma,
   type Suplemento,
 } from '@/lib/airtable'
 import { ConsultaSubsecuenteClient } from './consulta-subsecuente-client'
@@ -30,16 +32,19 @@ export default async function ConsultaSubsecuentePage({
   let allPatients: Cliente[] = []
   let supplementos: Suplemento[] = []
   let initialConsultations: Consulta[] = []
+  let initialCuestionarios: CuestionarioSintoma[] = []
 
   if (clienteId) {
     try {
       patient = await getClienteById(clienteId)
       const nombre = patient.fields['Nombre Completo'] ?? ''
-      const [consultasResult, supplementosResult] = await Promise.allSettled([
+      const [consultasResult, cuestionariosResult, supplementosResult] = await Promise.allSettled([
         nombre ? getConsultasByCliente(nombre) : Promise.resolve([]),
+        nombre ? getCuestionariosByCliente(nombre) : Promise.resolve([]),
         getSupplementos(),
       ])
       if (consultasResult.status === 'fulfilled') initialConsultations = consultasResult.value
+      if (cuestionariosResult.status === 'fulfilled') initialCuestionarios = cuestionariosResult.value
       if (supplementosResult.status === 'fulfilled') supplementos = supplementosResult.value
     } catch { /* errors shown in client */ }
   } else {
@@ -58,6 +63,7 @@ export default async function ConsultaSubsecuentePage({
       allPatients={allPatients}
       supplementos={supplementos}
       initialConsultations={initialConsultations}
+      initialCuestionarios={initialCuestionarios}
     />
   )
 }

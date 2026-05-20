@@ -3,9 +3,9 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
-import { saveConsultaSubsecuente, fetchPatientConsultations } from './actions'
+import { saveConsultaSubsecuente, fetchPatientConsultations, fetchPatientCuestionarios } from './actions'
 import { sendReinitiationEmail } from '@/app/dashboard/[id]/edit/actions'
-import type { Cliente, Consulta, Suplemento } from '@/lib/airtable'
+import type { Cliente, Consulta, CuestionarioSintoma, Suplemento } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
@@ -38,6 +38,7 @@ type Props = {
   allPatients: Cliente[]
   supplementos: Suplemento[]
   initialConsultations: Consulta[]
+  initialCuestionarios: CuestionarioSintoma[]
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -120,6 +121,91 @@ function ToggleGroup<T extends string>({
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ── Cuestionario table ────────────────────────────────────────────────────────
+
+function toxicidadColor(nivel: string | undefined): string {
+  if (!nivel) return '#9A9590'
+  const n = nivel.toLowerCase()
+  if (n.includes('crít') || n.includes('crit')) return '#ff6b6b'
+  if (n.includes('moder')) return '#C9A84C'
+  if (n.includes('bajo')) return '#6fbf6f'
+  return '#9A9590'
+}
+
+function CuestionarioTable({ cuestionarios, es }: { cuestionarios: CuestionarioSintoma[]; es: boolean }) {
+  if (cuestionarios.length === 0) {
+    return (
+      <p style={{ fontSize: pt.sm, color: '#6A6560', margin: '12px 0 0', fontFamily: pt.sans }}>
+        {es ? 'Sin cuestionarios registrados.' : 'No questionnaires on record.'}
+      </p>
+    )
+  }
+
+  const cols = [
+    { key: 'fecha',    label: es ? 'Fecha'           : 'Date'            },
+    { key: 'total',    label: 'Total'                                     },
+    { key: 'nivel',    label: es ? 'Toxicidad'        : 'Toxicity'        },
+    { key: 'sistema',  label: es ? 'Sist. Prioritario' : 'Priority System' },
+    { key: 'secundario', label: es ? 'Sist. Secundario' : 'Secondary System' },
+    { key: 'protocolo', label: es ? 'Protocolo'       : 'Protocol'        },
+  ]
+
+  return (
+    <div style={{ overflowX: 'auto', marginTop: 16 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.sm }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.25)' }}>
+            {cols.map(col => (
+              <th key={col.key} style={{
+                textAlign: 'left', padding: '8px 12px', whiteSpace: 'nowrap',
+                fontSize: pt.xs, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C9A84C',
+              }}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cuestionarios.map((q, i) => {
+            const f = q.fields
+            const nivel = f['Nivel de toxicidad'] as string | undefined
+            return (
+              <tr
+                key={q.id}
+                style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                }}
+              >
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#FAFAF8' }}>
+                  {q.createdTime
+                    ? new Intl.DateTimeFormat(es ? 'es-MX' : 'en-US', { dateStyle: 'medium', timeZone: 'America/Los_Angeles' }).format(new Date(q.createdTime))
+                    : '—'}
+                </td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#9A9590' }}>
+                  {f['TOTAL GENERAL'] != null ? String(f['TOTAL GENERAL']) : '—'}
+                </td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: toxicidadColor(nivel), fontWeight: 500 }}>
+                  {nivel ?? '—'}
+                </td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#9A9590' }}>
+                  {(f['Sistema Prioritarios'] as string | undefined) ?? '—'}
+                </td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#9A9590' }}>
+                  {(f['Sistema Secundario'] as string | undefined) ?? '—'}
+                </td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#9A9590' }}>
+                  {(f['Rec. de Protocolo'] as string | undefined) ?? '—'}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -252,11 +338,15 @@ function PatientBanner({
   patient,
   consultations = [],
   loadingConsultas,
+  cuestionarios = [],
+  loadingCuestionarios,
   es,
 }: {
   patient: Cliente
   consultations: Consulta[]
   loadingConsultas: boolean
+  cuestionarios: CuestionarioSintoma[]
+  loadingCuestionarios: boolean
   es: boolean
 }) {
   const nombre     = patient.fields['Nombre Completo'] ?? '—'
@@ -432,6 +522,20 @@ function PatientBanner({
               es={es}
             />
           )}
+
+          {/* Cuestionario Síntomas history */}
+          <div style={{ marginTop: 28 }}>
+            <div style={{ fontSize: pt.xs, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.18em', fontFamily: pt.sans, marginBottom: 4 }}>
+              {es ? 'Cuestionario de Síntomas' : 'Symptom Questionnaire'}
+            </div>
+            {loadingCuestionarios ? (
+              <p style={{ fontSize: pt.sm, color: '#6A6560', margin: '12px 0 0', fontFamily: pt.sans }}>
+                {es ? 'Cargando cuestionarios...' : 'Loading questionnaires...'}
+              </p>
+            ) : (
+              <CuestionarioTable cuestionarios={cuestionarios} es={es} />
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -440,7 +544,7 @@ function PatientBanner({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients, supplementos, initialConsultations }: Props) {
+export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients, supplementos, initialConsultations, initialCuestionarios }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const es = lang === 'es'
   const router = useRouter()
@@ -454,6 +558,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   // Consultation history for the banner
   const [consultasData, setConsultasData] = useState<Consulta[]>(initialConsultations ?? [])
   const [consultasPending, startConsultasTransition] = useTransition()
+
+  // Cuestionario data for the banner
+  const [cuestionariosData, setCuestionariosData] = useState<CuestionarioSintoma[]>(initialCuestionarios ?? [])
+  const [cuestionariosPending, startCuestionariosTransition] = useTransition()
 
   // Weight unit toggle
   const [pesoUnit,  setPesoUnit]  = useState<'kg' | 'lbs'>('kg')
@@ -513,11 +621,16 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     const p = allPatients.find(p => p.id === clienteId) ?? null
     setSelectedPatient(p)
     setConsultasData([])
+    setCuestionariosData([])
     if (p) {
       const nombre = p.fields['Nombre Completo'] ?? ''
       startConsultasTransition(async () => {
         const consultas = await fetchPatientConsultations(nombre)
         setConsultasData(consultas)
+      })
+      startCuestionariosTransition(async () => {
+        const cuestionarios = await fetchPatientCuestionarios(nombre)
+        setCuestionariosData(cuestionarios)
       })
     }
   }
@@ -678,6 +791,8 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
           patient={patient}
           consultations={consultasData}
           loadingConsultas={consultasPending}
+          cuestionarios={cuestionariosData}
+          loadingCuestionarios={cuestionariosPending}
           es={es}
         />
       )}

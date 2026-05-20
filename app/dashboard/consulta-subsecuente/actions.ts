@@ -1,10 +1,19 @@
 'use server'
 
-import { createConsulta, updateCliente, CLIENTES_FIELDS, getConsultasByCliente, type Consulta } from '@/lib/airtable'
+import {
+  createConsulta, updateCliente, CLIENTES_FIELDS,
+  getConsultasByCliente, getCuestionariosByCliente,
+  type Consulta, type CuestionarioSintoma,
+} from '@/lib/airtable'
 
 export async function fetchPatientConsultations(nombreCliente: string): Promise<Consulta[]> {
   if (!nombreCliente) return []
   return getConsultasByCliente(nombreCliente)
+}
+
+export async function fetchPatientCuestionarios(nombreCliente: string): Promise<CuestionarioSintoma[]> {
+  if (!nombreCliente) return []
+  return getCuestionariosByCliente(nombreCliente)
 }
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
