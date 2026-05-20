@@ -416,6 +416,17 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
   return allRecords
 }
 
+export async function getConsultaById(id: string): Promise<Consulta> {
+  return airtableFetch(`/Consultas/${id}`)
+}
+
+export async function updateConsulta(id: string, fields: Record<string, unknown>): Promise<Consulta> {
+  return airtableFetch(`/Consultas/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fields }),
+  })
+}
+
 export async function createConsulta(fields: Record<string, unknown>): Promise<Consulta> {
   return airtableFetch(`/Consultas`, {
     method: 'POST',

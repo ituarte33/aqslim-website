@@ -3,9 +3,9 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
-import { saveConsultaSubsecuente } from './actions'
+import { saveConsultaSubsecuente, fetchPatientConsultations } from './actions'
 import { sendReinitiationEmail } from '@/app/dashboard/[id]/edit/actions'
-import type { Cliente, Suplemento } from '@/lib/airtable'
+import type { Cliente, Consulta, Suplemento } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
@@ -37,6 +37,7 @@ type Props = {
   patient: Cliente | null
   allPatients: Cliente[]
   supplementos: Suplemento[]
+  initialConsultations: Consulta[]
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -123,18 +124,156 @@ function ToggleGroup<T extends string>({
   )
 }
 
-// ── Patient info banner ───────────────────────────────────────────────────────
+// ── Patient info banner (expandable) ─────────────────────────────────────────
 
-function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
-  const nombre    = patient.fields['Nombre Completo'] ?? '—'
-  const idCliente = patient.fields['ID Cliente']
-  const edad      = typeof patient.fields['Edad'] === 'number' ? patient.fields['Edad'] : null
-  const unidad    = patient.fields['Unidad de Peso'] ?? 'Lbs'
-  const pesoMeta  = patient.fields['Peso Meta (con unidad)'] ?? patient.fields['Peso Meta']
-  const idioma    = patient.fields['Idioma Preferido']
+function fmt(val: unknown): string {
+  if (val == null) return '—'
+  if (typeof val === 'boolean') return val ? 'Sí' : 'No'
+  if (Array.isArray(val)) return val.join(', ') || '—'
+  const s = String(val).trim()
+  return s || '—'
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 3 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{value}</div>
+    </div>
+  )
+}
+
+function ConsultaHistoryTable({
+  consultations,
+  weightUnit,
+  es,
+}: {
+  consultations: Consulta[]
+  weightUnit: 'kg' | 'lbs'
+  es: boolean
+}) {
+  if (consultations.length === 0) {
+    return (
+      <p style={{ fontSize: pt.sm, color: '#6A6560', margin: '12px 0 0', fontFamily: pt.sans }}>
+        {es ? 'Sin consultas registradas.' : 'No consultations on record.'}
+      </p>
+    )
+  }
+
+  const u = weightUnit
+  const toDisplay = (kg: number) => u === 'lbs' ? kg * 2.20462 : kg
+
+  const cols = [
+    { key: 'fecha',    label: es ? 'Fecha'    : 'Date'    },
+    { key: 'tipo',     label: es ? 'Tipo'     : 'Type'    },
+    { key: 'peso',     label: `Peso (${u})`               },
+    { key: 'dif',      label: `Dif. (${u})`               },
+    { key: 'grasa',    label: '% Grasa'                   },
+    { key: 'cintura',  label: es ? 'Cintura'  : 'Waist'   },
+    { key: 'cadera',   label: es ? 'Cadera'   : 'Hips'    },
+    { key: 'cumplim',  label: es ? 'Dieta'    : 'Diet'    },
+    { key: 'sentirse', label: es ? 'Sentirse' : 'Feeling' },
+  ]
+
+  function getCell(c: Consulta, i: number, key: string): string {
+    const f = c.fields
+    switch (key) {
+      case 'fecha':    return fmt(f['Fecha Consulta'])
+      case 'tipo':     return fmt(f['Tipo de Consulta'])
+      case 'peso': {
+        const kg = f['Peso (kg)']
+        return kg != null ? toDisplay(Number(kg)).toFixed(1) : '—'
+      }
+      case 'dif': {
+        const curr = f['Peso (kg)']
+        const prev = consultations[i + 1]?.fields['Peso (kg)']
+        if (curr == null || prev == null) return '—'
+        const d = toDisplay(Number(curr) - Number(prev))
+        return `${d > 0 ? '+' : ''}${d.toFixed(1)}`
+      }
+      case 'grasa':    return f['% Grasa Corporal'] != null ? `${Number(f['% Grasa Corporal']).toFixed(1)}%` : '—'
+      case 'cintura':  return f['Cintura (cm)'] != null ? `${f['Cintura (cm)']}` : '—'
+      case 'cadera':   return f['Cadera (cm)'] != null ? `${f['Cadera (cm)']}` : '—'
+      case 'cumplim':  return f['Cumplimiento Dieta (1-10)'] != null ? `${f['Cumplimiento Dieta (1-10)']}/10` : '—'
+      case 'sentirse': return f['Cómo Se Siente (1-10)'] != null ? `${f['Cómo Se Siente (1-10)']}/10` : '—'
+      default:         return '—'
+    }
+  }
+
+  return (
+    <div style={{ overflowX: 'auto', marginTop: 16 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.sm }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.25)' }}>
+            {cols.map(col => (
+              <th key={col.key} style={{
+                textAlign: 'left', padding: '8px 12px', whiteSpace: 'nowrap',
+                fontSize: pt.xs, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C9A84C',
+              }}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {consultations.map((c, i) => (
+            <tr
+              key={c.id}
+              style={{
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                cursor: 'pointer',
+              }}
+              onClick={() => window.open(`/dashboard/consultas/${c.id}`, '_blank', 'noopener,noreferrer')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,168,76,0.06)')}
+              onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)')}
+            >
+              {cols.map(col => (
+                <td key={col.key} style={{
+                  padding: '10px 12px', whiteSpace: 'nowrap',
+                  color: col.key === 'fecha' ? '#FAFAF8' : col.key === 'dif'
+                    ? (getCell(c, i, 'dif').startsWith('+') ? '#ff6b6b' : getCell(c, i, 'dif') === '—' ? '#6A6560' : '#6fbf6f')
+                    : '#9A9590',
+                }}>
+                  {getCell(c, i, col.key)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PatientBanner({
+  patient,
+  consultations = [],
+  loadingConsultas,
+  es,
+}: {
+  patient: Cliente
+  consultations: Consulta[]
+  loadingConsultas: boolean
+  es: boolean
+}) {
+  const nombre     = patient.fields['Nombre Completo'] ?? '—'
+  const idCliente  = patient.fields['ID Cliente']
+  const edad       = typeof patient.fields['Edad'] === 'number' ? patient.fields['Edad'] : null
+  const unidad     = patient.fields['Unidad de Peso'] ?? 'Lbs'
+  const pesoMeta   = patient.fields['Peso Meta (con unidad)'] ?? patient.fields['Peso Meta']
+  const idioma     = patient.fields['Idioma Preferido']
+  const email      = patient.fields['Email']
+  const telefono   = patient.fields['Teléfono']
   const estaturaCm = typeof patient.fields['Estatura (cm)'] === 'number' ? patient.fields['Estatura (cm)'] as number : null
+  const proximaCita = patient.fields['Próxima Cita']
 
+  const [expanded, setExpanded]         = useState(false)
   const [estaturaUnit, setEstaturaUnit] = useState<'ft-in' | 'cm'>('ft-in')
+  const [weightUnit,   setWeightUnit]   = useState<'kg' | 'lbs'>('kg')
+
   const estaturaDisplay = estaturaCm
     ? estaturaUnit === 'cm'
       ? `${estaturaCm} cm`
@@ -144,75 +283,164 @@ function PatientBanner({ patient, es }: { patient: Cliente; es: boolean }) {
         })()
     : null
 
+  const toWu = (kg: number) => weightUnit === 'lbs' ? kg * 2.20462 : kg
+
+  const latestConsulta = consultations[0]
+  const latestPesoKg   = latestConsulta?.fields['Peso (kg)']
+  const prevPesoKg     = consultations[1]?.fields['Peso (kg)']
+  const weightDiffKg   = latestPesoKg != null && prevPesoKg != null
+    ? Number(latestPesoKg) - Number(prevPesoKg)
+    : null
+
   return (
     <div style={{
       border: '1px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.04)',
-      padding: '20px 28px', marginBottom: 32,
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+      marginBottom: 32, overflow: 'hidden',
     }}>
-      <div>
-        <div style={{ fontSize: pt.xs, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: pt.sans, marginBottom: 6 }}>
-          {es ? 'Paciente' : 'Patient'}
-        </div>
-        <div style={{ fontFamily: pt.serif, fontSize: 22, color: '#FAFAF8', marginBottom: 4 }}>{nombre}</div>
-        <div style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
-          {[idCliente ? `ID ${idCliente}` : null, edad ? `${edad} ${es ? 'años' : 'yrs'}` : null].filter(Boolean).join(' · ')}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {estaturaDisplay && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans }}>
-                {es ? 'Estatura' : 'Height'}
-              </div>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {(['ft-in', 'cm'] as const).map(u => (
-                  <button key={u} type="button" onClick={() => setEstaturaUnit(u)} style={{
-                    padding: '1px 5px', fontSize: 9, fontFamily: pt.sans, cursor: 'pointer',
-                    letterSpacing: '0.06em', textTransform: 'uppercase',
-                    border: estaturaUnit === u ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.2)',
-                    background: estaturaUnit === u ? 'rgba(201,168,76,0.12)' : 'transparent',
-                    color: estaturaUnit === u ? '#C9A84C' : '#6A6560', transition: 'all 0.1s',
-                  }}>
-                    {u === 'ft-in' ? 'ft' : 'cm'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{estaturaDisplay}</div>
-          </div>
-        )}
-        {pesoMeta && (
-          <div>
-            <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>
-              {es ? 'Peso Meta' : 'Goal Weight'}
-            </div>
-            <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{String(pesoMeta)}</div>
-          </div>
-        )}
+      {/* Collapsed header — always visible; div instead of button to allow nested buttons */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded(v => !v)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(v => !v) } }}
+        style={{
+          width: '100%', cursor: 'pointer',
+          padding: '20px 28px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+        }}
+      >
         <div>
-          <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>
-            {es ? 'Unidad' : 'Unit'}
+          <div style={{ fontSize: pt.xs, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: pt.sans, marginBottom: 6 }}>
+            {es ? 'Paciente' : 'Patient'}
           </div>
-          <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{unidad}</div>
+          <div style={{ fontFamily: pt.serif, fontSize: 22, color: '#FAFAF8', marginBottom: 4 }}>{nombre}</div>
+          <div style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
+            {[
+              idCliente ? `ID ${idCliente}` : null,
+              edad ? `${edad} ${es ? 'años' : 'yrs'}` : null,
+              latestPesoKg != null ? `${toWu(Number(latestPesoKg)).toFixed(1)} ${weightUnit}` : null,
+            ].filter(Boolean).join(' · ')}
+          </div>
         </div>
-        {idioma && (
-          <div>
-            <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 4 }}>
-              {es ? 'Idioma' : 'Language'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+          {weightDiffKg != null && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans, marginBottom: 3 }}>
+                {es ? 'Último cambio' : 'Last change'}
+              </div>
+              <div style={{ fontSize: pt.base, color: weightDiffKg > 0 ? '#ff6b6b' : '#6fbf6f', fontFamily: pt.sans, fontWeight: 500 }}>
+                {weightDiffKg > 0 ? '+' : ''}{toWu(weightDiffKg).toFixed(1)} {weightUnit}
+              </div>
             </div>
-            <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{idioma}</div>
+          )}
+          {/* kg / lbs toggle — stopPropagation so it doesn't collapse/expand the banner */}
+          <div
+            style={{ display: 'flex', gap: 3 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {(['kg', 'lbs'] as const).map(u => (
+              <button
+                key={u} type="button"
+                onClick={() => setWeightUnit(u)}
+                style={{
+                  padding: '3px 9px', fontSize: pt.xs, fontFamily: pt.sans, cursor: 'pointer',
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  border: weightUnit === u ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+                  background: weightUnit === u ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.03)',
+                  color: weightUnit === u ? '#C9A84C' : '#6A6560',
+                  transition: 'all 0.12s',
+                }}
+              >
+                {u}
+              </button>
+            ))}
           </div>
-        )}
+          <div style={{ fontSize: pt.sm, color: '#6A6560', fontFamily: pt.sans }}>
+            {expanded ? '▲' : '▼'}
+          </div>
+        </div>
       </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div style={{ padding: '0 28px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Patient info pills */}
+          <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', paddingTop: 20, marginBottom: 24 }}>
+            {estaturaDisplay && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <div style={{ fontSize: pt.xs, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: pt.sans }}>
+                    {es ? 'Estatura' : 'Height'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {(['ft-in', 'cm'] as const).map(u => (
+                      <button key={u} type="button" onClick={e => { e.stopPropagation(); setEstaturaUnit(u) }} style={{
+                        padding: '1px 5px', fontSize: 9, fontFamily: pt.sans, cursor: 'pointer',
+                        letterSpacing: '0.06em', textTransform: 'uppercase',
+                        border: estaturaUnit === u ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.2)',
+                        background: estaturaUnit === u ? 'rgba(201,168,76,0.12)' : 'transparent',
+                        color: estaturaUnit === u ? '#C9A84C' : '#6A6560', transition: 'all 0.1s',
+                      }}>
+                        {u === 'ft-in' ? 'ft' : 'cm'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ fontSize: pt.base, color: '#FAFAF8' }}>{estaturaDisplay}</div>
+              </div>
+            )}
+            {pesoMeta && <InfoPill label={es ? 'Peso Meta' : 'Goal Weight'} value={String(pesoMeta)} />}
+            <InfoPill label={es ? 'Unidad' : 'Unit'} value={String(unidad)} />
+            {idioma && <InfoPill label={es ? 'Idioma' : 'Language'} value={String(idioma)} />}
+            {email && <InfoPill label="Email" value={String(email)} />}
+            {telefono && <InfoPill label={es ? 'Teléfono' : 'Phone'} value={String(telefono)} />}
+            {proximaCita && (
+              <InfoPill
+                label={es ? 'Próxima Cita' : 'Next Appt.'}
+                value={new Intl.DateTimeFormat(es ? 'es-MX' : 'en-US', {
+                  dateStyle: 'medium', timeZone: 'America/Los_Angeles',
+                }).format(new Date(proximaCita))}
+              />
+            )}
+            {latestConsulta && (
+              <>
+                {latestConsulta.fields['% Grasa Corporal'] != null && (
+                  <InfoPill label="% Grasa" value={`${Number(latestConsulta.fields['% Grasa Corporal']).toFixed(1)}%`} />
+                )}
+                {latestConsulta.fields['IMC'] != null && (
+                  <InfoPill label="IMC" value={String(latestConsulta.fields['IMC'])} />
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Consultation history */}
+          <div style={{ fontSize: pt.xs, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.18em', fontFamily: pt.sans, marginBottom: 4 }}>
+            {es ? 'Historial de Consultas' : 'Consultation History'}
+          </div>
+          <div style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans, marginBottom: 4 }}>
+            {es ? 'Haz clic en una fila para ver el expediente completo en una nueva pestaña.' : 'Click a row to open the full record in a new tab.'}
+          </div>
+          {loadingConsultas ? (
+            <p style={{ fontSize: pt.sm, color: '#6A6560', margin: '12px 0 0', fontFamily: pt.sans }}>
+              {es ? 'Cargando consultas...' : 'Loading consultations...'}
+            </p>
+          ) : (
+            <ConsultaHistoryTable
+              consultations={consultations}
+              weightUnit={weightUnit}
+              es={es}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients, supplementos }: Props) {
+export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPatients, supplementos, initialConsultations }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const es = lang === 'es'
   const router = useRouter()
@@ -222,6 +450,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [patientSearch, setPatientSearch] = useState('')
 
   const patient = selectedPatient
+
+  // Consultation history for the banner
+  const [consultasData, setConsultasData] = useState<Consulta[]>(initialConsultations ?? [])
+  const [consultasPending, startConsultasTransition] = useTransition()
 
   // Weight unit toggle
   const [pesoUnit,  setPesoUnit]  = useState<'kg' | 'lbs'>('kg')
@@ -280,6 +512,14 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   function handleSelectPatient(clienteId: string) {
     const p = allPatients.find(p => p.id === clienteId) ?? null
     setSelectedPatient(p)
+    setConsultasData([])
+    if (p) {
+      const nombre = p.fields['Nombre Completo'] ?? ''
+      startConsultasTransition(async () => {
+        const consultas = await fetchPatientConsultations(nombre)
+        setConsultasData(consultas)
+      })
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -433,7 +673,14 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
       )}
 
       {/* Patient info banner */}
-      {patient && <PatientBanner patient={patient} es={es} />}
+      {patient && (
+        <PatientBanner
+          patient={patient}
+          consultations={consultasData}
+          loadingConsultas={consultasPending}
+          es={es}
+        />
+      )}
 
       {/* Form — only show once patient is identified */}
       {patient && (

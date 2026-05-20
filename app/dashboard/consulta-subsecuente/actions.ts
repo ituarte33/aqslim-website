@@ -1,6 +1,11 @@
 'use server'
 
-import { createConsulta, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
+import { createConsulta, updateCliente, CLIENTES_FIELDS, getConsultasByCliente, type Consulta } from '@/lib/airtable'
+
+export async function fetchPatientConsultations(nombreCliente: string): Promise<Consulta[]> {
+  if (!nombreCliente) return []
+  return getConsultasByCliente(nombreCliente)
+}
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
   const clienteRecordId = (formData.get('clienteRecordId') as string).trim()

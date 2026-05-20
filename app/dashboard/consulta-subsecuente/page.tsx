@@ -1,7 +1,15 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getRole } from '@/lib/auth'
-import { getClienteById, getClientes, getSupplementos, type Cliente, type Suplemento } from '@/lib/airtable'
+import {
+  getClienteById,
+  getClientes,
+  getConsultasByCliente,
+  getSupplementos,
+  type Cliente,
+  type Consulta,
+  type Suplemento,
+} from '@/lib/airtable'
 import { ConsultaSubsecuenteClient } from './consulta-subsecuente-client'
 
 export default async function ConsultaSubsecuentePage({
@@ -21,18 +29,26 @@ export default async function ConsultaSubsecuentePage({
   let patient: Cliente | null = null
   let allPatients: Cliente[] = []
   let supplementos: Suplemento[] = []
+  let initialConsultations: Consulta[] = []
 
-  const [patientsResult, supplementosResult] = await Promise.allSettled([
-    clienteId ? getClienteById(clienteId) : getClientes(),
-    getSupplementos(),
-  ])
-
-  if (patientsResult.status === 'fulfilled') {
-    if (clienteId) { patient = patientsResult.value as Cliente }
-    else { allPatients = patientsResult.value as Cliente[] }
-  }
-  if (supplementosResult.status === 'fulfilled') {
-    supplementos = supplementosResult.value as Suplemento[]
+  if (clienteId) {
+    try {
+      patient = await getClienteById(clienteId)
+      const nombre = patient.fields['Nombre Completo'] ?? ''
+      const [consultasResult, supplementosResult] = await Promise.allSettled([
+        nombre ? getConsultasByCliente(nombre) : Promise.resolve([]),
+        getSupplementos(),
+      ])
+      if (consultasResult.status === 'fulfilled') initialConsultations = consultasResult.value
+      if (supplementosResult.status === 'fulfilled') supplementos = supplementosResult.value
+    } catch { /* errors shown in client */ }
+  } else {
+    const [patientsResult, supplementosResult] = await Promise.allSettled([
+      getClientes(),
+      getSupplementos(),
+    ])
+    if (patientsResult.status === 'fulfilled') allPatients = patientsResult.value as Cliente[]
+    if (supplementosResult.status === 'fulfilled') supplementos = supplementosResult.value
   }
 
   return (
@@ -41,6 +57,7 @@ export default async function ConsultaSubsecuentePage({
       patient={patient}
       allPatients={allPatients}
       supplementos={supplementos}
+      initialConsultations={initialConsultations}
     />
   )
 }

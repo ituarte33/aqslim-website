@@ -162,11 +162,15 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 
 function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; columns: ColDef[] }) {
+  const router = useRouter()
   if (consultations.length === 0) {
     return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin consultas registradas.</p>
   }
   return (
     <div style={{ overflowX: 'auto' }}>
+      <p style={{ fontSize: pt.xs, color: '#6A6560', margin: '0 0 8px', fontFamily: 'sans-serif', letterSpacing: '0.04em' }}>
+        Haz clic en una fila para editar esa consulta.
+      </p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
         <thead>
           <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
@@ -182,10 +186,17 @@ function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; 
         </thead>
         <tbody>
           {consultations.map((c, i) => (
-            <tr key={c.id} style={{
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
-            }}>
+            <tr
+              key={c.id}
+              onClick={() => router.push(`/dashboard/consultas/${c.id}`)}
+              style={{
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,168,76,0.06)')}
+              onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)')}
+            >
               {columns.map(col => (
                 <td key={col.colKey ?? String(col.field)} style={{
                   padding: '12px 16px', whiteSpace: 'nowrap',
