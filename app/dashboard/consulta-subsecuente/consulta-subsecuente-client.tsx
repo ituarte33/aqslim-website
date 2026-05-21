@@ -593,8 +593,17 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [consultaFee, setConsultaFee]     = useState('')
   const [suppSearch, setSuppSearch]       = useState('')
 
+  // Shipping (only for "Suplementos + Envio")
+  const [shippingOption, setShippingOption] = useState<'Small' | 'Medium' | 'Large' | 'Custom' | null>(null)
+  const [shippingCustom, setShippingCustom] = useState('')
+
   const supplementTotal = cart.reduce((s, i) => s + i.precio, 0)
-  const montoCobradoTotal = supplementTotal + (parseFloat(consultaFee) || 0)
+  const shippingCost =
+    shippingOption === 'Small'  ? 5  :
+    shippingOption === 'Medium' ? 10 :
+    shippingOption === 'Large'  ? 15 :
+    shippingOption === 'Custom' ? (parseFloat(shippingCustom) || 0) : 0
+  const montoCobradoTotal = supplementTotal + (parseFloat(consultaFee) || 0) + shippingCost
 
   const [proximaCita, setProximaCita] = useState(nextWeekDatetimeLocal)
   const [showBooking, setShowBooking] = useState(false)
@@ -805,16 +814,26 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {([
-              ['Cliente Nuevo',       es ? 'Cliente Nuevo'       : 'New Client'      ],
-              ['Cliente subsecuente', es ? 'Cliente Subsecuente' : 'Returning Client'],
-              ['Cliente Re-Inicio',   es ? 'Cliente Re-Inicio'   : 'Re-Start Client' ],
+              ['Cliente Nuevo',        es ? 'Cliente Nuevo'        : 'New Client'             ],
+              ['Cliente subsecuente',  es ? 'Cliente Subsecuente'  : 'Returning Client'       ],
+              ['Cliente Re-Inicio',    es ? 'Cliente Re-Inicio'    : 'Re-Start Client'        ],
+              ['Suplementos',          es ? 'Suplementos'          : 'Supplements'            ],
+              ['Suplementos + Envio',  es ? 'Suplementos + Envío'  : 'Supplements + Shipping' ],
             ] as [string, string][]).map(([value, label]) => (
               <button
                 key={value} type="button"
                 onClick={() => {
                   setTipoConsulta(value)
-                  const fee = value === 'Cliente Nuevo' ? '40' : value === 'Cliente Re-Inicio' ? '35' : '30'
+                  const fee =
+                    value === 'Cliente Nuevo'       ? '40' :
+                    value === 'Cliente Re-Inicio'   ? '35' :
+                    value === 'Suplementos'         ? '0'  :
+                    value === 'Suplementos + Envio' ? '0'  : '30'
                   setConsultaFee(fee)
+                  if (value !== 'Suplementos + Envio') {
+                    setShippingOption(null)
+                    setShippingCustom('')
+                  }
                 }}
                 style={{
                   padding: '11px 20px', fontSize: pt.base, fontFamily: pt.sans, fontWeight: 500,
@@ -1119,6 +1138,52 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
                   {es ? 'Suplementos' : 'Supplements'}
                 </span>
                 <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>${supplementTotal.toFixed(2)}</span>
+              </div>
+            )}
+            {tipoConsulta === 'Suplementos + Envio' && (
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans, display: 'block', marginBottom: 10 }}>
+                  {es ? 'Costo de Envío' : 'Shipping Cost'}
+                </span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {([
+                    ['Small',  es ? 'Chico'                 : 'Small',  5   ],
+                    ['Medium', es ? 'Mediano'               : 'Medium', 10  ],
+                    ['Large',  es ? 'Grande'                : 'Large',  15  ],
+                    ['Custom', es ? 'Cantidad Personalizada': 'Custom Amt.', null],
+                  ] as [string, string, number | null][]).map(([opt, label, price]) => (
+                    <button
+                      key={opt} type="button"
+                      onClick={() => { setShippingOption(opt as 'Small' | 'Medium' | 'Large' | 'Custom'); if (opt !== 'Custom') setShippingCustom('') }}
+                      style={{
+                        padding: '8px 14px', fontSize: pt.sm, fontFamily: pt.sans, fontWeight: 500,
+                        cursor: 'pointer',
+                        border: shippingOption === opt ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)',
+                        background: shippingOption === opt ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.05)',
+                        color: shippingOption === opt ? '#C9A84C' : '#9A9590',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {label}{price !== null ? ` — $${price}` : ''}
+                    </button>
+                  ))}
+                </div>
+                {shippingOption === 'Custom' && (
+                  <input
+                    type="number" step="0.01" min="0"
+                    placeholder="0.00"
+                    value={shippingCustom}
+                    onChange={e => setShippingCustom(e.target.value)}
+                    style={{ ...inputStyle, width: 140, textAlign: 'right', marginTop: 10 }}
+                  />
+                )}
+                {shippingOption && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
+                      ${shippingCost.toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
             <div style={{ padding: '14px 16px', background: 'rgba(201,168,76,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
