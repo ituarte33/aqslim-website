@@ -483,8 +483,19 @@ export interface Suplemento {
 
 export async function getSupplementos(): Promise<Suplemento[]> {
   const formula = encodeURIComponent(`{Activo} = "Sí"`)
-  const data = await airtableFetch(
-    `/Suplementos_AQSLIM?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Nombre&sort%5B0%5D%5Bdirection%5D=asc`
-  )
-  return data.records ?? []
+  const records: Suplemento[] = []
+  let offset: string | undefined
+  do {
+    const params = new URLSearchParams({
+      filterByFormula: `{Activo} = "Sí"`,
+      pageSize: '100',
+      'sort[0][field]': 'Nombre',
+      'sort[0][direction]': 'asc',
+    })
+    if (offset) params.set('offset', offset)
+    const data = await airtableFetch(`/Suplementos_AQSLIM?${params}`)
+    records.push(...(data.records ?? []))
+    offset = data.offset
+  } while (offset)
+  return records
 }
