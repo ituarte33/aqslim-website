@@ -589,3 +589,14 @@ export async function getMealLogsByUser(userId: string, limit = 20): Promise<Mea
   )
   return data.records ?? []
 }
+
+// Fetch all logs since a given date (YYYY-MM-DD) — used for daily/weekly/monthly filtering on the client
+export async function getMealLogsSince(userId: string, since: string, limit = 200): Promise<MealLog[]> {
+  const formula = encodeURIComponent(
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.DATE}} >= "${since}")`
+  )
+  const data = await airtableFetch(
+    `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${MEAL_LOGS_FIELDS.TIMESTAMP}&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=${limit}`
+  )
+  return data.records ?? []
+}

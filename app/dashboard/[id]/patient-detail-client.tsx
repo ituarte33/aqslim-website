@@ -9,6 +9,7 @@ import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 import { sendNoShowEmail } from '@/app/dashboard/[id]/edit/actions'
+import { FoodLogWidget } from '@/app/food-log-widget'
 
 type Props = {
   patient: Cliente | null
@@ -44,7 +45,7 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
   )
 }
 
-function EstaturaCard({ cm }: { cm: number }) {
+function EstaturaCard({ cm, label }: { cm: number; label: string }) {
   const [unit, setUnit] = useState<'ft-in' | 'cm'>('ft-in')
   const totalIn = cm / 2.54
   const ft = Math.floor(totalIn / 12)
@@ -58,7 +59,7 @@ function EstaturaCard({ cm }: { cm: number }) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: pt.sm, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9A9590' }}>
-          Estatura
+          {label}
         </div>
         <div style={{ display: 'flex', gap: 3 }}>
           {(['ft-in', 'cm'] as const).map(u => (
@@ -172,9 +173,9 @@ function toxicidadColor(nivel: string | undefined): string {
   return '#9A9590'
 }
 
-function CuestionarioTab({ cuestionarios }: { cuestionarios: CuestionarioSintoma[] }) {
+function CuestionarioTab({ cuestionarios, lang }: { cuestionarios: CuestionarioSintoma[]; lang: 'es' | 'en' }) {
   if (cuestionarios.length === 0) {
-    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin cuestionarios registrados.</p>
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>{copy[lang].noQuestionnaires}</p>
   }
 
   const cols = [
@@ -246,27 +247,31 @@ function CuestionarioTab({ cuestionarios }: { cuestionarios: CuestionarioSintoma
   )
 }
 
-function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; columns: ColDef[] }) {
+function ConsultaTable({ consultations, columns, lang }: { consultations: Consulta[]; columns: ColDef[]; lang: 'es' | 'en' }) {
   const router = useRouter()
   if (consultations.length === 0) {
-    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin consultas registradas.</p>
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>{copy[lang].noConsultas}</p>
   }
   return (
     <div style={{ overflowX: 'auto' }}>
       <p style={{ fontSize: pt.xs, color: '#6A6560', margin: '0 0 8px', fontFamily: 'sans-serif', letterSpacing: '0.04em' }}>
-        Haz clic en una fila para editar esa consulta.
+        {copy[lang].clickToEdit}
       </p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
         <thead>
           <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.3)' }}>
-            {columns.map(col => (
-              <th key={col.colKey ?? String(col.field)} style={{
-                textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
-                fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
-              }}>
-                {col.label ?? String(col.field)}
-              </th>
-            ))}
+            {columns.map(col => {
+              const key = col.colKey ?? String(col.field)
+              const label = COL_LABELS[key]?.[lang] ?? COL_LABELS[String(col.field)]?.[lang] ?? col.label ?? String(col.field)
+              return (
+                <th key={key} style={{
+                  textAlign: 'left', padding: '10px 16px', whiteSpace: 'nowrap',
+                  fontSize: pt.xs, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C9A84C',
+                }}>
+                  {label}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>
@@ -298,12 +303,12 @@ function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; 
   )
 }
 
-function NotesTab({ consultations }: { consultations: Consulta[] }) {
+function NotesTab({ consultations, lang }: { consultations: Consulta[]; lang: 'es' | 'en' }) {
   const withNotes = consultations.filter(
     c => c.fields['Recomendaciones al Cliente'] || c.fields['Notas del Terapeuta']
   )
   if (withNotes.length === 0) {
-    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin notas registradas.</p>
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>{copy[lang].noNotes}</p>
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -319,7 +324,7 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
           {c.fields['Recomendaciones al Cliente'] && (
             <div style={{ marginBottom: c.fields['Notas del Terapeuta'] ? 16 : 0 }}>
               <div style={{ fontSize: pt.sm, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9590', marginBottom: 6, fontFamily: pt.sans }}>
-                Recomendaciones al Cliente
+                {copy[lang].notes.recomendaciones}
               </div>
               <p style={{ fontSize: pt.md, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
                 {String(c.fields['Recomendaciones al Cliente'])}
@@ -329,7 +334,7 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
           {c.fields['Notas del Terapeuta'] && (
             <div>
               <div style={{ fontSize: pt.sm, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9590', marginBottom: 6, fontFamily: pt.sans }}>
-                Notas del Terapeuta
+                {copy[lang].notes.notas}
               </div>
               <p style={{ fontSize: pt.md, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
                 {String(c.fields['Notas del Terapeuta'])}
@@ -342,13 +347,77 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
   )
 }
 
+const copy = {
+  es: {
+    pageLabel:       'Expediente del Paciente',
+    foodScanner:     'Escáner de Alimentos con IA',
+    mealLog:         'Registro de Comidas',
+    schedule:        '+ Agendar Cita',
+    closeSchedule:   '✕ Cerrar',
+    followUp:        '+ Consulta Subsecuente',
+    editPatient:     'Editar Paciente',
+    clickToEdit:     'Haz clic en una fila para editar esa consulta.',
+    noConsultas:     'Sin consultas registradas.',
+    noNotes:         'Sin notas registradas.',
+    noQuestionnaires:'Sin cuestionarios registrados.',
+    notFound:        'Paciente no encontrado.',
+    patients:        'Pacientes',
+    tabs: { weight: 'Peso', measurements: 'Medidas', wellness: 'Bienestar', notes: 'Notas', cuestionario: 'Cuestionario' },
+    stats: { idCliente: 'ID Cliente', edad: 'Edad', estatura: 'Estatura', pesoMeta: 'Peso Meta', consultas: 'Consultas' },
+    notes: { recomendaciones: 'Recomendaciones al Cliente', notas: 'Notas del Terapeuta' },
+  },
+  en: {
+    pageLabel:       'Patient File',
+    foodScanner:     'AI Food Scanner',
+    mealLog:         'Meal Log',
+    schedule:        '+ Schedule Appointment',
+    closeSchedule:   '✕ Close',
+    followUp:        '+ Follow-up Consultation',
+    editPatient:     'Edit Patient',
+    clickToEdit:     'Click a row to edit that consultation.',
+    noConsultas:     'No consultations on record.',
+    noNotes:         'No notes on record.',
+    noQuestionnaires:'No questionnaires on record.',
+    notFound:        'Patient not found.',
+    patients:        'Patients',
+    tabs: { weight: 'Weight', measurements: 'Measurements', wellness: 'Wellness', notes: 'Notes', cuestionario: 'Questionnaire' },
+    stats: { idCliente: 'Client ID', edad: 'Age', estatura: 'Height', pesoMeta: 'Goal Weight', consultas: 'Consultations' },
+    notes: { recomendaciones: 'Client Recommendations', notas: 'Therapist Notes' },
+  },
+}
+
+// Column header translations keyed by colKey or field name
+const COL_LABELS: Record<string, { es: string; en: string }> = {
+  'Fecha Consulta':            { es: 'Fecha Consulta',            en: 'Date'                    },
+  'peso-kg':                   { es: 'Peso (kg)',                 en: 'Weight (kg)'             },
+  'peso-lbs':                  { es: 'Peso (lbs)',                en: 'Weight (lbs)'            },
+  'dif-kg':                    { es: 'Dif. (kg)',                 en: 'Diff. (kg)'              },
+  'dif-lbs':                   { es: 'Dif. (lbs)',                en: 'Diff. (lbs)'             },
+  '% Grasa Corporal':          { es: '% Grasa Corporal',          en: '% Body Fat'              },
+  'IMC':                       { es: 'IMC',                       en: 'BMI'                     },
+  'Cintura (cm)':              { es: 'Cintura (cm)',              en: 'Waist (cm)'              },
+  'Cadera (cm)':               { es: 'Cadera (cm)',               en: 'Hips (cm)'               },
+  'Brazos (cm)':               { es: 'Brazos (cm)',               en: 'Arms (cm)'               },
+  'Muslos (cm)':               { es: 'Muslos (cm)',               en: 'Thighs (cm)'             },
+  'Pecho/Busto (cm)':          { es: 'Pecho/Busto (cm)',          en: 'Chest/Bust (cm)'         },
+  'Cumplimiento Dieta (1-10)': { es: 'Cumplimiento Dieta (1-10)', en: 'Diet Compliance (1-10)'  },
+  'Cómo Se Siente (1-10)':     { es: 'Cómo Se Siente (1-10)',     en: 'Feeling (1-10)'          },
+  'Nivel de Energía':          { es: 'Nivel de Energía',          en: 'Energy Level'            },
+  'Calidad de Sueño':          { es: 'Calidad de Sueño',          en: 'Sleep Quality'           },
+  '¿Ansiedad?':                { es: '¿Ansiedad?',                en: 'Anxiety?'                },
+  '¿Tuvo Hambre?':             { es: '¿Tuvo Hambre?',             en: 'Hunger?'                 },
+}
+
 export function PatientDetailClient({ patient, consultations, cuestionarios, error, isAdmin }: Props) {
   const router = useRouter()
+  const [lang, setLang]           = useState<'es' | 'en'>('es')
   const [activeTab, setActiveTab] = useState<TabId>('weight')
   const [showBooking, setShowBooking] = useState(false)
   const [noShowPending, startNoShowTransition] = useTransition()
   const [noShowStatus, setNoShowStatus] = useState<'idle' | 'sent' | 'error'>('idle')
   const [noShowError, setNoShowError]   = useState<string | null>(null)
+
+  const t = copy[lang]
 
   const tabBtn = (id: TabId) => ({
     background: 'none' as const,
@@ -389,21 +458,22 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                 fontFamily: pt.sans, textTransform: 'uppercase',
               }}
             >
-              ← Pacientes
+              ← {t.patients}
             </button>
           )}
-          <Link
-            href="/food-scanner"
-            style={{
-              color: '#9A9590', fontSize: pt.sm, letterSpacing: '0.12em',
-              textTransform: 'uppercase', textDecoration: 'none',
-              fontFamily: pt.sans, transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#C9A84C')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#9A9590')}
-          >
-            🍽 {isAdmin ? 'Food Scanner' : 'Mis Comidas'}
-          </Link>
+          <div style={{ display: 'flex', gap: 2 }}>
+            {(['es', 'en'] as const).map(l => (
+              <button key={l} onClick={() => setLang(l)} style={{
+                padding: '4px 8px', fontSize: 10, fontFamily: pt.sans, cursor: 'pointer',
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+                border: lang === l ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
+                background: lang === l ? 'rgba(201,168,76,0.12)' : 'transparent',
+                color: lang === l ? '#C9A84C' : '#6A6560', transition: 'all 0.15s',
+              }}>
+                {l}
+              </button>
+            ))}
+          </div>
           <UserButton />
         </div>
       </header>
@@ -420,20 +490,20 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
             {/* Patient header */}
             <div style={{ marginBottom: 40 }}>
               <p style={{ fontSize: pt.sm, color: '#9A9590', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
-                Expediente del Paciente
+                {t.pageLabel}
               </p>
               <h1 style={{ fontFamily: pt.serif, fontSize: pt.hero, fontWeight: 400, margin: '0 0 24px' }}>
                 {fmt(patient.fields['Nombre Completo'])}
               </h1>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <StatCard label="ID Cliente" value={fmt(patient.fields['ID Cliente'])} />
-                <StatCard label="Edad" value={fmt(patient.fields['Edad'])} />
+                <StatCard label={t.stats.idCliente} value={fmt(patient.fields['ID Cliente'])} />
+                <StatCard label={t.stats.edad} value={fmt(patient.fields['Edad'])} />
                 {typeof patient.fields['Estatura (cm)'] === 'number' && (
-                  <EstaturaCard cm={patient.fields['Estatura (cm)'] as number} />
+                  <EstaturaCard cm={patient.fields['Estatura (cm)'] as number} label={t.stats.estatura} />
                 )}
-                <StatCard label="Peso Meta" value={fmt(patient.fields['Peso Meta (con unidad)'])} highlight />
-                <StatCard label="Consultas" value={String(consultations.length)} />
+                <StatCard label={t.stats.pesoMeta} value={fmt(patient.fields['Peso Meta (con unidad)'])} highlight />
+                <StatCard label={t.stats.consultas} value={String(consultations.length)} />
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
@@ -446,7 +516,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                       textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
                       textDecoration: 'none', display: 'inline-block',
                     }}>
-                      + Consulta Subsecuente
+                      {t.followUp}
                     </Link>
                     <Link href={`/dashboard/${patient.id}/edit`} style={{
                       background: 'none', color: '#C9A84C',
@@ -455,7 +525,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                       textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
                       textDecoration: 'none', display: 'inline-block',
                     }}>
-                      Editar Paciente
+                      {t.editPatient}
                     </Link>
                   </>
                 )}
@@ -470,8 +540,19 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                     cursor: 'pointer',
                   }}
                 >
-                  {showBooking ? '✕ Cerrar' : '+ Agendar Cita'}
+                  {showBooking ? t.closeSchedule : t.schedule}
                 </button>
+                {!isAdmin && (
+                  <Link href="/food-scanner" style={{
+                    background: 'none', color: '#C9A84C',
+                    border: '1px solid rgba(201,168,76,0.5)',
+                    padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+                    textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+                    textDecoration: 'none', display: 'inline-block',
+                  }}>
+                    {t.foodScanner}
+                  </Link>
+                )}
                 {isAdmin && (
                   <button
                     disabled={noShowPending || noShowStatus === 'sent'}
@@ -520,7 +601,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                     telefono={patient.fields['Teléfono'] ? String(patient.fields['Teléfono']) : undefined}
                     allowedServices={isAdmin ? ADMIN_SERVICES : ['Returning Client', 'New Beggining']}
                     isAdmin={isAdmin}
-                    lang="es"
+                    lang={lang}
                     onBooked={() => setShowBooking(false)}
                   />
                 </div>
@@ -529,23 +610,32 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
 
             {/* Tabs */}
             <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
-              {TABS.map(t => (
-                <button key={t.id} style={tabBtn(t.id)} onClick={() => setActiveTab(t.id)}>
-                  {t.label}
+              {TABS.map(tab => (
+                <button key={tab.id} style={tabBtn(tab.id)} onClick={() => setActiveTab(tab.id)}>
+                  {t.tabs[tab.id]}
                 </button>
               ))}
             </div>
 
-            {activeTab === 'weight' && <ConsultaTable consultations={consultations} columns={WEIGHT_COLS} />}
-            {activeTab === 'measurements' && <ConsultaTable consultations={consultations} columns={MEASUREMENTS_COLS} />}
-            {activeTab === 'wellness' && <ConsultaTable consultations={consultations} columns={WELLNESS_COLS} />}
-            {activeTab === 'notes' && <NotesTab consultations={consultations} />}
-            {activeTab === 'cuestionario' && <CuestionarioTab cuestionarios={cuestionarios} />}
+            {activeTab === 'weight' && <ConsultaTable consultations={consultations} columns={WEIGHT_COLS} lang={lang} />}
+            {activeTab === 'measurements' && <ConsultaTable consultations={consultations} columns={MEASUREMENTS_COLS} lang={lang} />}
+            {activeTab === 'wellness' && <ConsultaTable consultations={consultations} columns={WELLNESS_COLS} lang={lang} />}
+            {activeTab === 'notes' && <NotesTab consultations={consultations} lang={lang} />}
+            {activeTab === 'cuestionario' && <CuestionarioTab cuestionarios={cuestionarios} lang={lang} />}
+
+            {!isAdmin && (
+              <div style={{ marginTop: 56 }}>
+                <h2 style={{ fontFamily: pt.serif, fontSize: 24, fontWeight: 400, marginBottom: 16, color: '#FAFAF8' }}>
+                  {t.mealLog}
+                </h2>
+                <FoodLogWidget />
+              </div>
+            )}
           </>
         )}
 
         {!patient && !error && (
-          <p style={{ color: '#6A6560', fontSize: pt.base }}>Paciente no encontrado.</p>
+          <p style={{ color: '#6A6560', fontSize: pt.base }}>{t.notFound}</p>
         )}
       </main>
 

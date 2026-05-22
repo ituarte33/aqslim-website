@@ -133,7 +133,7 @@ async function updateClerkUserPlan(email: string, plan: string): Promise<void> {
       return
     }
     await clerk.users.updateUserMetadata(users.data[0].id, {
-      publicMetadata: { plan },
+      privateMetadata: { plan },
     })
     console.log(`[square-plans] ${email} → plan: ${plan}`)
   } catch (err) {

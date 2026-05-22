@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { countTodayScans, createMealLog, getMealLogsByUser, type MealType } from '@/lib/airtable'
+import { countTodayScans, createMealLog, getMealLogsSince, type MealType } from '@/lib/airtable'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user  = await currentUser()
-  const plan  = (user?.publicMetadata?.plan as string | undefined) ?? 'free'
+  const plan  = (user?.privateMetadata?.plan as string | undefined) ?? 'free'
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
   const limit = SCAN_LIMITS[plan] ?? 1
   const today = todayPT()
@@ -97,21 +97,25 @@ All numeric values are integers representing grams (carbs/fats/proteins) or kcal
   })
 }
 
-// GET — return today's usage + recent logs
+// GET — return today's usage + monthly logs for period filtering
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user  = await currentUser()
-  const plan  = (user?.publicMetadata?.plan as string | undefined) ?? 'free'
-  const email = user?.emailAddresses[0]?.emailAddress ?? ''
+  const plan  = (user?.privateMetadata?.plan as string | undefined) ?? 'free'
   const limit = SCAN_LIMITS[plan] ?? 1
   const today = todayPT()
 
+  const [y, m, d] = today.split('-').map(Number)
+  const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()
+  const weekStart  = new Date(Date.UTC(y, m - 1, d - (dow === 0 ? 6 : dow - 1), 12)).toISOString().slice(0, 10)
+  const monthStart = `${today.slice(0, 7)}-01`
+
   const [used, logs] = await Promise.all([
     countTodayScans(userId, today),
-    getMealLogsByUser(userId, 20),
+    getMealLogsSince(userId, monthStart, 200),
   ])
 
-  return Response.json({ used, limit, remaining: limit - used, plan, logs })
+  return Response.json({ used, limit, remaining: limit - used, plan, today, weekStart, monthStart, logs })
 }

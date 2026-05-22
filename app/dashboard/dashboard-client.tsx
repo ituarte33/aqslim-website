@@ -225,6 +225,7 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
           muted
         />
       </div>
+
     </DashboardShell>
   )
 }

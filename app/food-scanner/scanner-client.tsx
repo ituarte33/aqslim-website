@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
+import { FoodLogWidget, type LogEntry } from '../food-log-widget'
 
 type Plan = 'free' | 'mid' | 'top'
 
@@ -14,21 +16,6 @@ interface ScanResult {
   used: number
   limit: number
   remaining: number
-}
-
-interface LogEntry {
-  id: string
-  createdTime: string
-  fields: {
-    'Food Description'?: string
-    'Calories'?: number
-    'Carbs (g)'?: number
-    'Fats (g)'?: number
-    'Proteins (g)'?: number
-    'Date'?: string
-    'Timestamp'?: string
-    'Meal Type'?: string
-  }
 }
 
 const PLAN_LABELS: Record<Plan, string> = {
@@ -46,13 +33,16 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [scanning, setScanning] = useState(false)
   const [result, setResult]     = useState<ScanResult | null>(null)
   const [error, setError]       = useState<string | null>(null)
-  const [used, setUsed]         = useState(0)
-  const [limit, setLimit]       = useState(1)
-  const [logs, setLogs]         = useState<LogEntry[]>([])
+  const [used, setUsed]               = useState(0)
+  const [limit, setLimit]             = useState(1)
+  const [logs, setLogs]               = useState<LogEntry[]>([])
+  const [logToday, setLogToday]       = useState('')
+  const [logWeekStart, setLogWeekStart]   = useState('')
+  const [logMonthStart, setLogMonthStart] = useState('')
   const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Load today's usage + history on mount
+  // Load today's usage + monthly log history on mount
   useEffect(() => {
     fetch('/api/food-scan')
       .then(r => r.json())
@@ -60,6 +50,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         setUsed(d.used ?? 0)
         setLimit(d.limit ?? 1)
         setLogs(d.logs ?? [])
+        setLogToday(d.today ?? '')
+        setLogWeekStart(d.weekStart ?? '')
+        setLogMonthStart(d.monthStart ?? '')
       })
       .catch(() => {})
   }, [])
@@ -114,7 +107,6 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
       setResult(data)
       setUsed(data.used)
-      // Prepend to log list
       setLogs(prev => [{
         id:          Date.now().toString(),
         createdTime: new Date().toISOString(),
@@ -124,7 +116,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           'Carbs (g)':        data.carbs,
           'Fats (g)':         data.fats,
           'Proteins (g)':     data.proteins,
-          'Date':             new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()),
+          'Date':             logToday || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()),
           'Timestamp':        new Date().toISOString(),
           'Meal Type':        mealType,
         },
@@ -148,7 +140,11 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             <div className="fs-logo">AQ<span>SLIM</span></div>
             <div className="fs-header-sub">Food Scanner</div>
           </div>
-          <div className="fs-plan-badge">{PLAN_LABELS[typedPlan]}</div>
+          <div className="fs-header-right">
+            <Link href="/dashboard" className="fs-nav-link">← Dashboard</Link>
+            <Link href="/" className="fs-nav-link">← Home</Link>
+            <div className="fs-plan-badge">{PLAN_LABELS[typedPlan]}</div>
+          </div>
         </div>
       </header>
 
@@ -303,33 +299,15 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           )}
         </div>
 
-        {/* Meal log */}
-        {logs.length > 0 && (
+        {/* Meal log with period tabs */}
+        {logToday && (
           <div className="fs-log-section">
-            <div className="fs-log-title">Meal Log</div>
-            <div className="fs-log-list">
-              {logs.map(log => (
-                <div key={log.id} className="fs-log-row">
-                  <div className="fs-log-food">
-                    {log.fields['Meal Type'] && (
-                      <span className="fs-log-type">{log.fields['Meal Type']}</span>
-                    )}
-                    {log.fields['Food Description'] ?? '—'}
-                  </div>
-                  <div className="fs-log-macros">
-                    <span className="fs-log-cal">{log.fields['Calories'] ?? 0} kcal</span>
-                    <span className="fs-log-m" style={{ color: '#C9A84C' }}>C {log.fields['Carbs (g)'] ?? 0}g</span>
-                    <span className="fs-log-m" style={{ color: '#9A9590' }}>F {log.fields['Fats (g)'] ?? 0}g</span>
-                    <span className="fs-log-m" style={{ color: '#E2C87A' }}>P {log.fields['Proteins (g)'] ?? 0}g</span>
-                  </div>
-                  <div className="fs-log-date">
-                    {log.fields['Timestamp']
-                      ? new Date(log.fields['Timestamp']).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-                      : log.fields['Date'] ?? ''}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <FoodLogWidget
+              logs={logs}
+              today={logToday}
+              weekStart={logWeekStart}
+              monthStart={logMonthStart}
+            />
           </div>
         )}
 
@@ -339,7 +317,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             <div className="fs-upgrade-text">
               <strong>Want more scans?</strong> Upgrade your plan to scan 3× or unlimited meals per day.
             </div>
-            <a href="/#services" className="fs-upgrade-btn">View Plans</a>
+            <a href="/#food-scanner" className="fs-upgrade-btn">View Plans</a>
           </div>
         )}
       </main>

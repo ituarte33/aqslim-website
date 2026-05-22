@@ -12,7 +12,7 @@ export default async function FoodScannerPage() {
   if (!userId) redirect('/sign-in')
 
   const user = await currentUser()
-  const plan      = (user?.publicMetadata?.plan as string | undefined) ?? 'free'
+  const plan      = (user?.privateMetadata?.plan as string | undefined) ?? 'free'
   const firstName = user?.firstName ?? ''
 
   return <ScannerClient plan={plan} userName={firstName} />
