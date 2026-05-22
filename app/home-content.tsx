@@ -137,5 +137,6 @@ export function HomeContent({ html }: { html: string }) {
     }
   }, [])
 
+
   return <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
 }

@@ -588,6 +588,8 @@ footer {
     <li><a href="#supplements"><span data-es>Suplementos</span><span data-en>Supplements</span></a></li>
     <li><a href="#appointment"><span data-es>Cita</span><span data-en>Appointment</span></a></li>
     <li><a href="#contact"><span data-es>Contacto</span><span data-en>Contact</span></a></li>
+    <li id="nav-dashboard-item" style="display:none"><a href="/dashboard"><span data-es>Mi Portal</span><span data-en>My Portal</span></a></li>
+    <li id="nav-scanner-item" style="display:none"><a href="/food-scanner"><span data-es>🍽 Mis Comidas</span><span data-en>🍽 My Meals</span></a></li>
   </ul>
   <a href="/sign-in" class="hero-cta-btn" style="padding:10px 24px;font-size:13px;text-decoration:none;">
     <span data-es>Portal Paciente</span><span data-en>Patient Portal</span>
@@ -605,6 +607,8 @@ footer {
   <a href="#supplements" onclick="closeMenu()"><span data-es>Suplementos</span><span data-en>Supplements</span></a>
   <a href="#appointment" onclick="closeMenu()"><span data-es>Cita</span><span data-en>Appointment</span></a>
   <a href="#contact" onclick="closeMenu()"><span data-es>Contacto</span><span data-en>Contact</span></a>
+  <a href="/dashboard" id="mobile-dashboard-link" style="display:none" onclick="closeMenu()"><span data-es>Mi Portal</span><span data-en>My Portal</span></a>
+  <a href="/food-scanner" id="mobile-scanner-link" style="display:none" onclick="closeMenu()"><span data-es>🍽 Mis Comidas</span><span data-en>🍽 My Meals</span></a>
 </div>
 
 <!-- WHATSAPP -->
@@ -939,6 +943,103 @@ footer {
       <div class="service-title" data-en>Initial Consultation</div>
       <div class="service-text" data-es>Evaluación completa: cuestionario de síntomas, análisis de toxicidad, toma de medidas y diseño de tu protocolo personalizado.</div>
       <div class="service-text" data-en>Full evaluation: symptom questionnaire, toxicity analysis, measurements, and design of your personalized protocol.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOD SCANNER PROMO -->
+<section class="food-scanner-promo" id="food-scanner">
+  <div class="fsp-inner">
+    <div class="fsp-content reveal">
+      <div class="fsp-label">
+        <span data-es>Nueva Función · App Exclusiva</span>
+        <span data-en>New Feature · Exclusive App</span>
+      </div>
+      <h2 class="fsp-heading">
+        <span data-es>Escanea tu comida,<br><em>conoce tus macros</em></span>
+        <span data-en>Scan your meal,<br><em>know your macros</em></span>
+      </h2>
+      <p class="fsp-desc">
+        <span data-es>Toma una foto de tu plato y obtén al instante el desglose de calorías, carbohidratos, grasas y proteínas. Registra cada comida y lleva el control de tu nutrición con inteligencia artificial.</span>
+        <span data-en>Take a photo of your plate and instantly get the breakdown of calories, carbs, fats, and proteins. Log every meal and stay on top of your nutrition with AI.</span>
+      </p>
+      <div class="fsp-tiers">
+        <div class="fsp-tier">
+          <div class="fsp-tier-icon">🌱</div>
+          <div class="fsp-tier-name">
+            <span data-es>Gratis</span>
+            <span data-en>Free</span>
+          </div>
+          <div class="fsp-tier-desc">
+            <span data-es>1 foto por día — crea tu cuenta gratis</span>
+            <span data-en>1 photo per day — create your free account</span>
+          </div>
+        </div>
+        <div class="fsp-tier">
+          <div class="fsp-tier-icon">⚡</div>
+          <div class="fsp-tier-name">Mid Tier</div>
+          <div class="fsp-tier-desc">
+            <span data-es>3 fotos por día</span>
+            <span data-en>3 photos per day</span>
+          </div>
+        </div>
+        <div class="fsp-tier">
+          <div class="fsp-tier-icon">🏆</div>
+          <div class="fsp-tier-name">Top Tier</div>
+          <div class="fsp-tier-desc">
+            <span data-es>Escaneos ilimitados</span>
+            <span data-en>Unlimited scans</span>
+          </div>
+        </div>
+      </div>
+      <a href="/sign-in" class="fsp-cta">
+        <span data-es>Crear cuenta gratis</span>
+        <span data-en>Create free account</span>
+      </a>
+    </div>
+    <div class="fsp-visual reveal-left">
+      <!-- Mock food scanner card -->
+      <div class="fsp-mock-card">
+        <div class="fsp-mock-header">
+          <span data-es>Análisis nutricional</span>
+          <span data-en>Nutrition analysis</span>
+        </div>
+        <div class="fsp-mock-food">
+          <span data-es>Pechuga de pollo con arroz</span>
+          <span data-en>Grilled chicken breast with rice</span>
+        </div>
+        <div class="fsp-mock-cal">420</div>
+        <div class="fsp-mock-cal-label">kcal</div>
+        <div class="fsp-mock-bars">
+          <div class="fsp-mock-bar-row">
+            <div class="fsp-mock-bar-lbl">
+              <span data-es>Carbs</span><span data-en>Carbs</span>
+            </div>
+            <div class="fsp-mock-bar-track">
+              <div class="fsp-mock-bar-fill" style="width:72%;background:#C9A84C;"></div>
+            </div>
+            <div class="fsp-mock-bar-val">45g</div>
+          </div>
+          <div class="fsp-mock-bar-row">
+            <div class="fsp-mock-bar-lbl">
+              <span data-es>Grasas</span><span data-en>Fats</span>
+            </div>
+            <div class="fsp-mock-bar-track">
+              <div class="fsp-mock-bar-fill" style="width:22%;background:#9A9590;"></div>
+            </div>
+            <div class="fsp-mock-bar-val">8g</div>
+          </div>
+          <div class="fsp-mock-bar-row">
+            <div class="fsp-mock-bar-lbl">
+              <span data-es>Proteína</span><span data-en>Protein</span>
+            </div>
+            <div class="fsp-mock-bar-track">
+              <div class="fsp-mock-bar-fill" style="width:100%;background:#E2C87A;"></div>
+            </div>
+            <div class="fsp-mock-bar-val">42g</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>

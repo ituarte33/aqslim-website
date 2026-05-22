@@ -1,0 +1,117 @@
+import { auth, currentUser } from '@clerk/nextjs/server'
+import Anthropic from '@anthropic-ai/sdk'
+import { countTodayScans, createMealLog, getMealLogsByUser, type MealType } from '@/lib/airtable'
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+const SCAN_LIMITS: Record<string, number> = {
+  free: 1,
+  mid:  3,
+  top:  100,
+}
+
+function todayPT(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
+}
+
+export async function POST(req: Request) {
+  const { userId } = await auth()
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const user  = await currentUser()
+  const plan  = (user?.publicMetadata?.plan as string | undefined) ?? 'free'
+  const email = user?.emailAddresses[0]?.emailAddress ?? ''
+  const limit = SCAN_LIMITS[plan] ?? 1
+  const today = todayPT()
+
+  const used = await countTodayScans(userId, today)
+  if (used >= limit) {
+    return Response.json({ error: 'limit_reached', used, limit }, { status: 429 })
+  }
+
+  const { imageBase64, mimeType, mealType } = await req.json() as {
+    imageBase64: string
+    mimeType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+    mealType?: MealType
+  }
+  if (!imageBase64 || !mimeType) {
+    return Response.json({ error: 'image_required' }, { status: 400 })
+  }
+
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 512,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mimeType, data: imageBase64 },
+          },
+          {
+            type: 'text',
+            text: `You are a nutrition analysis AI. Analyze this food image and return ONLY valid JSON with no markdown or extra text:
+{
+  "food": "concise food name",
+  "calories": number,
+  "carbs": number,
+  "fats": number,
+  "proteins": number,
+  "notes": "brief note on serving size assumptions or estimation confidence"
+}
+All numeric values are integers representing grams (carbs/fats/proteins) or kcal (calories) for the visible portion.`,
+          },
+        ],
+      },
+    ],
+  })
+
+  const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  let result: { food: string; calories: number; carbs: number; fats: number; proteins: number; notes: string }
+  try {
+    result = JSON.parse(raw)
+  } catch {
+    return Response.json({ error: 'parse_failed', raw }, { status: 500 })
+  }
+
+  await createMealLog({
+    userId,
+    userEmail:       email,
+    date:            today,
+    foodDescription: result.food,
+    calories:        result.calories,
+    carbs:           result.carbs,
+    fats:            result.fats,
+    proteins:        result.proteins,
+    plan,
+    notes:           result.notes,
+    mealType,
+  })
+
+  return Response.json({
+    ...result,
+    used:      used + 1,
+    limit,
+    remaining: limit - used - 1,
+  })
+}
+
+// GET — return today's usage + recent logs
+export async function GET() {
+  const { userId } = await auth()
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const user  = await currentUser()
+  const plan  = (user?.publicMetadata?.plan as string | undefined) ?? 'free'
+  const email = user?.emailAddresses[0]?.emailAddress ?? ''
+  const limit = SCAN_LIMITS[plan] ?? 1
+  const today = todayPT()
+
+  const [used, logs] = await Promise.all([
+    countTodayScans(userId, today),
+    getMealLogsByUser(userId, 20),
+  ])
+
+  return Response.json({ used, limit, remaining: limit - used, plan, logs })
+}

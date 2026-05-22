@@ -599,7 +599,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
   const supplementTotal = cart.reduce((s, i) => s + i.precio, 0)
   const shippingCost =
-    shippingOption === 'Small'  ? 5  :
+    shippingOption === 'Small'  ? 6  :
     shippingOption === 'Medium' ? 10 :
     shippingOption === 'Large'  ? 15 :
     shippingOption === 'Custom' ? (parseFloat(shippingCustom) || 0) : 0
@@ -667,9 +667,21 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     if (metodoPago)    formData.set('metodoPago',         metodoPago)
     if (cumplimiento !== null) formData.set('cumplimientoDieta', String(cumplimiento))
     if (comoSeSiente !== null) formData.set('comoSeSiente',      String(comoSeSiente))
-    if (cart.length > 0) {
-      const lines = cart.map(i => `- ${i.nombre} ($${i.precio.toFixed(2)})`).join('\n')
-      formData.set('notasSuplemento', `Suplementos vendidos:\n${lines}\nTotal: $${supplementTotal.toFixed(2)}`)
+    const hasShipping = tipoConsulta === 'Suplementos + Envio' && shippingOption !== null
+    if (cart.length > 0 || hasShipping) {
+      const parts: string[] = []
+      if (cart.length > 0) {
+        const lines = cart.map(i => `- ${i.nombre} ($${i.precio.toFixed(2)})`).join('\n')
+        parts.push(`Suplementos vendidos:\n${lines}\nSubtotal: $${supplementTotal.toFixed(2)}`)
+      }
+      if (hasShipping) {
+        const shippingLabel =
+          shippingOption === 'Small'  ? 'Chico'       :
+          shippingOption === 'Medium' ? 'Mediano'      :
+          shippingOption === 'Large'  ? 'Grande'       : 'Personalizado'
+        parts.push(`Envío (${shippingLabel}): $${shippingCost.toFixed(2)}`)
+      }
+      formData.set('notasSuplemento', parts.join('\n'))
     }
 
     startTransition(async () => {
@@ -1147,7 +1159,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
                 </span>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {([
-                    ['Small',  es ? 'Chico'                 : 'Small',  5   ],
+                    ['Small',  es ? 'Chico'                 : 'Small',  6   ],
                     ['Medium', es ? 'Mediano'               : 'Medium', 10  ],
                     ['Large',  es ? 'Grande'                : 'Large',  15  ],
                     ['Custom', es ? 'Cantidad Personalizada': 'Custom Amt.', null],

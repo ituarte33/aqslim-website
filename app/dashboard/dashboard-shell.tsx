@@ -18,6 +18,7 @@ const NAV = [
   { href: '/dashboard/appointments', exact: false, es: 'Citas', en: 'Appointments' },
   { href: '/dashboard/finances', exact: false, es: 'Finanzas', en: 'Finances' },
   { href: '/dashboard/patients', exact: false, es: 'Pacientes', en: 'Patients' },
+  { href: '/food-scanner', exact: false, es: '🍽 Mis Comidas', en: '🍽 My Meals' },
 ]
 
 export function DashboardShell({ user, lang, setLang, children }: Props) {
@@ -52,13 +53,15 @@ export function DashboardShell({ user, lang, setLang, children }: Props) {
         background: 'rgba(10,10,10,0.95)', zIndex: 10,
         gap: 32,
       }}>
-        {/* Logo */}
-        <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em', flexShrink: 0 }}>
-          AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
-          <span style={{ fontSize: pt.xs, color: '#9A9590', marginLeft: 10, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans }}>
-            Portal
+        {/* Logo — links back to homepage */}
+        <Link href="/" style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
+          <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
+            AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
+            <span style={{ fontSize: pt.xs, color: '#9A9590', marginLeft: 10, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans }}>
+              Portal
+            </span>
           </span>
-        </span>
+        </Link>
 
         {/* Nav links — using div to avoid global nav { position: fixed } in globals.css */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>

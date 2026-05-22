@@ -499,3 +499,93 @@ export async function getSupplementos(): Promise<Suplemento[]> {
   } while (offset)
   return records
 }
+
+// ---------- Meal Logs ----------
+export const MEAL_LOGS_TABLE = 'tblHcUslnFOgGjL43'
+
+export const MEAL_LOGS_FIELDS = {
+  USER_ID:          'fldxHW800FYtVhYei',     // Text — Clerk user ID (used for rate-limit filtering)
+  USER_EMAIL:       'fldNmYfen0Lg3prTf',
+  DATE:             'fldpoqYuNUq54szWY',
+  FOOD_DESCRIPTION: 'fldSbnbkh8nKkkjoM',
+  CALORIES:         'fldicYAqfidZQokET',
+  CARBS_G:          'fld87DAlwQ9apCVsA',
+  FATS_G:           'fldmyRfLyNe8lVYCN',
+  PROTEINS_G:       'fldDJpomPW2W88ze1',
+  TIMESTAMP:        'fld596uC3GlqHr59T',
+  PLAN:             'fldDToUQRdKhv89aF',
+  NOTES:            'fldaKtk9h5u2riid3',
+  MEAL_TYPE:        'fld7Pc0AxN4ujVWvZ',
+} as const
+
+export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'
+
+export interface MealLog {
+  id: string
+  createdTime: string
+  fields: {
+    'User Email'?: string
+    'Date'?: string
+    'Food Description'?: string
+    'Calories'?: number
+    'Carbs (g)'?: number
+    'Fats (g)'?: number
+    'Proteins (g)'?: number
+    'Timestamp'?: string
+    'Plan'?: string
+    'Notes'?: string
+    'Meal Type'?: MealType
+  }
+}
+
+export async function createMealLog(data: {
+  userId: string
+  userEmail: string
+  date: string
+  foodDescription: string
+  calories: number
+  carbs: number
+  fats: number
+  proteins: number
+  plan: string
+  notes?: string
+  mealType?: MealType
+}): Promise<MealLog> {
+  return airtableFetch(`/${MEAL_LOGS_TABLE}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      fields: {
+        [MEAL_LOGS_FIELDS.USER_ID]:          data.userId,
+        [MEAL_LOGS_FIELDS.USER_EMAIL]:       data.userEmail,
+        [MEAL_LOGS_FIELDS.DATE]:             data.date,
+        [MEAL_LOGS_FIELDS.FOOD_DESCRIPTION]: data.foodDescription,
+        [MEAL_LOGS_FIELDS.CALORIES]:         data.calories,
+        [MEAL_LOGS_FIELDS.CARBS_G]:          data.carbs,
+        [MEAL_LOGS_FIELDS.FATS_G]:           data.fats,
+        [MEAL_LOGS_FIELDS.PROTEINS_G]:       data.proteins,
+        [MEAL_LOGS_FIELDS.TIMESTAMP]:        new Date().toISOString(),
+        [MEAL_LOGS_FIELDS.PLAN]:             data.plan,
+        ...(data.notes    ? { [MEAL_LOGS_FIELDS.NOTES]:     data.notes }    : {}),
+        ...(data.mealType ? { [MEAL_LOGS_FIELDS.MEAL_TYPE]: data.mealType } : {}),
+      },
+    }),
+  })
+}
+
+export async function countTodayScans(userId: string, date: string): Promise<number> {
+  const formula = encodeURIComponent(
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.DATE}} = "${date}")`
+  )
+  const data = await airtableFetch(
+    `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&fields%5B%5D=${MEAL_LOGS_FIELDS.USER_ID}`
+  )
+  return (data.records ?? []).length
+}
+
+export async function getMealLogsByUser(userId: string, limit = 20): Promise<MealLog[]> {
+  const formula = encodeURIComponent(`{${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}"`)
+  const data = await airtableFetch(
+    `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${MEAL_LOGS_FIELDS.TIMESTAMP}&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=${limit}`
+  )
+  return data.records ?? []
+}

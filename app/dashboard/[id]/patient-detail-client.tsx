@@ -299,9 +299,11 @@ function ConsultaTable({ consultations, columns }: { consultations: Consulta[]; 
 }
 
 function NotesTab({ consultations }: { consultations: Consulta[] }) {
-  const withNotes = consultations.filter(c => c.fields['Recomendaciones al Cliente'])
+  const withNotes = consultations.filter(
+    c => c.fields['Recomendaciones al Cliente'] || c.fields['Notas del Terapeuta']
+  )
   if (withNotes.length === 0) {
-    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin recomendaciones registradas.</p>
+    return <p style={{ color: '#6A6560', fontSize: pt.base }}>Sin notas registradas.</p>
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -311,12 +313,29 @@ function NotesTab({ consultations }: { consultations: Consulta[] }) {
           border: '1px solid rgba(255,255,255,0.08)',
           padding: '20px 24px',
         }}>
-          <div style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.12em', marginBottom: 10 }}>
+          <div style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.12em', marginBottom: 14 }}>
             {fmt(c.fields['Fecha Consulta'])}
           </div>
-          <p style={{ fontSize: pt.md, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
-            {String(c.fields['Recomendaciones al Cliente'])}
-          </p>
+          {c.fields['Recomendaciones al Cliente'] && (
+            <div style={{ marginBottom: c.fields['Notas del Terapeuta'] ? 16 : 0 }}>
+              <div style={{ fontSize: pt.sm, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9590', marginBottom: 6, fontFamily: pt.sans }}>
+                Recomendaciones al Cliente
+              </div>
+              <p style={{ fontSize: pt.md, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                {String(c.fields['Recomendaciones al Cliente'])}
+              </p>
+            </div>
+          )}
+          {c.fields['Notas del Terapeuta'] && (
+            <div>
+              <div style={{ fontSize: pt.sm, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9590', marginBottom: 6, fontFamily: pt.sans }}>
+                Notas del Terapeuta
+              </div>
+              <p style={{ fontSize: pt.md, color: '#FAFAF8', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                {String(c.fields['Notas del Terapeuta'])}
+              </p>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -373,6 +392,18 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
               ← Pacientes
             </button>
           )}
+          <Link
+            href="/food-scanner"
+            style={{
+              color: '#9A9590', fontSize: pt.sm, letterSpacing: '0.12em',
+              textTransform: 'uppercase', textDecoration: 'none',
+              fontFamily: pt.sans, transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#C9A84C')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#9A9590')}
+          >
+            🍽 {isAdmin ? 'Food Scanner' : 'Mis Comidas'}
+          </Link>
           <UserButton />
         </div>
       </header>

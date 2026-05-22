@@ -2,6 +2,8 @@ import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import './globals.css'
 import { LanguageModal } from './language-modal'
+import { ChatWidget } from './chat-widget'
+import { NavAuthLinks } from './nav-auth-links'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -22,6 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkProvider afterSignOutUrl="/signed-out">
           <LanguageModal />
           {children}
+          <ChatWidget />
+          <NavAuthLinks />
         </ClerkProvider>
       </body>
     </html>
