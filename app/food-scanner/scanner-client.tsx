@@ -176,6 +176,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       if (!res.ok) {
         if (data.error === 'limit_reached') {
           setError(t.limitError(data.limit, t.plans[typedPlan]))
+          setUsed(data.used ?? data.limit)   // disable button immediately
+          setLimit(data.limit ?? limit)
         } else {
           setError(t.failError)
         }

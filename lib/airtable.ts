@@ -573,13 +573,34 @@ export async function createMealLog(data: {
 }
 
 export async function countTodayScans(userId: string, date: string): Promise<number> {
+  // Use TIMESTAMP range instead of DATE field equality — avoids issues with
+  // Airtable Date-type fields where = "YYYY-MM-DD" can silently match nothing.
+  const [y, m, d] = date.split('-').map(Number)
+
+  // Determine current PT UTC offset (7 = PDT, 8 = PST) by sampling noon UTC on this day
+  const sampleUTC = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  const ptNoonHour = parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      hour12: false,
+      hourCycle: 'h23',
+    }).format(sampleUTC),
+    10
+  )
+  const offsetHours = 12 - ptNoonHour // 7 for PDT, 8 for PST
+
+  // UTC boundaries for midnight-to-midnight PT
+  const startUTC = new Date(Date.UTC(y, m - 1, d,     offsetHours, 0, 0)).toISOString()
+  const endUTC   = new Date(Date.UTC(y, m - 1, d + 1, offsetHours, 0, 0)).toISOString()
+
   const formula = encodeURIComponent(
-    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.DATE}} = "${date}")`
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} >= "${startUTC}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} < "${endUTC}")`
   )
   const data = await airtableFetch(
     `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&fields%5B%5D=${MEAL_LOGS_FIELDS.USER_ID}`
   )
-  return (data.records ?? []).length
+  return Array.isArray(data?.records) ? data.records.length : 0
 }
 
 export async function getMealLogsByUser(userId: string, limit = 20): Promise<MealLog[]> {

@@ -24,7 +24,13 @@ export async function POST(req: Request) {
   const limit = SCAN_LIMITS[plan] ?? 1
   const today = todayPT()
 
-  const used = await countTodayScans(userId, today)
+  let used: number
+  try {
+    used = await countTodayScans(userId, today)
+  } catch {
+    // Can't verify count — deny to prevent bypass on infra errors
+    return Response.json({ error: 'limit_reached', used: limit, limit }, { status: 429 })
+  }
   if (used >= limit) {
     return Response.json({ error: 'limit_reached', used, limit }, { status: 429 })
   }
