@@ -461,6 +461,16 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
               ← {t.patients}
             </button>
           )}
+          <Link href="/" style={{
+            color: '#9A9590', fontSize: pt.sm, letterSpacing: '0.12em',
+            textTransform: 'uppercase', textDecoration: 'none',
+            fontFamily: pt.sans, transition: 'color 0.15s',
+          }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#C9A84C')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#9A9590')}
+          >
+            ← {lang === 'es' ? 'Inicio' : 'Home'}
+          </Link>
           <div style={{ display: 'flex', gap: 2 }}>
             {(['es', 'en'] as const).map(l => (
               <button key={l} onClick={() => setLang(l)} style={{

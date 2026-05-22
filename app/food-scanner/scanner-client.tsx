@@ -18,29 +18,104 @@ interface ScanResult {
   remaining: number
 }
 
-const PLAN_LABELS: Record<Plan, string> = {
-  free: 'Free Edition',
-  mid:  'Mid Tier',
-  top:  'Top Tier',
+function getLang(): 'es' | 'en' {
+  if (typeof document === 'undefined') return 'es'
+  return document.body.classList.contains('lang-en') ? 'en' : 'es'
+}
+
+const COPY = {
+  es: {
+    sub:        'Escáner de Alimentos',
+    dashboard:  '← Panel',
+    home:       '← Inicio',
+    usage:      (name: string) => `${name ? name + ' · ' : ''}Escaneos de hoy`,
+    remaining:  (n: number) => `${n} restante${n !== 1 ? 's' : ''}`,
+    limitReached: 'Límite alcanzado',
+    uploadTitle: 'Sube una foto de tu comida',
+    dropText:   'Suelta aquí o haz clic para buscar',
+    dropHint:   'JPG, PNG, WEBP · máx. 5 MB',
+    mealTypes:  { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<string, string>,
+    clear:      'Borrar',
+    analyze:    'Analizar Comida',
+    analyzing:  'Analizando…',
+    nutritionTitle: 'Análisis Nutricional',
+    carbs:      'Carbos',
+    fats:       'Grasas',
+    protein:    'Proteína',
+    kcal:       'kcal',
+    placeholder: 'Los resultados aparecerán aquí tras el análisis',
+    wantMore:   '¿Quieres más escaneos?',
+    upgradeText: 'Mejora tu plan para escanear 3× o comidas ilimitadas por día.',
+    viewPlans:  'Ver Planes',
+    plans:      { free: 'Edición Gratuita', mid: 'Nivel Medio', top: 'Nivel Premium' } as Record<Plan, string>,
+    limitError: (limit: number, plan: string) =>
+      `Límite diario alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}). Mejora para más.`,
+    failError:    'El análisis falló. Inténtalo de nuevo.',
+    networkError: 'Error de red. Inténtalo de nuevo.',
+    imageError:   'Por favor sube un archivo de imagen.',
+    sizeError:    'La imagen debe ser menor a 5 MB.',
+  },
+  en: {
+    sub:        'Food Scanner',
+    dashboard:  '← Dashboard',
+    home:       '← Home',
+    usage:      (name: string) => `${name ? name + ' · ' : ''}Today's scans`,
+    remaining:  (n: number) => `${n} remaining`,
+    limitReached: 'Limit reached',
+    uploadTitle: 'Upload a meal photo',
+    dropText:   'Drop photo here or click to browse',
+    dropHint:   'JPG, PNG, WEBP · max 5 MB',
+    mealTypes:  { Breakfast: 'Breakfast', Lunch: 'Lunch', Dinner: 'Dinner', Snack: 'Snack', Other: 'Other' } as Record<string, string>,
+    clear:      'Clear',
+    analyze:    'Analyze Meal',
+    analyzing:  'Analyzing…',
+    nutritionTitle: 'Nutrition Breakdown',
+    carbs:      'Carbs',
+    fats:       'Fats',
+    protein:    'Protein',
+    kcal:       'kcal',
+    placeholder: 'Results will appear here after analysis',
+    wantMore:   'Want more scans?',
+    upgradeText: 'Upgrade your plan to scan 3× or unlimited meals per day.',
+    viewPlans:  'View Plans',
+    plans:      { free: 'Free Edition', mid: 'Mid Tier', top: 'Top Tier' } as Record<Plan, string>,
+    limitError: (limit: number, plan: string) =>
+      `Daily limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}). Upgrade for more.`,
+    failError:    'Analysis failed. Please try again.',
+    networkError: 'Network error. Please try again.',
+    imageError:   'Please upload an image file.',
+    sizeError:    'Image must be under 5 MB.',
+  },
 }
 
 export function ScannerClient({ plan, userName }: { plan: string; userName: string }) {
-  const typedPlan = (plan as Plan) in PLAN_LABELS ? (plan as Plan) : 'free'
+  const typedPlan = (plan as Plan) in COPY.en.plans ? (plan as Plan) : 'free'
 
-  const [image, setImage]       = useState<string | null>(null)
-  const [mimeType, setMimeType] = useState<'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'>('image/jpeg')
-  const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'>('Other')
-  const [scanning, setScanning] = useState(false)
-  const [result, setResult]     = useState<ScanResult | null>(null)
-  const [error, setError]       = useState<string | null>(null)
-  const [used, setUsed]               = useState(0)
-  const [limit, setLimit]             = useState(1)
-  const [logs, setLogs]               = useState<LogEntry[]>([])
-  const [logToday, setLogToday]       = useState('')
+  const [lang, setLang]          = useState<'es' | 'en'>('es')
+  const [image, setImage]        = useState<string | null>(null)
+  const [mimeType, setMimeType]  = useState<'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'>('image/jpeg')
+  const [mealType, setMealType]  = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'>('Other')
+  const [scanning, setScanning]  = useState(false)
+  const [result, setResult]      = useState<ScanResult | null>(null)
+  const [error, setError]        = useState<string | null>(null)
+  const [used, setUsed]          = useState(0)
+  const [limit, setLimit]        = useState(1)
+  const [logs, setLogs]          = useState<LogEntry[]>([])
+  const [logToday, setLogToday]  = useState('')
   const [logWeekStart, setLogWeekStart]   = useState('')
   const [logMonthStart, setLogMonthStart] = useState('')
-  const [dragging, setDragging] = useState(false)
+  const [dragging, setDragging]  = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Sync language with body class
+  useEffect(() => {
+    function sync() { setLang(getLang()) }
+    sync()
+    window.addEventListener('aqslim-lang', sync)
+    const observer = new MutationObserver(sync)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    return () => { window.removeEventListener('aqslim-lang', sync); observer.disconnect() }
+  }, [])
 
   // Load today's usage + monthly log history on mount
   useEffect(() => {
@@ -57,13 +132,15 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       .catch(() => {})
   }, [])
 
+  const t = COPY[lang]
+
   function loadFile(file: File) {
     if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file.')
+      setError(t.imageError)
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be under 5 MB.')
+      setError(t.sizeError)
       return
     }
     setError(null)
@@ -98,9 +175,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
       if (!res.ok) {
         if (data.error === 'limit_reached') {
-          setError(`Daily limit reached (${data.limit} scan${data.limit > 1 ? 's' : ''} for ${PLAN_LABELS[typedPlan]}). Upgrade for more.`)
+          setError(t.limitError(data.limit, t.plans[typedPlan]))
         } else {
-          setError('Analysis failed. Please try again.')
+          setError(t.failError)
         }
         return
       }
@@ -122,7 +199,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         },
       }, ...prev])
     } catch {
-      setError('Network error. Please try again.')
+      setError(t.networkError)
     } finally {
       setScanning(false)
     }
@@ -138,12 +215,12 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         <div className="fs-header-inner">
           <div>
             <div className="fs-logo">AQ<span>SLIM</span></div>
-            <div className="fs-header-sub">Food Scanner</div>
+            <div className="fs-header-sub">{t.sub}</div>
           </div>
           <div className="fs-header-right">
-            <Link href="/dashboard" className="fs-nav-link">← Dashboard</Link>
-            <Link href="/" className="fs-nav-link">← Home</Link>
-            <div className="fs-plan-badge">{PLAN_LABELS[typedPlan]}</div>
+            <Link href="/dashboard" className="fs-nav-link">{t.dashboard}</Link>
+            <Link href="/" className="fs-nav-link">{t.home}</Link>
+            <div className="fs-plan-badge">{t.plans[typedPlan]}</div>
           </div>
         </div>
       </header>
@@ -151,9 +228,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       <main className="fs-main">
         {/* Usage bar */}
         <div className="fs-usage-bar">
-          <span className="fs-usage-label">
-            {userName ? `${userName} · ` : ''}Today&apos;s scans
-          </span>
+          <span className="fs-usage-label">{t.usage(userName)}</span>
           <div className="fs-usage-pips">
             {limit <= 10 ? (
               Array.from({ length: limit }).map((_, i) => (
@@ -169,14 +244,14 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             )}
           </div>
           <span className="fs-usage-remain">
-            {remaining > 0 ? `${remaining} remaining` : 'Limit reached'}
+            {remaining > 0 ? t.remaining(remaining) : t.limitReached}
           </span>
         </div>
 
         <div className="fs-grid">
           {/* Upload panel */}
           <div className="fs-card">
-            <div className="fs-card-title">Upload a meal photo</div>
+            <div className="fs-card-title">{t.uploadTitle}</div>
 
             <div
               className={`fs-drop-zone ${dragging ? 'dragging' : ''} ${image ? 'has-image' : ''}`}
@@ -197,8 +272,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                       <rect x="3" y="5" width="26" height="22" rx="2" stroke="currentColor" strokeWidth="1.5"/>
                     </svg>
                   </div>
-                  <div className="fs-drop-text">Drop photo here or click to browse</div>
-                  <div className="fs-drop-hint">JPG, PNG, WEBP · max 5 MB</div>
+                  <div className="fs-drop-text">{t.dropText}</div>
+                  <div className="fs-drop-hint">{t.dropHint}</div>
                 </div>
               )}
             </div>
@@ -212,14 +287,14 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             />
 
             <div className="fs-meal-type-row">
-              {(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'] as const).map(t => (
+              {(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'] as const).map(mt => (
                 <button
-                  key={t}
-                  className={`fs-meal-type-btn ${mealType === t ? 'active' : ''}`}
-                  onClick={() => setMealType(t)}
+                  key={mt}
+                  className={`fs-meal-type-btn ${mealType === mt ? 'active' : ''}`}
+                  onClick={() => setMealType(mt)}
                   type="button"
                 >
-                  {t}
+                  {t.mealTypes[mt]}
                 </button>
               ))}
             </div>
@@ -230,7 +305,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                   className="fs-btn-secondary"
                   onClick={() => { setImage(null); setResult(null); setError(null) }}
                 >
-                  Clear
+                  {t.clear}
                 </button>
               )}
               <button
@@ -238,7 +313,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 onClick={analyze}
                 disabled={!image || scanning || remaining <= 0}
               >
-                {scanning ? 'Analyzing…' : 'Analyze Meal'}
+                {scanning ? t.analyzing : t.analyze}
               </button>
             </div>
 
@@ -248,23 +323,23 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           {/* Results panel */}
           {result ? (
             <div className="fs-card fs-result-card">
-              <div className="fs-card-title">Nutrition Breakdown</div>
+              <div className="fs-card-title">{t.nutritionTitle}</div>
               <div className="fs-food-name">{result.food}</div>
 
               <div className="fs-calories-row">
                 <div className="fs-calories-num">{result.calories}</div>
-                <div className="fs-calories-label">kcal</div>
+                <div className="fs-calories-label">{t.kcal}</div>
               </div>
 
               <div className="fs-macros">
-                <MacroBar label="Carbs" value={result.carbs} color="#C9A84C" max={Math.max(result.carbs, result.fats, result.proteins)} />
-                <MacroBar label="Fats"  value={result.fats}  color="#9A9590" max={Math.max(result.carbs, result.fats, result.proteins)} />
-                <MacroBar label="Protein" value={result.proteins} color="#E2C87A" max={Math.max(result.carbs, result.fats, result.proteins)} />
+                <MacroBar label={t.carbs}   value={result.carbs}    color="#C9A84C" max={Math.max(result.carbs, result.fats, result.proteins)} />
+                <MacroBar label={t.fats}    value={result.fats}     color="#9A9590" max={Math.max(result.carbs, result.fats, result.proteins)} />
+                <MacroBar label={t.protein} value={result.proteins} color="#E2C87A" max={Math.max(result.carbs, result.fats, result.proteins)} />
               </div>
 
               <div className="fs-macro-totals">
-                <MacroChip label="C" value={result.carbs} color="#C9A84C" />
-                <MacroChip label="F" value={result.fats}  color="#9A9590" />
+                <MacroChip label="C" value={result.carbs}    color="#C9A84C" />
+                <MacroChip label="F" value={result.fats}     color="#9A9590" />
                 <MacroChip label="P" value={result.proteins} color="#E2C87A" />
               </div>
 
@@ -272,12 +347,11 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 <div className="fs-notes">{result.notes}</div>
               )}
 
-              {/* Macro ratio ring */}
               <div className="fs-ratio-row">
                 {[
-                  { label: 'Carbs', pct: pct(result.carbs, result.carbs + result.fats + result.proteins), color: '#C9A84C' },
-                  { label: 'Fats',  pct: pct(result.fats,  result.carbs + result.fats + result.proteins), color: '#9A9590' },
-                  { label: 'Protein', pct: pct(result.proteins, result.carbs + result.fats + result.proteins), color: '#E2C87A' },
+                  { label: t.carbs,   pct: pct(result.carbs,    result.carbs + result.fats + result.proteins), color: '#C9A84C' },
+                  { label: t.fats,    pct: pct(result.fats,     result.carbs + result.fats + result.proteins), color: '#9A9590' },
+                  { label: t.protein, pct: pct(result.proteins, result.carbs + result.fats + result.proteins), color: '#E2C87A' },
                 ].map(m => (
                   <div key={m.label} className="fs-ratio-chip" style={{ borderColor: m.color }}>
                     <div className="fs-ratio-pct" style={{ color: m.color }}>{m.pct}%</div>
@@ -294,7 +368,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                   <path d="M16 24h16M24 16v16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".5"/>
                 </svg>
               </div>
-              <div className="fs-placeholder-text">Results will appear here after analysis</div>
+              <div className="fs-placeholder-text">{t.placeholder}</div>
             </div>
           )}
         </div>
@@ -307,6 +381,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               today={logToday}
               weekStart={logWeekStart}
               monthStart={logMonthStart}
+              lang={lang}
             />
           </div>
         )}
@@ -315,9 +390,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         {typedPlan === 'free' && (
           <div className="fs-upgrade-banner">
             <div className="fs-upgrade-text">
-              <strong>Want more scans?</strong> Upgrade your plan to scan 3× or unlimited meals per day.
+              <strong>{t.wantMore}</strong> {t.upgradeText}
             </div>
-            <a href="/#food-scanner" className="fs-upgrade-btn">View Plans</a>
+            <a href="/#food-scanner" className="fs-upgrade-btn">{t.viewPlans}</a>
           </div>
         )}
       </main>

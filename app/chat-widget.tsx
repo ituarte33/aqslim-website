@@ -1,26 +1,40 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
+type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
 type Message = { role: 'user' | 'assistant'; content: string }
+
+const STATE_IMAGES: Record<BuddyState, string> = {
+  idle:     '/Aqslim_Buddy_Pics/aqslim_buddy_open_arms.png',
+  thinking: '/Aqslim_Buddy_Pics/aqslim_buddy_thinking.png',
+  happy:    '/Aqslim_Buddy_Pics/aqslim_buddy_thumbs_up.png',
+  love:     '/Aqslim_Buddy_Pics/aqslim_buddy_heart_eyes.png',
+  warning:  '/Aqslim_Buddy_Pics/aqslim_buddy_inspecting.png',
+}
+
+const IDLE_BUBBLES = {
+  es: ['¡Hola! Soy AQ Buddy 👋', '¿En qué te puedo ayudar?', '¡Tócame para chatear!', '¿Listo para cuidar tu salud? 🌿'],
+  en: ["Hi! I'm AQ Buddy 👋", 'How can I help you?', 'Tap me to chat!', 'Ready to support your wellness? 🌿'],
+}
 
 const LABELS = {
   es: {
-    title: 'Asistente AQSLIM',
-    subtitle: 'Estamos aquí para ayudarte',
+    title: 'AQ Buddy',
+    subtitle: 'Tu asistente de bienestar',
     placeholder: 'Escribe tu pregunta...',
     send: 'Enviar',
-    welcome: '¡Hola! Soy el asistente virtual de AQSLIM. ¿En qué puedo ayudarte hoy?',
-    thinking: 'Escribiendo...',
+    welcome: '¡Hola! Soy AQ Buddy, tu asistente de bienestar AQSLIM. ¿En qué te puedo ayudar hoy?',
+    thinking: 'Pensando...',
     error: 'Ocurrió un error. Intenta de nuevo.',
   },
   en: {
-    title: 'AQSLIM Assistant',
-    subtitle: 'We are here to help you',
+    title: 'AQ Buddy',
+    subtitle: 'Your wellness assistant',
     placeholder: 'Type your question...',
     send: 'Send',
-    welcome: 'Hello! I\'m the AQSLIM virtual assistant. How can I help you today?',
-    thinking: 'Typing...',
+    welcome: "Hi! I'm AQ Buddy, your AQSLIM wellness assistant. How can I help you today?",
+    thinking: 'Thinking...',
     error: 'An error occurred. Please try again.',
   },
 }
@@ -30,14 +44,72 @@ function getLang(): 'es' | 'en' {
   return document.body.classList.contains('lang-en') ? 'en' : 'es'
 }
 
+function detectState(text: string): BuddyState {
+  const lower = text.toLowerCase()
+  const warnWords = ['careful', 'cuidado', 'high in carb', 'high calorie', 'watch out', 'limit', 'avoid', 'too much', 'demasiado', 'exceso', 'high carb', 'caution', 'alto en', 'reduce', 'be careful']
+  const loveWords = ['great job', 'excellent', 'amazing', 'fantastic', 'wonderful', 'proud', 'congratulat', 'well done', 'progress', 'keep it up', 'excelente', 'increíble', 'fantástico', 'orgulloso', 'felicit', 'progreso', 'sigue así', 'bravo', "you're doing", 'lo estás haciendo']
+  if (warnWords.some(w => lower.includes(w))) return 'warning'
+  if (loveWords.some(w => lower.includes(w))) return 'love'
+  return 'happy'
+}
+
 export function ChatWidget() {
-  const [open, setOpen] = useState(false)
-  const [lang, setLang] = useState<'es' | 'en'>('es')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
+  const [open, setOpen]           = useState(false)
+  const [lang, setLang]           = useState<'es' | 'en'>('es')
+  const [buddyState, setBuddyState] = useState<BuddyState>('idle')
+  const [bubble, setBubble]       = useState('')
+  const [talking, setTalking]     = useState(false)
+  const [messages, setMessages]   = useState<Message[]>([])
+  const [input, setInput]         = useState('')
   const [streaming, setStreaming] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [fontSize, setFontSize]   = useState(16)
+
+  const MIN_FONT = 13
+  const MAX_FONT = 25
+  function increaseFontSize() { setFontSize(prev => Math.min(MAX_FONT, prev + 3)) }
+  function decreaseFontSize() { setFontSize(prev => Math.max(MIN_FONT, prev - 3)) }
+
+  const bottomRef      = useRef<HTMLDivElement>(null)
+  const inputRef       = useRef<HTMLTextAreaElement>(null)
+  const idleTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const buddyStateRef  = useRef<BuddyState>('idle')
+  const idleBubbleIdx  = useRef(0)
+
+  // Keep ref in sync for use in intervals/timeouts
+  useEffect(() => { buddyStateRef.current = buddyState }, [buddyState])
+
+  // Set state with auto-return to idle
+  const setStateWithTimeout = useCallback((state: BuddyState, message: string, duration = 5000) => {
+    setBuddyState(state)
+    setBubble(message)
+    if (state !== 'idle' && state !== 'thinking') {
+      setTalking(true)
+      setTimeout(() => setTalking(false), 1400)
+    }
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    if (state !== 'idle' && state !== 'thinking') {
+      idleTimerRef.current = setTimeout(() => {
+        setBuddyState('idle')
+        setBubble('')
+      }, duration)
+    }
+  }, [])
+
+  // Expose global setAQBuddyState + custom event
+  useEffect(() => {
+    // @ts-expect-error window extension
+    window.setAQBuddyState = (state: BuddyState, message: string) => setStateWithTimeout(state, message)
+    function onEvent(e: Event) {
+      const { state, message } = (e as CustomEvent).detail
+      setStateWithTimeout(state, message)
+    }
+    window.addEventListener('aq-buddy', onEvent)
+    return () => {
+      // @ts-expect-error window extension
+      delete window.setAQBuddyState
+      window.removeEventListener('aq-buddy', onEvent)
+    }
+  }, [setStateWithTimeout])
 
   // Sync language with body class
   useEffect(() => {
@@ -49,21 +121,38 @@ export function ChatWidget() {
     return () => { window.removeEventListener('aqslim-lang', sync); observer.disconnect() }
   }, [])
 
-  // Init welcome message when opening for the first time
+  // Idle bubble rotation — only when chat is closed and buddy is idle
+  useEffect(() => {
+    if (open) { setBubble(''); return }
+    function showBubble() {
+      if (buddyStateRef.current !== 'idle') return
+      const bubbles = IDLE_BUBBLES[lang]
+      setBubble(bubbles[idleBubbleIdx.current % bubbles.length])
+      idleBubbleIdx.current++
+      setTimeout(() => { if (buddyStateRef.current === 'idle') setBubble('') }, 3500)
+    }
+    const first    = setTimeout(showBubble, 1200)
+    const interval = setInterval(showBubble, 10000)
+    return () => { clearTimeout(first); clearInterval(interval) }
+  }, [open, lang])
+
+  // Welcome message on first open
   useEffect(() => {
     if (open && messages.length === 0) {
-      setMessages([{ role: 'assistant', content: LABELS[lang].welcome }])
+      const welcome = LABELS[lang].welcome
+      setMessages([{ role: 'assistant', content: welcome }])
+      setStateWithTimeout('love', '¡Hola! 👋', 3500)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streaming])
 
-  // Focus input when opening
+  // Focus input on open
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 100)
+    if (open) setTimeout(() => inputRef.current?.focus(), 80)
   }, [open])
 
   const t = LABELS[lang]
@@ -77,29 +166,26 @@ export function ChatWidget() {
     const history = [...messages, userMsg]
     setMessages(history)
     setStreaming(true)
+    setBuddyState('thinking')
+    setBubble(t.thinking)
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
 
-    // Add empty assistant message to stream into
     setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: history.map(m => ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
       })
 
       if (!res.ok || !res.body) {
-        setMessages(prev => {
-          const next = [...prev]
-          next[next.length - 1] = { role: 'assistant', content: t.error }
-          return next
-        })
+        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: t.error }; return n })
+        setStateWithTimeout('warning', t.error)
         return
       }
 
-      const reader = res.body.getReader()
+      const reader  = res.body.getReader()
       const decoder = new TextDecoder()
       let full = ''
 
@@ -107,85 +193,115 @@ export function ChatWidget() {
         const { done, value } = await reader.read()
         if (done) break
         full += decoder.decode(value, { stream: true })
-        setMessages(prev => {
-          const next = [...prev]
-          next[next.length - 1] = { role: 'assistant', content: full }
-          return next
-        })
+        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: full }; return n })
       }
+
+      const finalState = detectState(full)
+      const preview = full.slice(0, 70).trim() + (full.length > 70 ? '…' : '')
+      setStateWithTimeout(finalState, preview, 5000)
     } catch {
-      setMessages(prev => {
-        const next = [...prev]
-        next[next.length - 1] = { role: 'assistant', content: t.error }
-        return next
-      })
+      setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: t.error }; return n })
+      setStateWithTimeout('warning', t.error)
     } finally {
       setStreaming(false)
     }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
   return (
-    <>
-      {/* Chat panel */}
+    <div className="aqb-wrap">
+
+      {/* Mascot — always at top */}
+      <button
+        className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
+        onClick={() => setOpen(v => !v)}
+        aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={STATE_IMAGES[buddyState]}
+          alt="AQ Buddy"
+          className="aqb-img"
+        />
+        {!open && (
+          <div className="aqb-cta-label">
+            💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
+          </div>
+        )}
+      </button>
+
+      {/* Speech bubble — only when chat is closed */}
+      {bubble && !open && (
+        <div className="aqb-bubble">
+          <div className="aqb-bubble-text">{bubble}</div>
+          <div className="aqb-bubble-tail" />
+        </div>
+      )}
+
+      {/* Chat panel — opens below mascot */}
       {open && (
-        <div className="chat-panel">
-          <div className="chat-header">
+        <div className="aqb-panel">
+          <div className="aqb-panel-header">
             <div>
-              <div className="chat-header-title">{t.title}</div>
-              <div className="chat-header-subtitle">{t.subtitle}</div>
+              <div className="aqb-panel-title">{t.title}</div>
+              <div className="aqb-panel-subtitle">{t.subtitle}</div>
             </div>
-            <button className="chat-close" onClick={() => setOpen(false)} aria-label="Close chat">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                className="aqb-font-btn"
+                onClick={decreaseFontSize}
+                disabled={fontSize <= MIN_FONT}
+                aria-label="Decrease font size"
+              >
+                A−
+              </button>
+              <button
+                className="aqb-font-btn"
+                onClick={increaseFontSize}
+                disabled={fontSize >= MAX_FONT}
+                aria-label="Increase font size"
+              >
+                A+
+              </button>
+              <button className="aqb-panel-close" onClick={() => setOpen(false)} aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
-          <div className="chat-messages">
+          <div className="aqb-messages">
             {messages.map((m, i) => (
-              <div key={i} className={`chat-bubble-row ${m.role}`}>
-                <div className={`chat-bubble ${m.role}`}>
-                  {m.content}
-                  {streaming && i === messages.length - 1 && m.role === 'assistant' && !m.content && (
-                    <span className="chat-cursor" />
-                  )}
+              <div key={i} className={`aqb-msg-row ${m.role}`}>
+                <div className={`aqb-msg ${m.role}`} style={{ fontSize }}>
+                  {m.content
+                    ? m.content
+                    : (streaming && i === messages.length - 1)
+                      ? <><span className="aqb-dot" /><span className="aqb-dot" /><span className="aqb-dot" /></>
+                      : null}
                 </div>
               </div>
             ))}
-            {streaming && messages[messages.length - 1]?.content === '' && (
-              <div className="chat-bubble-row assistant">
-                <div className="chat-bubble assistant chat-thinking">
-                  <span /><span /><span />
-                </div>
-              </div>
-            )}
             <div ref={bottomRef} />
           </div>
 
-          <div className="chat-input-row">
+          <div className="aqb-input-row">
             <textarea
               ref={inputRef}
-              className="chat-input"
+              className="aqb-input"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder={t.placeholder}
               rows={1}
               disabled={streaming}
+              style={{ fontSize }}
             />
-            <button
-              className="chat-send"
-              onClick={send}
-              disabled={!input.trim() || streaming}
-              aria-label={t.send}
-            >
+            <button className="aqb-send" onClick={send} disabled={!input.trim() || streaming} aria-label={t.send}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <path d="M2 9h14M9 2l7 7-7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -194,22 +310,6 @@ export function ChatWidget() {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        className={`chat-fab ${open ? 'chat-fab--open' : ''}`}
-        onClick={() => setOpen(v => !v)}
-        aria-label={open ? 'Close chat' : 'Open chat'}
-      >
-        {open ? (
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <path d="M3 3l16 16M19 3L3 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        ) : (
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <path d="M4 4h14a2 2 0 012 2v8a2 2 0 01-2 2H7l-4 3V6a2 2 0 012-2z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
-          </svg>
-        )}
-      </button>
-    </>
+    </div>
   )
 }

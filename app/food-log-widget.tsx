@@ -19,14 +19,40 @@ export interface LogEntry {
 
 type Period = 'today' | 'week' | 'month'
 
+const COPY = {
+  es: {
+    loading:   'Cargando registro…',
+    noMeals:   'Aún no hay comidas registradas.',
+    scan:      'Escanea una comida',
+    toStart:   'para comenzar.',
+    title:     'Registro de Comidas',
+    tabs:      { today: 'Hoy', week: 'Esta Semana', month: 'Este Mes' },
+    meals:     (n: number) => `${n} comida${n !== 1 ? 's' : ''}`,
+    noPeriod:  (p: Period) => p === 'today' ? 'Sin comidas hoy.' : p === 'week' ? 'Sin comidas esta semana.' : 'Sin comidas este mes.',
+    kcal: 'kcal', carbs: 'carbos', fats: 'grasas', protein: 'proteína',
+  },
+  en: {
+    loading:   'Loading meal log…',
+    noMeals:   'No meals logged yet.',
+    scan:      'Scan a meal',
+    toStart:   'to start tracking.',
+    title:     'Meal Log',
+    tabs:      { today: 'Today', week: 'This Week', month: 'This Month' },
+    meals:     (n: number) => `${n} meal${n !== 1 ? 's' : ''}`,
+    noPeriod:  (p: Period) => p === 'today' ? 'No meals logged today.' : p === 'week' ? 'No meals logged this week.' : 'No meals logged this month.',
+    kcal: 'kcal', carbs: 'carbs', fats: 'fats', protein: 'protein',
+  },
+}
+
 interface Props {
   logs?: LogEntry[]
   today?: string
   weekStart?: string
   monthStart?: string
+  lang?: 'es' | 'en'
 }
 
-export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: propWeekStart, monthStart: propMonthStart }: Props) {
+export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: propWeekStart, monthStart: propMonthStart, lang = 'en' }: Props) {
   const selfFetch = propLogs === undefined
 
   const [fetched, setFetched] = useState<{
@@ -37,6 +63,8 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
   } | null>(null)
   const [loading, setLoading] = useState(selfFetch)
   const [period, setPeriod] = useState<Period>('today')
+
+  const t = COPY[lang]
 
   useEffect(() => {
     if (!selfFetch) return
@@ -57,14 +85,14 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
   const weekStart  = selfFetch ? (fetched?.weekStart  ?? '') : propWeekStart!
   const monthStart = selfFetch ? (fetched?.monthStart ?? '') : propMonthStart!
 
-  if (loading) return <div className="flw-wrap"><div className="flw-loading">Loading meal log…</div></div>
+  if (loading) return <div className="flw-wrap"><div className="flw-loading">{t.loading}</div></div>
 
   if (!logs.length) return (
     <div className="flw-wrap">
       <div className="flw-empty">
-        No meals logged yet.{' '}
-        <a href="/food-scanner" style={{ color: 'var(--gold)', textDecoration: 'none' }}>Scan a meal</a>{' '}
-        to start tracking.
+        {t.noMeals}{' '}
+        <a href="/food-scanner" style={{ color: 'var(--gold)', textDecoration: 'none' }}>{t.scan}</a>{' '}
+        {t.toStart}
       </div>
     </div>
   )
@@ -85,11 +113,11 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
   return (
     <div className="flw-wrap">
       <div className="flw-header">
-        <div className="flw-title">Meal Log</div>
+        <div className="flw-title">{t.title}</div>
         <div className="flw-tabs">
           {(['today', 'week', 'month'] as Period[]).map(p => (
             <button key={p} className={`flw-tab${period === p ? ' active' : ''}`} onClick={() => setPeriod(p)} type="button">
-              {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+              {t.tabs[p]}
             </button>
           ))}
         </div>
@@ -99,29 +127,27 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
         <div className="flw-summary">
           <div className="flw-summary-item">
             <span className="flw-summary-val">{totals.calories}</span>
-            <span className="flw-summary-lbl">kcal</span>
+            <span className="flw-summary-lbl">{t.kcal}</span>
           </div>
           <div className="flw-summary-sep" />
           <div className="flw-summary-item">
             <span className="flw-summary-val" style={{ color: '#C9A84C' }}>{totals.carbs}g</span>
-            <span className="flw-summary-lbl">carbs</span>
+            <span className="flw-summary-lbl">{t.carbs}</span>
           </div>
           <div className="flw-summary-item">
             <span className="flw-summary-val" style={{ color: '#9A9590' }}>{totals.fats}g</span>
-            <span className="flw-summary-lbl">fats</span>
+            <span className="flw-summary-lbl">{t.fats}</span>
           </div>
           <div className="flw-summary-item">
             <span className="flw-summary-val" style={{ color: '#E2C87A' }}>{totals.proteins}g</span>
-            <span className="flw-summary-lbl">protein</span>
+            <span className="flw-summary-lbl">{t.protein}</span>
           </div>
-          <div className="flw-summary-count">{filtered.length} meal{filtered.length !== 1 ? 's' : ''}</div>
+          <div className="flw-summary-count">{t.meals(filtered.length)}</div>
         </div>
       )}
 
       {filtered.length === 0 ? (
-        <div className="flw-empty">
-          No meals logged {period === 'today' ? 'today' : period === 'week' ? 'this week' : 'this month'}.
-        </div>
+        <div className="flw-empty">{t.noPeriod(period)}</div>
       ) : (
         <div className="flw-list">
           {filtered.map(log => (
@@ -131,14 +157,14 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
                 {log.fields['Food Description'] ?? '—'}
               </div>
               <div className="flw-row-macros">
-                <span className="flw-row-cal">{log.fields['Calories'] ?? 0} kcal</span>
+                <span className="flw-row-cal">{log.fields['Calories'] ?? 0} {t.kcal}</span>
                 <span style={{ color: '#C9A84C' }}>C {log.fields['Carbs (g)'] ?? 0}g</span>
                 <span style={{ color: '#9A9590' }}>F {log.fields['Fats (g)'] ?? 0}g</span>
                 <span style={{ color: '#E2C87A' }}>P {log.fields['Proteins (g)'] ?? 0}g</span>
               </div>
               <div className="flw-row-date">
                 {log.fields['Timestamp']
-                  ? new Date(log.fields['Timestamp']).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                  ? new Date(log.fields['Timestamp']).toLocaleTimeString(lang === 'es' ? 'es-MX' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
                   : log.fields['Date'] ?? ''}
               </div>
             </div>
