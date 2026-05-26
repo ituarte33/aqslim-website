@@ -41,6 +41,10 @@ async function airtableFetch(path: string, options?: RequestInit) {
   })
   if (!res.ok) {
     const text = await res.text()
+    const method = options?.method ?? 'GET'
+    console.error('[airtable] error', method, path)
+    if (options?.body) console.error('[airtable] request body:', options.body)
+    console.error('[airtable] response:', res.status, text)
     throw new Error(`Airtable ${res.status}: ${text}`)
   }
   return res.json()
