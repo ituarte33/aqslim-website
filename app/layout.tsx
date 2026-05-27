@@ -1,4 +1,5 @@
-import { ClerkProvider, SignedIn } from '@clerk/nextjs'
+import { ClerkProvider } from '@clerk/nextjs'
+import { ClientSignedIn } from './client-signed-in'
 import type { Metadata } from 'next'
 import './globals.css'
 import { LanguageModal } from './language-modal'
@@ -24,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkProvider afterSignOutUrl="/signed-out">
           <LanguageModal />
           {children}
-          <SignedIn><ChatWidget /></SignedIn>
+          <ClientSignedIn><ChatWidget /></ClientSignedIn>
           <NavAuthLinks />
         </ClerkProvider>
       </body>
