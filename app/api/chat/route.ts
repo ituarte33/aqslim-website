@@ -8,6 +8,8 @@ type ChatMessage = Anthropic.MessageParam
 const DIABETES_TERMS = /\b(diabetes|diabetic|diabetico|diabetica|diabeticos|diabeticas|glucose|glucosa|blood sugar|azucar(?: en la sangre)?)\b/i
 const MEDICATION_TERMS = /\b(medication|medications|medicine|medicines|medicina|medicinas|medicamento|medicamentos|insulin|insulina|dose|dosage|dosis|metformin|metformina|glucose[- ]lowering|baja(?:n|r)? la glucosa|controlar el azucar)\b/i
 const CARB_REDUCTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
+const PREGNANCY_TERMS = /\b(pregnant|pregnancy|expecting|embarazada|embarazo|gestante|gestacion)\b/i
+const PREGNANCY_RESTRICTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|weight loss|lose weight|losing weight|bajar de peso|perder peso|adelgazar|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
 
 const DIABETES_MEDICATION_SAFETY_ES = `**Información de seguridad importante**
 
@@ -24,6 +26,22 @@ Do not begin the Jing Phase, fasting, or a major carbohydrate reduction until yo
 If you are already experiencing shaking, sweating, dizziness, confusion, marked weakness, trouble walking or speaking, fainting, seizure, or a dangerously low reading, stop nutrition coaching, follow the hypoglycemia emergency plan provided by your medical team, and seek immediate medical help. If you are unconscious, having a seizure, cannot swallow safely, or cannot treat yourself, someone nearby should call emergency services immediately; in the United States, call 911. An unconscious person should not be given food or drink.
 
 AQ Buddy can help you understand AQSLIM phases and prepare questions for your clinician, but it cannot authorize the nutrition change or adjust medication.`
+
+const PREGNANCY_SAFETY_ES = `**Información de seguridad importante — embarazo**
+
+Durante el embarazo, AQSLIM no debe iniciar la Fase Jing, ayunos prolongados, dietas cetogénicas o muy bajas en carbohidratos ni un protocolo intencional para bajar de peso. No hagas una restricción importante de alimentos o carbohidratos siguiendo indicaciones de AQ Buddy. La meta de peso durante el embarazo debe establecerse con tu obstetra, partera u otro profesional prenatal autorizado según tu situación individual. Cualquier plan nutricional especial durante el embarazo debe quedar bajo la dirección de ese profesional.
+
+Busca atención médica inmediata si durante el embarazo presentas sangrado vaginal mayor que un manchado, pérdida de líquido, desmayo, dificultad para respirar, dolor intenso de pecho, dolor abdominal intenso que no desaparece, dolor de cabeza intenso que no cede o empeora, o cambios importantes en la visión. Esta lista no incluye todas las posibles señales de alarma. Si los síntomas son graves o existe peligro inmediato, llama a los servicios de emergencia; en Estados Unidos, al 911.
+
+AQ Buddy puede ayudarte a comprender información general de AQSLIM y a preparar preguntas para tu profesional prenatal, pero no puede autorizar Jing, ayunos, pérdida de peso ni una dieta restrictiva durante el embarazo.`
+
+const PREGNANCY_SAFETY_EN = `**Important safety information — pregnancy**
+
+During pregnancy, AQSLIM should not start the Jing Phase, prolonged fasting, ketogenic or very-low-carbohydrate diets, or an intentional weight-loss protocol. Do not make major food or carbohydrate restrictions based on AQ Buddy guidance. Your pregnancy weight goal should be established with your obstetrician, midwife, or other licensed prenatal clinician based on your individual circumstances. Any special nutrition plan during pregnancy should remain under that clinician's direction.
+
+Seek immediate medical care during pregnancy for vaginal bleeding that is more than spotting, leaking fluid, fainting, trouble breathing, severe chest pain, severe belly pain that does not go away, a severe headache that will not go away or is getting worse, or major vision changes. This is not a complete list of warning signs. If symptoms are severe or there is immediate danger, call emergency services; in the United States, call 911.
+
+AQ Buddy can help you understand general AQSLIM information and prepare questions for your prenatal clinician, but it cannot authorize Jing, fasting, weight loss, or a restrictive diet during pregnancy.`
 
 function messageText(message: ChatMessage | undefined) {
   if (!message) return ''
@@ -47,11 +65,27 @@ function requiresDiabetesMedicationSafety(messages: ChatMessage[]) {
   )
 }
 
-function safetyBlockFor(text: string) {
-  const looksSpanish = /[¿¡áéíóúñ]|\b(tengo|tomo|quiero|como|medicamentos|azucar|carbohidratos|ayuno)\b/i.test(text)
-  return looksSpanish
+function requiresPregnancySafety(messages: ChatMessage[]) {
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')
+  const text = messageText(latestUserMessage)
+
+  return PREGNANCY_TERMS.test(text) && PREGNANCY_RESTRICTION_TERMS.test(text)
+}
+
+function looksSpanish(text: string) {
+  return /[¿¡áéíóúñ]|\b(tengo|tomo|quiero|como|medicamentos|azucar|carbohidratos|ayuno|embarazada|embarazo)\b/i.test(text)
+}
+
+function diabetesSafetyBlockFor(text: string) {
+  return looksSpanish(text)
     ? DIABETES_MEDICATION_SAFETY_ES
     : DIABETES_MEDICATION_SAFETY_EN
+}
+
+function pregnancySafetyBlockFor(text: string) {
+  return looksSpanish(text) ? PREGNANCY_SAFETY_ES : PREGNANCY_SAFETY_EN
 }
 
 export async function POST(req: Request) {
@@ -59,9 +93,14 @@ export async function POST(req: Request) {
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')
   )
-  const requiredSafetyBlock = requiresDiabetesMedicationSafety(messages)
-    ? safetyBlockFor(latestUserText)
-    : null
+  const requiredSafetyBlocks = [
+    requiresDiabetesMedicationSafety(messages)
+      ? diabetesSafetyBlockFor(latestUserText)
+      : null,
+    requiresPregnancySafety(messages)
+      ? pregnancySafetyBlockFor(latestUserText)
+      : null,
+  ].filter((block): block is string => Boolean(block))
 
   const stream = client.messages.stream({
     model: 'claude-haiku-4-5-20251001',
@@ -82,8 +121,10 @@ export async function POST(req: Request) {
             controller.enqueue(encoder.encode(chunk.delta.text))
           }
         }
-        if (requiredSafetyBlock) {
-          controller.enqueue(encoder.encode(`\n\n---\n\n${requiredSafetyBlock}`))
+        if (requiredSafetyBlocks.length > 0) {
+          controller.enqueue(
+            encoder.encode(`\n\n---\n\n${requiredSafetyBlocks.join('\n\n---\n\n')}`)
+          )
         }
       } finally {
         controller.close()
