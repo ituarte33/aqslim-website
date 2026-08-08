@@ -10,6 +10,8 @@ const MEDICATION_TERMS = /\b(medication|medications|medicine|medicines|medicina|
 const CARB_REDUCTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
 const PREGNANCY_TERMS = /\b(pregnant|pregnancy|expecting|embarazada|embarazo|gestante|gestacion)\b/i
 const PREGNANCY_RESTRICTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|weight loss|lose weight|losing weight|bajar de peso|perder peso|adelgazar|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
+const BREASTFEEDING_TERMS = /\b(breastfeed|breastfeeding|breastfed|lactation|lactating|amamantando|amamantar|lactancia|dando pecho|dar el pecho)\b|\bnursing (?:my |a |an )?(?:baby|infant|newborn)\b/i
+const BREASTFEEDING_RESTRICTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|weight loss|lose weight|losing weight|bajar de peso|perder peso|adelgazar|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
 
 const DIABETES_MEDICATION_SAFETY_ES = `**Información de seguridad importante**
 
@@ -43,6 +45,22 @@ Seek immediate medical care during pregnancy for vaginal bleeding that is more t
 
 AQ Buddy can help you understand general AQSLIM information and prepare questions for your prenatal clinician, but it cannot authorize Jing, fasting, weight loss, or a restrictive diet during pregnancy.`
 
+const BREASTFEEDING_SAFETY_ES = `**Información de seguridad importante — lactancia**
+
+Durante la lactancia exclusiva temprana, especialmente en las primeras semanas después del parto, AQSLIM no debe iniciar la Fase Jing, ayunos de 36 horas, dietas cetogénicas o muy bajas en carbohidratos ni prescribir una velocidad de pérdida de peso. No hagas una restricción importante de alimentos o carbohidratos siguiendo indicaciones de AQ Buddy. Antes de intentar bajar de peso o cambiar de forma considerable tu alimentación, consulta al médico u obstetra que atiende tu recuperación posparto y, cuando corresponda, al pediatra y a un especialista acreditado en lactancia. Cualquier plan debe individualizarse para proteger la nutrición, energía y bienestar de la madre, la producción de leche y la alimentación y crecimiento del bebé.
+
+Suspende cualquier protocolo restrictivo y comunícate prontamente con el pediatra o especialista en lactancia si notas una reducción marcada en la producción de leche, si el bebé mama mucho menos o no se escucha que trague, moja menos pañales de lo esperado, presenta somnolencia inusual o no aumenta de peso como espera su pediatra. Busca atención médica inmediata por señales maternas posparto como desmayo, dificultad para respirar, dolor de pecho, convulsiones, sangrado vaginal abundante, fiebre de 100.4 °F (38 °C) o más, dolor de cabeza intenso que no cede o empeora, cambios importantes en la visión o pensamientos de hacerte daño o dañar al bebé. Esta lista no incluye todas las posibles señales de alarma. Si los síntomas son graves o existe peligro inmediato, llama a los servicios de emergencia; en Estados Unidos, al 911.
+
+AQ Buddy puede ayudarte a comprender información general de AQSLIM y a preparar preguntas para tus profesionales, pero no puede autorizar Jing, ayunos, una dieta restrictiva ni establecer una meta o velocidad de pérdida de peso durante la lactancia.`
+
+const BREASTFEEDING_SAFETY_EN = `**Important safety information — breastfeeding**
+
+During early exclusive breastfeeding, especially in the first weeks after delivery, AQSLIM should not start the Jing Phase, 36-hour fasts, ketogenic or very-low-carbohydrate diets, or prescribe a rate of weight loss. Do not make major food or carbohydrate restrictions based on AQ Buddy guidance. Before trying to lose weight or substantially changing your diet, consult the physician or obstetric clinician managing your postpartum recovery and, when appropriate, the baby's pediatrician and a credentialed lactation specialist. Any plan should be individualized to protect the mother's nutrition, energy, and well-being, milk production, and the baby's feeding and growth.
+
+Stop any restrictive protocol and promptly contact the pediatrician or lactation specialist if you notice a marked drop in milk production, the baby feeds much less or you cannot hear swallowing, has fewer wet diapers than expected, is unusually sleepy, or is not gaining weight as expected by the pediatrician. Seek immediate medical care for postpartum maternal warning signs such as fainting, trouble breathing, chest pain, seizure, heavy vaginal bleeding, a fever of 100.4°F (38°C) or higher, a severe headache that will not go away or is getting worse, major vision changes, or thoughts of harming yourself or the baby. This is not a complete list of warning signs. If symptoms are severe or there is immediate danger, call emergency services; in the United States, call 911.
+
+AQ Buddy can help you understand general AQSLIM information and prepare questions for your clinicians, but it cannot authorize Jing, fasting, a restrictive diet, or set a weight-loss goal or rate while breastfeeding.`
+
 function messageText(message: ChatMessage | undefined) {
   if (!message) return ''
   if (typeof message.content === 'string') return message.content
@@ -74,8 +92,20 @@ function requiresPregnancySafety(messages: ChatMessage[]) {
   return PREGNANCY_TERMS.test(text) && PREGNANCY_RESTRICTION_TERMS.test(text)
 }
 
+function requiresBreastfeedingSafety(messages: ChatMessage[]) {
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')
+  const text = messageText(latestUserMessage)
+
+  return (
+    BREASTFEEDING_TERMS.test(text) &&
+    BREASTFEEDING_RESTRICTION_TERMS.test(text)
+  )
+}
+
 function looksSpanish(text: string) {
-  return /[¿¡áéíóúñ]|\b(tengo|tomo|quiero|como|medicamentos|azucar|carbohidratos|ayuno|embarazada|embarazo)\b/i.test(text)
+  return /[¿¡áéíóúñ]|\b(tengo|tomo|quiero|deseo|como|medicamentos|azucar|carbohidratos|ayuno|embarazada|embarazo|amamantando|amamantar|lactancia|bajar de peso|dando pecho|dar el pecho)\b/i.test(text)
 }
 
 function diabetesSafetyBlockFor(text: string) {
@@ -86,6 +116,12 @@ function diabetesSafetyBlockFor(text: string) {
 
 function pregnancySafetyBlockFor(text: string) {
   return looksSpanish(text) ? PREGNANCY_SAFETY_ES : PREGNANCY_SAFETY_EN
+}
+
+function breastfeedingSafetyBlockFor(text: string) {
+  return looksSpanish(text)
+    ? BREASTFEEDING_SAFETY_ES
+    : BREASTFEEDING_SAFETY_EN
 }
 
 export async function POST(req: Request) {
@@ -99,6 +135,9 @@ export async function POST(req: Request) {
       : null,
     requiresPregnancySafety(messages)
       ? pregnancySafetyBlockFor(latestUserText)
+      : null,
+    requiresBreastfeedingSafety(messages)
+      ? breastfeedingSafetyBlockFor(latestUserText)
       : null,
   ].filter((block): block is string => Boolean(block))
 
