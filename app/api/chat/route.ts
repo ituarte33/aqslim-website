@@ -61,6 +61,20 @@ Stop any restrictive protocol and promptly contact the pediatrician or lactation
 
 AQ Buddy can help you understand general AQSLIM information and prepare questions for your clinicians, but it cannot authorize Jing, fasting, a restrictive diet, or set a weight-loss goal or rate while breastfeeding.`
 
+const MEDICAL_SAFETY_RESPONSE_BOUNDARY = `
+MEDICAL SAFETY RESPONSE BOUNDARY — MANDATORY
+
+One or more deterministic medical safety protections apply to this response.
+
+- Do not mention Rom, Romulo, Hillary, or any AQSLIM employee or team member by name.
+- Refer only to "the AQSLIM team" in English or "el equipo de AQSLIM" in Spanish, and only for non-clinical operational support.
+- Never state or imply that the AQSLIM team can perform a medical or professional clinical evaluation, authorize a restrictive diet or fasting protocol, or design a clinical nutrition plan for the user, a pregnancy, or a baby.
+- Clinical decisions must be directed to the appropriate licensed healthcare professional identified in the applicable safety block.
+- The AQSLIM team may only help explain general AQSLIM information, document relevant circumstances, and help the user prepare questions for licensed healthcare professionals.
+- Do not claim that dietary restriction will necessarily change breast-milk quality. When relevant, use cautious language about possible effects on maternal intake or energy, milk production, and the well-being of mother and baby.
+- Do not contradict, weaken, or qualify the deterministic safety information that will be appended after the response.
+`
+
 function messageText(message: ChatMessage | undefined) {
   if (!message) return ''
   if (typeof message.content === 'string') return message.content
@@ -141,10 +155,15 @@ export async function POST(req: Request) {
       : null,
   ].filter((block): block is string => Boolean(block))
 
+  const systemPrompt =
+    requiredSafetyBlocks.length > 0
+      ? `${SYSTEM_PROMPT}\n\n${MEDICAL_SAFETY_RESPONSE_BOUNDARY}`
+      : SYSTEM_PROMPT
+
   const stream = client.messages.stream({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages,
   })
 
