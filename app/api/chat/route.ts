@@ -12,6 +12,7 @@ const PREGNANCY_TERMS = /\b(pregnant|pregnancy|expecting|embarazada|embarazo|ges
 const PREGNANCY_RESTRICTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|weight loss|lose weight|losing weight|bajar de peso|perder peso|adelgazar|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
 const BREASTFEEDING_TERMS = /\b(breastfeed|breastfeeding|breastfed|lactation|lactating|amamantando|amamantar|lactancia|dando pecho|dar el pecho)\b|\bnursing (?:my |a |an )?(?:baby|infant|newborn)\b/i
 const BREASTFEEDING_RESTRICTION_TERMS = /\b(jing|fasting|fast|ayuno|low[- ]carb|keto|ketogenic|carbohydrate reduction|reduce carbohydrates|reducing carbohydrates|menos de 20|less than 20|weight loss|lose weight|losing weight|bajar de peso|perder peso|adelgazar|reducir (?:mucho |drasticamente )?(?:los )?carbohidratos|bajar (?:mucho |drasticamente )?(?:los )?carbohidratos)\b/i
+const FAST36_TERMS = /\bfast\s*36\b|\b36[- ]?hour fast(?:ing|s)?\b|\bayuno(?:s)? de 36 horas\b/i
 
 const DIABETES_MEDICATION_SAFETY_ES = `**Información de seguridad importante**
 
@@ -60,6 +61,22 @@ During early exclusive breastfeeding, especially in the first weeks after delive
 Stop any restrictive protocol and promptly contact the pediatrician or lactation specialist if you notice a marked drop in milk production, the baby feeds much less or you cannot hear swallowing, has fewer wet diapers than expected, is unusually sleepy, or is not gaining weight as expected by the pediatrician. Seek immediate medical care for postpartum maternal warning signs such as fainting, trouble breathing, chest pain, seizure, heavy vaginal bleeding, a fever of 100.4°F (38°C) or higher, a severe headache that will not go away or is getting worse, major vision changes, or thoughts of harming yourself or the baby. This is not a complete list of warning signs. If symptoms are severe or there is immediate danger, call emergency services; in the United States, call 911.
 
 AQ Buddy can help you understand general AQSLIM information and prepare questions for your clinicians, but it cannot authorize Jing, fasting, a restrictive diet, or set a weight-loss goal or rate while breastfeeding.`
+
+const FAST36_SAFETY_ES = `**Información importante — Fast36**
+
+Fast36 está en evaluación y actualmente no es un protocolo oficial de AQSLIM disponible para pacientes. No forma parte de la Fase Jing y AQ Buddy no debe enseñarte cómo realizarlo, programarlo ni iniciarlo.
+
+No recurras a Rom, Hillary ni al equipo de AQSLIM para obtener autorización clínica sobre un ayuno prolongado. Si tienes una condición médica, tomas medicamentos o existe cualquier duda sobre si un ayuno sería seguro para ti, esa decisión debe revisarse con el profesional de salud autorizado que conozca tu situación.
+
+El equipo de AQSLIM puede ayudarte únicamente con información general y apoyo operativo sobre los programas actualmente disponibles.`
+
+const FAST36_SAFETY_EN = `**Important information — Fast36**
+
+Fast36 is under evaluation and is not currently an official AQSLIM patient-facing protocol. It is not part of the Jing Phase, and AQ Buddy should not teach you how to perform, schedule, or start it.
+
+Do not rely on Rom, Hillary, or the AQSLIM team for clinical clearance for prolonged fasting. If you have a medical condition, take medications, or there is any question about whether fasting would be safe for you, that decision must be reviewed with the licensed healthcare professional who knows your situation.
+
+The AQSLIM team may help only with general information and non-clinical operational support about programs that are currently available.`
 
 const MEDICAL_SAFETY_RESPONSE_BOUNDARY = `
 MEDICAL SAFETY RESPONSE BOUNDARY — MANDATORY
@@ -118,6 +135,13 @@ function requiresBreastfeedingSafety(messages: ChatMessage[]) {
   )
 }
 
+function requiresFast36Safety(messages: ChatMessage[]) {
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')
+  return FAST36_TERMS.test(messageText(latestUserMessage))
+}
+
 function looksSpanish(text: string) {
   return /[¿¡áéíóúñ]|\b(tengo|tomo|quiero|deseo|como|medicamentos|azucar|carbohidratos|ayuno|embarazada|embarazo|amamantando|amamantar|lactancia|bajar de peso|dando pecho|dar el pecho)\b/i.test(text)
 }
@@ -138,12 +162,19 @@ function breastfeedingSafetyBlockFor(text: string) {
     : BREASTFEEDING_SAFETY_EN
 }
 
+function fast36SafetyBlockFor(text: string) {
+  return looksSpanish(text) ? FAST36_SAFETY_ES : FAST36_SAFETY_EN
+}
+
 export async function POST(req: Request) {
   const { messages }: { messages: ChatMessage[] } = await req.json()
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')
   )
   const requiredSafetyBlocks = [
+    requiresFast36Safety(messages)
+      ? fast36SafetyBlockFor(latestUserText)
+      : null,
     requiresDiabetesMedicationSafety(messages)
       ? diabetesSafetyBlockFor(latestUserText)
       : null,
