@@ -66,7 +66,7 @@ const FAST36_SAFETY_ES = `**Información importante — Fast36**
 
 Fast36 está en evaluación y actualmente no es un protocolo oficial de AQSLIM disponible para pacientes. No forma parte de la Fase Jing y AQ Buddy no debe enseñarte cómo realizarlo, programarlo ni iniciarlo.
 
-No recurras a Rom, Hillary ni al equipo de AQSLIM para obtener autorización clínica sobre un ayuno prolongado. Si tienes una condición médica, tomas medicamentos o existe cualquier duda sobre si un ayuno sería seguro para ti, esa decisión debe revisarse con el profesional de salud autorizado que conozca tu situación.
+El equipo de AQSLIM no puede otorgar autorización clínica para un ayuno prolongado. Si tienes una condición médica, tomas medicamentos o existe cualquier duda sobre si un ayuno sería seguro para ti, esa decisión debe revisarse con el profesional de salud correspondiente que conozca tu situación.
 
 El equipo de AQSLIM puede ayudarte únicamente con información general y apoyo operativo sobre los programas actualmente disponibles.`
 
@@ -74,7 +74,7 @@ const FAST36_SAFETY_EN = `**Important information — Fast36**
 
 Fast36 is under evaluation and is not currently an official AQSLIM patient-facing protocol. It is not part of the Jing Phase, and AQ Buddy should not teach you how to perform, schedule, or start it.
 
-Do not rely on Rom, Hillary, or the AQSLIM team for clinical clearance for prolonged fasting. If you have a medical condition, take medications, or there is any question about whether fasting would be safe for you, that decision must be reviewed with the licensed healthcare professional who knows your situation.
+The AQSLIM team cannot provide clinical clearance for prolonged fasting. If you have a medical condition, take medications, or there is any question about whether fasting would be safe for you, that decision must be reviewed with the appropriate licensed healthcare professional who knows your situation.
 
 The AQSLIM team may help only with general information and non-clinical operational support about programs that are currently available.`
 
