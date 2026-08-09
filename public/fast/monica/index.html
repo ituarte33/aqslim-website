@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#171512" />
+  <title>AQSLIM · Ayuno 36 Horas</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">AQSLIM · FAST-001</div>
+        <h1>Ayuno de 36 Horas</h1>
+      </div>
+      <button id="installBtn" class="ghost hidden">Instalar</button>
+    </header>
+
+    <section class="card profile-card">
+      <label for="profile">Perfil</label>
+      <div class="profile-row">
+        <select id="profile">
+          <option value="Mónica Santander">Mónica Santander</option>
+        </select>
+        <span id="weekBadge" class="badge">Semana 1 de 6</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Mi horario de ayuno</h2>
+      <label>Hora de mi última comida
+        <input id="startDateTime" type="datetime-local" value="2026-08-09T22:00">
+      </label>
+      <p class="hint">La aplicación calculará automáticamente cuándo se cumplen tus 36 horas.</p>
+      <button id="scheduleBtn" class="primary">Guardar horario</button>
+      <div id="scheduleSaved" class="saved hidden">Horario guardado ✓</div>
+    </section>
+
+    <section class="hero card">
+      <div class="status-line"><span class="dot"></span><span id="statusText">En progreso</span></div>
+      <div class="timing-grid">
+        <div>
+          <div class="label">Última comida</div>
+          <div id="startText" class="bigtext"></div>
+        </div>
+        <div>
+          <div class="label">Próximo alimento</div>
+          <div id="endText" class="bigtext"></div>
+        </div>
+      </div>
+      <div class="countdown-wrap">
+        <div class="label">Tiempo restante</div>
+        <div id="countdown" class="countdown">--:--:--</div>
+        <div class="progress"><div id="progressBar"></div></div>
+        <div id="elapsedText" class="muted"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>¿Cómo me siento?</h2>
+      <div id="moodGrid" class="mood-grid">
+        <button data-mood="Excelente">😀<span>Excelente</span></button>
+        <button data-mood="Bien">🙂<span>Bien</span></button>
+        <button data-mood="Hambre">😐<span>Hambre</span></button>
+        <button data-mood="Cansado">😕<span>Cansado</span></button>
+        <button data-mood="Difícil">😵<span>Difícil</span></button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Hoy</h2>
+      <div class="check-grid">
+        <label><input type="checkbox" data-check="agua"> Agua suficiente</label>
+        <label><input type="checkbox" data-check="electrolitos"> Electrolitos</label>
+        <label><input type="checkbox" data-check="cafe"> Café o té</label>
+        <label><input type="checkbox" data-check="caminata"> Caminé</label>
+        <label><input type="checkbox" data-check="sueno"> Dormí bien</label>
+      </div>
+      <p class="hint">Durante el ayuno pueden usarse agua, café negro, té, Propel®, Gatorade Zero® o bebidas sin calorías endulzadas con Splenda®.</p>
+    </section>
+
+    <section class="card">
+      <h2>Registro rápido</h2>
+      <div class="field-grid">
+        <label>Peso inicial (lb)<input id="startWeight" inputmode="decimal" type="number" step="0.1"></label>
+        <label>Peso actual (lb)<input id="currentWeight" inputmode="decimal" type="number" step="0.1"></label>
+        <label>Cintura inicial (in)<input id="startWaist" inputmode="decimal" type="number" step="0.1"></label>
+        <label>Cintura actual (in)<input id="currentWaist" inputmode="decimal" type="number" step="0.1"></label>
+      </div>
+      <label class="notes-label">Notas<textarea id="notes" rows="4" placeholder="Ejemplo: A las 3:00 pm tuve hambre, pero mejoró después de tomar agua."></textarea></label>
+      <button id="saveBtn" class="primary">Guardar registro</button>
+      <div id="savedMsg" class="saved hidden">Guardado ✓</div>
+    </section>
+
+    <section class="card">
+      <h2>Progreso de 6 semanas</h2>
+      <div id="weeks" class="weeks"></div>
+    </section>
+
+    <section class="card safety">
+      <h2>Seguridad</h2>
+      <p>Suspende el ayuno y busca orientación médica si presentas desmayo, confusión, vómito persistente, dolor intenso, debilidad extrema o síntomas preocupantes. Las personas que usan insulina o medicamentos que bajan la glucosa deben consultar a su médico antes de realizar ayunos prolongados.</p>
+    </section>
+
+    <footer>
+      <button id="exportBtn" class="ghost">Exportar mis datos</button>
+      <div>AQSLIM · Piloto Mónica Santander</div>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
