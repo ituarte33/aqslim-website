@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#171512" />
-  <title>AQSLIM · Ayuno 36 Horas</title>
+  <title>AQSLIM · 36-Hour Fast</title>
   <link rel="manifest" href="/fast/monica/manifest.webmanifest" />
   <link rel="icon" href="/fast/monica/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/fast/monica/styles.css" />
@@ -14,45 +14,40 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">AQSLIM · FAST-001</div>
-        <h1>Ayuno de 36 Horas</h1>
+        <h1 data-i18n="title">36-Hour Fast</h1>
       </div>
-      <button id="installBtn" class="ghost hidden">Instalar</button>
+      <select id="language" aria-label="Language">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+      </select>
     </header>
 
     <section class="card profile-card">
-      <label for="profile">Perfil</label>
+      <label for="profile" data-i18n="profile">Profile</label>
       <div class="profile-row">
-        <select id="profile">
-          <option value="Mónica Santander">Mónica Santander</option>
-        </select>
-        <span id="weekBadge" class="badge">Semana 1 de 6</span>
+        <select id="profile"><option value="Mónica Santander">Mónica Santander</option></select>
+        <span id="weekBadge" class="badge">Week 1 of 6</span>
       </div>
     </section>
 
     <section class="card">
-      <h2>Mi horario de ayuno</h2>
-      <label>Hora de mi última comida
+      <h2 data-i18n="scheduleTitle">My fasting schedule</h2>
+      <label><span data-i18n="lastMealInput">Time of my last meal</span>
         <input id="startDateTime" type="datetime-local" value="2026-08-09T22:00">
       </label>
-      <p class="hint">La aplicación calculará automáticamente cuándo se cumplen tus 36 horas.</p>
-      <button id="scheduleBtn" class="primary">Guardar horario</button>
-      <div id="scheduleSaved" class="saved hidden">Horario guardado ✓</div>
+      <p class="hint" data-i18n="scheduleHint">The app will automatically calculate when your 36 hours are complete.</p>
+      <button id="scheduleBtn" class="primary" data-i18n="saveSchedule">Save schedule</button>
+      <div id="scheduleSaved" class="saved hidden" data-i18n="scheduleSaved">Schedule saved ✓</div>
     </section>
 
     <section class="hero card">
-      <div class="status-line"><span class="dot"></span><span id="statusText">En progreso</span></div>
+      <div class="status-line"><span class="dot"></span><span id="statusText">Scheduled</span></div>
       <div class="timing-grid">
-        <div>
-          <div class="label">Última comida</div>
-          <div id="startText" class="bigtext"></div>
-        </div>
-        <div>
-          <div class="label">Próximo alimento</div>
-          <div id="endText" class="bigtext"></div>
-        </div>
+        <div><div class="label" data-i18n="lastMeal">Last meal</div><div id="startText" class="bigtext"></div></div>
+        <div><div class="label" data-i18n="nextMeal">Next meal</div><div id="endText" class="bigtext"></div></div>
       </div>
       <div class="countdown-wrap">
-        <div class="label">Tiempo restante</div>
+        <div class="label" data-i18n="timeRemaining">Time remaining</div>
         <div id="countdown" class="countdown">--:--:--</div>
         <div class="progress"><div id="progressBar"></div></div>
         <div id="elapsedText" class="muted"></div>
@@ -60,54 +55,51 @@
     </section>
 
     <section class="card">
-      <h2>¿Cómo me siento?</h2>
+      <h2 data-i18n="feelTitle">How do I feel?</h2>
       <div id="moodGrid" class="mood-grid">
-        <button data-mood="Excelente">😀<span>Excelente</span></button>
-        <button data-mood="Bien">🙂<span>Bien</span></button>
-        <button data-mood="Hambre">😐<span>Hambre</span></button>
-        <button data-mood="Cansado">😕<span>Cansado</span></button>
-        <button data-mood="Difícil">😵<span>Difícil</span></button>
+        <button data-mood="excellent">😀<span data-i18n="moodExcellent">Excellent</span></button>
+        <button data-mood="good">🙂<span data-i18n="moodGood">Good</span></button>
+        <button data-mood="hungry">😐<span data-i18n="moodHungry">Hungry</span></button>
+        <button data-mood="tired">😕<span data-i18n="moodTired">Tired</span></button>
+        <button data-mood="difficult">😵<span data-i18n="moodDifficult">Difficult</span></button>
       </div>
     </section>
 
     <section class="card">
-      <h2>Hoy</h2>
+      <h2 data-i18n="today">Today</h2>
       <div class="check-grid">
-        <label><input type="checkbox" data-check="agua"> Agua suficiente</label>
-        <label><input type="checkbox" data-check="electrolitos"> Electrolitos</label>
-        <label><input type="checkbox" data-check="cafe"> Café o té</label>
-        <label><input type="checkbox" data-check="caminata"> Caminé</label>
-        <label><input type="checkbox" data-check="sueno"> Dormí bien</label>
+        <label><input type="checkbox" data-check="water"> <span data-i18n="water">Enough water</span></label>
+        <label><input type="checkbox" data-check="electrolytes"> <span data-i18n="electrolytes">Electrolytes</span></label>
+        <label><input type="checkbox" data-check="coffee"> <span data-i18n="coffee">Coffee or tea</span></label>
+        <label><input type="checkbox" data-check="walk"> <span data-i18n="walk">Walked</span></label>
+        <label><input type="checkbox" data-check="sleep"> <span data-i18n="sleep">Slept well</span></label>
       </div>
-      <p class="hint">Durante el ayuno pueden usarse agua, café negro, té, Propel®, Gatorade Zero® o bebidas sin calorías endulzadas con Splenda®.</p>
+      <p class="hint" data-i18n="fastingDrinks">During the fast you may use water, black coffee, tea, Propel®, Gatorade Zero® or zero-calorie drinks sweetened with Splenda®.</p>
     </section>
 
     <section class="card">
-      <h2>Registro rápido</h2>
+      <h2 data-i18n="quickLog">Quick log</h2>
       <div class="field-grid">
-        <label>Peso inicial (lb)<input id="startWeight" inputmode="decimal" type="number" step="0.1"></label>
-        <label>Peso actual (lb)<input id="currentWeight" inputmode="decimal" type="number" step="0.1"></label>
-        <label>Cintura inicial (in)<input id="startWaist" inputmode="decimal" type="number" step="0.1"></label>
-        <label>Cintura actual (in)<input id="currentWaist" inputmode="decimal" type="number" step="0.1"></label>
+        <label><span data-i18n="startWeight">Starting weight (lb)</span><input id="startWeight" inputmode="decimal" type="number" step="0.1"></label>
+        <label><span data-i18n="currentWeight">Current weight (lb)</span><input id="currentWeight" inputmode="decimal" type="number" step="0.1"></label>
+        <label><span data-i18n="startWaist">Starting waist (in)</span><input id="startWaist" inputmode="decimal" type="number" step="0.1"></label>
+        <label><span data-i18n="currentWaist">Current waist (in)</span><input id="currentWaist" inputmode="decimal" type="number" step="0.1"></label>
       </div>
-      <label class="notes-label">Notas<textarea id="notes" rows="4" placeholder="Ejemplo: A las 3:00 pm tuve hambre, pero mejoró después de tomar agua."></textarea></label>
-      <button id="saveBtn" class="primary">Guardar registro</button>
-      <div id="savedMsg" class="saved hidden">Guardado ✓</div>
+      <label class="notes-label"><span data-i18n="notes">Notes</span><textarea id="notes" rows="4" placeholder="Example: I felt hungry at 3:00 PM, but it improved after drinking water."></textarea></label>
+      <button id="saveBtn" class="primary" data-i18n="saveLog">Save log</button>
+      <div id="savedMsg" class="saved hidden" data-i18n="saved">Saved ✓</div>
     </section>
 
-    <section class="card">
-      <h2>Progreso de 6 semanas</h2>
-      <div id="weeks" class="weeks"></div>
-    </section>
+    <section class="card"><h2 data-i18n="progress6">6-week progress</h2><div id="weeks" class="weeks"></div></section>
 
     <section class="card safety">
-      <h2>Seguridad</h2>
-      <p>Suspende el ayuno y busca orientación médica si presentas desmayo, confusión, vómito persistente, dolor intenso, debilidad extrema o síntomas preocupantes. Las personas que usan insulina o medicamentos que bajan la glucosa deben consultar a su médico antes de realizar ayunos prolongados.</p>
+      <h2 data-i18n="safetyTitle">Safety</h2>
+      <p data-i18n="safetyText">Stop the fast and seek medical guidance if you experience fainting, confusion, persistent vomiting, intense pain, extreme weakness, or concerning symptoms. People who use insulin or medications that lower blood sugar should consult their doctor before prolonged fasting.</p>
     </section>
 
     <footer>
-      <button id="exportBtn" class="ghost">Exportar mis datos</button>
-      <div>AQSLIM · Piloto Mónica Santander</div>
+      <button id="exportBtn" class="ghost" data-i18n="export">Export my data</button>
+      <div>AQSLIM · Mónica Santander Pilot</div>
     </footer>
   </main>
   <script src="/fast/monica/app.js"></script>
