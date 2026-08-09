@@ -33,4 +33,10 @@ $$('[data-check]').forEach(c=>c.onchange=()=>{const d=load(),checks=d.checks||{}
 $('#saveBtn').onclick=()=>{const data={};['startWeight','currentWeight','startWaist','currentWaist','notes'].forEach(id=>data[id]=$('#'+id).value);data.updatedAt=new Date().toISOString();save(data);$('#savedMsg').classList.remove('hidden');setTimeout(()=>$('#savedMsg').classList.add('hidden'),1800)};
 $('#exportBtn').onclick=()=>{const START=getStart(),END=getEnd();const payload={exportedAt:new Date().toISOString(),start:START.toISOString(),end:END.toISOString(),profile:current,data:load()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AQSLIM_FAST-001_Monica_datos.json';a.click();URL.revokeObjectURL(a.href)};
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('#installBtn').classList.remove('hidden')});$('#installBtn').onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('#installBtn').classList.add('hidden')};
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/fast/monica/sw.js',{scope:'/fast/monica/'});renderStatic();tick();setInterval(tick,1000);
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => registrations.forEach(registration => {
+    if (registration.scope.includes('/fast/monica/')) registration.unregister();
+  }));
+  if ('caches' in window) caches.keys().then(keys => keys.filter(key=>key.startsWith('fast001-monica-')).forEach(key=>caches.delete(key)));
+}
+renderStatic();tick();setInterval(tick,1000);
