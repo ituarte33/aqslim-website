@@ -1,0 +1,10 @@
+{
+  "name":"AQSLIM Ayuno 36 Horas · Mónica",
+  "short_name":"AQSLIM Fast",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f4f0e8",
+  "theme_color":"#171512",
+  "description":"Piloto AQSLIM para seguimiento del ayuno semanal de 36 horas.",
+  "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
