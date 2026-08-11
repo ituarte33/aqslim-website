@@ -133,6 +133,17 @@ export function ChatWidget() {
     if (fullScreen) setOpen(true)
   }, [fullScreen])
 
+  // The full-screen patient chat owns the mobile viewport. Locking the page
+  // underneath prevents iOS from scrolling the portal header away when the
+  // text area receives focus.
+  useEffect(() => {
+    if (!fullScreen) return
+
+    window.scrollTo(0, 0)
+    document.body.classList.add('aqb-fullscreen-active')
+    return () => document.body.classList.remove('aqb-fullscreen-active')
+  }, [fullScreen])
+
   // Sync language with body class
   useEffect(() => {
     function sync() { setLang(getLang()) }

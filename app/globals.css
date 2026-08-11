@@ -780,6 +780,11 @@ nav { padding:0 20px; }
 .aqb-wrap--fullscreen.aqb-wrap--demo { top: 116px; }
 .aqb-wrap--fullscreen.aqb-wrap--open { top: 74px; left: 0; }
 .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 116px; }
+body.aqb-fullscreen-active {
+  height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 .aqb-wrap--fullscreen .aqb-panel {
   width: min(100%, 860px);
   height: 100%;

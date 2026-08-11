@@ -34,6 +34,12 @@ export function PortalShell({ firstName, initialLanguage, children, demo = false
   const basePath = demo ? '/my-aqslim/demo' : '/my-aqslim'
 
   useEffect(() => {
+    const savedLanguage = window.localStorage.getItem('myaq-language')
+    if (savedLanguage === 'es' || savedLanguage === 'en') setLanguage(savedLanguage)
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('myaq-language', language)
     document.body.classList.remove('marketing')
     document.body.classList.toggle('lang-es', language === 'es')
     document.body.classList.toggle('lang-en', language === 'en')
