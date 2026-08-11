@@ -64,6 +64,24 @@
 .topbarControls { gap: 13px; }
 .languageToggle { gap: 5px; color: var(--portal-dim); }
 
+.demoBanner {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 9px 18px;
+  border-bottom: 1px solid rgba(242, 207, 106, .32);
+  color: #17140c;
+  background: linear-gradient(100deg, #a87918, #f2d77a, #b48622);
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+
+.demoBanner strong { font-weight: 600; }
+.demoBanner span { opacity: .78; }
+
 .languageToggle button {
   border: 0;
   padding: 8px 3px;
@@ -427,6 +445,7 @@
   .buddyPanel > img { width: 108px; height: 108px; }
   .goldButton { font-size: 10px; padding-inline: 10px; }
   .navItem { font-size: 8px; }
+  .demoBanner { align-items: flex-start; flex-direction: column; gap: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

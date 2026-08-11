@@ -17,6 +17,7 @@ type Props = {
   firstName: string
   initialLanguage: 'es' | 'en'
   children: React.ReactNode
+  demo?: boolean
 }
 
 const navItems = [
@@ -26,9 +27,10 @@ const navItems = [
   { href: '/my-aqslim/materials', es: 'Materiales', en: 'Materials', icon: MaterialsIcon, pending: true },
 ]
 
-export function PortalShell({ firstName, initialLanguage, children }: Props) {
+export function PortalShell({ firstName, initialLanguage, children, demo = false }: Props) {
   const pathname = usePathname()
   const [language, setLanguage] = useState(initialLanguage)
+  const basePath = demo ? '/my-aqslim/demo' : '/my-aqslim'
 
   useEffect(() => {
     document.body.classList.remove('marketing')
@@ -45,7 +47,7 @@ export function PortalShell({ firstName, initialLanguage, children }: Props) {
   return (
     <div className={styles.portal} data-language={language}>
       <header className={styles.topbar}>
-        <Link href="/my-aqslim" className={styles.brand} aria-label="My AQSLIM">
+        <Link href={basePath} className={styles.brand} aria-label="My AQSLIM">
           <span className={styles.brandMark} aria-hidden="true">◈</span>
           <span>AQSLIM</span>
         </Link>
@@ -72,13 +74,23 @@ export function PortalShell({ firstName, initialLanguage, children }: Props) {
         </div>
       </header>
 
+      {demo ? (
+        <div className={styles.demoBanner} role="status">
+          <strong>{language === 'es' ? 'Vista de demostración' : 'Demo view'}</strong>
+          <span>{language === 'es' ? 'Los datos que aparecen son ficticios.' : 'The information shown is fictional.'}</span>
+        </div>
+      ) : null}
+
       <main className={styles.main}>{children}</main>
 
       <div className={styles.bottomNav} aria-label={language === 'es' ? 'Navegación principal' : 'Main navigation'}>
         {navItems.map(item => {
+          const itemPath = item.href === '/my-aqslim'
+            ? basePath
+            : item.href.replace('/my-aqslim', basePath)
           const active = item.href === '/my-aqslim'
-            ? pathname === item.href
-            : pathname.startsWith(item.href)
+            ? pathname === itemPath
+            : pathname.startsWith(itemPath)
           const Icon = item.icon
           if (item.pending) {
             return (
@@ -89,7 +101,7 @@ export function PortalShell({ firstName, initialLanguage, children }: Props) {
             )
           }
           return (
-            <Link key={item.href} href={item.href} className={`${styles.navItem} ${active ? styles.navActive : ''}`}>
+            <Link key={item.href} href={itemPath} className={`${styles.navItem} ${active ? styles.navActive : ''}`}>
               <Icon />
               <span>{item[language]}</span>
             </Link>
