@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     const consultas = idCliente ? await getConsultasByCliente(String(idCliente)) : []
     if (consultas.length === 0) redirect('/onboarding')
 
-    redirect(`/dashboard/${cliente.id}`)
+    redirect('/my-aqslim')
   }
 
   // Admin path

@@ -80,6 +80,7 @@ export interface Cliente {
     'Cita Agendada'?: boolean
     'Próxima Cita'?: string
     'Servicio Próxima Cita'?: string
+    'Plan AQSLIM'?: string[]
     [key: string]: unknown
   }
 }
@@ -470,6 +471,35 @@ export async function getConsultasByCliente(nombreCliente: string): Promise<Cons
   const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
   return data.records
+}
+
+// ---------- Plan AQSLIM ----------
+
+export interface PlanAqslim {
+  id: string
+  fields: {
+    'ID Plan'?: number
+    'ID Cliente'?: string[]
+    'Nombre Cliente'?: string
+    'Fecha Inicio Tratamiento'?: string
+    'Semanas Totales en Tratamiento'?: number
+    'Fase Actual'?: string
+    'Semana en Fase Actual'?: number
+    'Fecha Inicio Fase Actual'?: string
+    'Fecha Estimada Cambio de Fase'?: string
+    'Peso Inicio (kg)'?: number
+    'Peso Actual (kg)'?: number
+    'Peso Meta (kg)'?: number
+    'Total Bajado (kg)'?: number
+    '% Progreso hacia Meta'?: string
+    'Siguiente Fase'?: string[]
+    'Instrucciones Especiales'?: string
+    [key: string]: unknown
+  }
+}
+
+export async function getPlanById(id: string): Promise<PlanAqslim> {
+  return airtableFetch(`/Plan%20AQSLIM/${id}`)
 }
 
 // ---------- Suplementos ----------

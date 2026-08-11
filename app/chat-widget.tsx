@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -54,6 +55,8 @@ function detectState(text: string): BuddyState {
 }
 
 export function ChatWidget() {
+  const pathname                  = usePathname()
+  const inPatientPortal           = pathname.startsWith('/my-aqslim')
   const [open, setOpen]           = useState(false)
   const [lang, setLang]           = useState<'es' | 'en'>('es')
   const [buddyState, setBuddyState] = useState<BuddyState>('idle')
@@ -110,6 +113,13 @@ export function ChatWidget() {
       window.removeEventListener('aq-buddy', onEvent)
     }
   }, [setStateWithTimeout])
+
+  // Allow prominent portal actions to open the existing governed chat surface.
+  useEffect(() => {
+    function openChat() { setOpen(true) }
+    window.addEventListener('aq-buddy-open', openChat)
+    return () => window.removeEventListener('aq-buddy-open', openChat)
+  }, [])
 
   // Sync language with body class
   useEffect(() => {
@@ -212,7 +222,7 @@ export function ChatWidget() {
   }
 
   return (
-    <div className="aqb-wrap">
+    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
       {/* Mascot — always at top */}
       <button
