@@ -11,6 +11,9 @@ export const demoPatientPortalData: PatientPortalData = {
   phase: 'Jing',
   weekInPhase: 2,
   phaseStartDate: '2026-07-21T12:00:00.000Z',
+  estimatedPhaseChange: '2026-08-25T17:00:00.000Z',
+  nextPhase: 'Qi',
+  specialInstructions: 'Continúa con la guía de tu fase actual y lleva tus preguntas a tu próxima revisión.',
   nextReview: '2026-08-18T17:00:00.000Z',
   measurements: [
     { id: 'demo-1', date: '2026-07-07T17:00:00.000Z', weight: 198, source: 'AQSLIM (Consulta)' },

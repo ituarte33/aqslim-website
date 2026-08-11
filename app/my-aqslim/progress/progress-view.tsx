@@ -8,7 +8,6 @@ import {
   InfoIcon,
   ProgressIcon,
 } from '../portal-icons'
-import { OpenBuddyButton } from '../open-buddy-button'
 import { PortalShell } from '../portal-shell'
 import styles from '../portal.module.css'
 import { ProgressChart } from './progress-chart'
@@ -113,7 +112,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
           <a href="#historial"><ProgressIcon /><span>{es ? 'Ver historial de mediciones' : 'View measurement history'}</span></a>
           <a href="#tendencia"><ProgressIcon /><span>{es ? 'Ver tendencia detallada' : 'View detailed trend'}</span></a>
           <span><CalendarIcon /><span>{es ? 'Próxima revisión' : 'Next review'}<b>{formatDate(data.nextReview, data.language, false)}</b></span></span>
-          <OpenBuddyButton label={es ? 'Pregúntale a AQ Buddy' : 'Ask AQ Buddy'} />
+          <Link href={demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'} className={styles.buddyAction}><BuddyIcon /><span>{es ? 'Pregúntale a AQ Buddy' : 'Ask AQ Buddy'}</span></Link>
         </div>
       </section>
 

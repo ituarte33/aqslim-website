@@ -23,8 +23,9 @@ type Props = {
 const navItems = [
   { href: '/my-aqslim', es: 'Inicio', en: 'Home', icon: HomeIcon },
   { href: '/my-aqslim/progress', es: 'Progreso', en: 'Progress', icon: ProgressIcon },
-  { href: '/my-aqslim/plan', es: 'Mi Plan', en: 'My Plan', icon: PlanIcon, pending: true },
-  { href: '/my-aqslim/materials', es: 'Materiales', en: 'Materials', icon: MaterialsIcon, pending: true },
+  { href: '/my-aqslim/plan', es: 'Mi Plan', en: 'My Plan', icon: PlanIcon },
+  { href: '/my-aqslim/materials', es: 'Materiales', en: 'Materials', icon: MaterialsIcon },
+  { href: '/my-aqslim/buddy', es: 'AQ Buddy', en: 'AQ Buddy', icon: BuddyIcon },
 ]
 
 export function PortalShell({ firstName, initialLanguage, children, demo = false }: Props) {
@@ -39,10 +40,6 @@ export function PortalShell({ firstName, initialLanguage, children, demo = false
     document.documentElement.lang = language
     window.dispatchEvent(new CustomEvent('aqslim-lang', { detail: language }))
   }, [language])
-
-  function openBuddy() {
-    window.dispatchEvent(new CustomEvent('aq-buddy-open'))
-  }
 
   return (
     <div className={styles.portal} data-language={language}>
@@ -92,14 +89,6 @@ export function PortalShell({ firstName, initialLanguage, children, demo = false
             ? pathname === itemPath
             : pathname.startsWith(itemPath)
           const Icon = item.icon
-          if (item.pending) {
-            return (
-              <span key={item.href} className={`${styles.navItem} ${styles.navPending}`} aria-disabled="true">
-                <Icon />
-                <span>{item[language]}</span>
-              </span>
-            )
-          }
           return (
             <Link key={item.href} href={itemPath} className={`${styles.navItem} ${active ? styles.navActive : ''}`}>
               <Icon />
@@ -107,10 +96,6 @@ export function PortalShell({ firstName, initialLanguage, children, demo = false
             </Link>
           )
         })}
-        <button type="button" className={styles.navItem} onClick={openBuddy}>
-          <BuddyIcon />
-          <span>AQ Buddy</span>
-        </button>
       </div>
 
     </div>

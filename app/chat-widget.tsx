@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -56,8 +56,11 @@ function detectState(text: string): BuddyState {
 
 export function ChatWidget() {
   const pathname                  = usePathname()
+  const router                    = useRouter()
   const inPatientPortal           = pathname.startsWith('/my-aqslim')
-  const [open, setOpen]           = useState(false)
+  const fullScreen                = inPatientPortal && pathname.endsWith('/buddy')
+  const demo                      = pathname.startsWith('/my-aqslim/demo/')
+  const [open, setOpen]           = useState(fullScreen)
   const [lang, setLang]           = useState<'es' | 'en'>('es')
   const [buddyState, setBuddyState] = useState<BuddyState>('idle')
   const [bubble, setBubble]       = useState('')
@@ -120,6 +123,10 @@ export function ChatWidget() {
     window.addEventListener('aq-buddy-open', openChat)
     return () => window.removeEventListener('aq-buddy-open', openChat)
   }, [])
+
+  useEffect(() => {
+    if (fullScreen) setOpen(true)
+  }, [fullScreen])
 
   // Sync language with body class
   useEffect(() => {
@@ -221,13 +228,18 @@ export function ChatWidget() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
+  function closeChat() {
+    if (fullScreen) router.back()
+    else setOpen(false)
+  }
+
   return (
-    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${open ? ' aqb-wrap--open' : ''}`}>
+    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
       {/* Mascot — always at top */}
       <button
         className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
-        onClick={() => setOpen(v => !v)}
+        onClick={() => fullScreen ? undefined : setOpen(v => !v)}
         aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -276,7 +288,7 @@ export function ChatWidget() {
               >
                 A+
               </button>
-              <button className="aqb-panel-close" onClick={() => setOpen(false)} aria-label="Close">
+              <button className="aqb-panel-close" onClick={closeChat} aria-label="Close">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                   <path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>

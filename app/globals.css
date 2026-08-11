@@ -760,11 +760,7 @@ nav { padding:0 20px; }
   animation-delay: 1s;
 }
 .aqb-wrap > * { pointer-events: auto; }
-.aqb-wrap--portal:not(.aqb-wrap--open) {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
+.aqb-wrap--portal:not(.aqb-wrap--fullscreen) { display: none; }
 .aqb-wrap--portal.aqb-wrap--open {
   top: 90px;
   left: calc(50% - 180px);
@@ -772,6 +768,33 @@ nav { padding:0 20px; }
 .aqb-wrap--portal.aqb-wrap--open .aqb-mascot {
   display: none;
 }
+.aqb-wrap--fullscreen {
+  top: 74px;
+  right: 0;
+  bottom: 78px;
+  left: 0;
+  z-index: 44;
+  display: block;
+  animation: none;
+}
+.aqb-wrap--fullscreen.aqb-wrap--demo { top: 116px; }
+.aqb-wrap--fullscreen.aqb-wrap--open { top: 74px; left: 0; }
+.aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 116px; }
+.aqb-wrap--fullscreen .aqb-panel {
+  width: min(100%, 860px);
+  height: 100%;
+  max-height: none;
+  margin: 0 auto;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: 0 0 70px rgba(0,0,0,.38);
+}
+.aqb-wrap--fullscreen .aqb-panel-header { padding: 16px 20px; }
+.aqb-wrap--fullscreen .aqb-panel-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; letter-spacing: .04em; }
+.aqb-wrap--fullscreen .aqb-panel-subtitle { font-size: 11px; }
+.aqb-wrap--fullscreen .aqb-messages { padding: 20px; }
+.aqb-wrap--fullscreen .aqb-input-row { padding: 12px 18px max(12px, env(safe-area-inset-bottom)); }
 
 /* Chat panel */
 .aqb-panel {
@@ -1028,9 +1051,21 @@ nav { padding:0 20px; }
     right: 12px;
     left: 12px;
   }
+  .aqb-wrap--fullscreen.aqb-wrap--open {
+    top: 66px;
+    right: 0;
+    bottom: 78px;
+    left: 0;
+  }
+  .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 108px; }
   .aqb-wrap--portal.aqb-wrap--open .aqb-panel {
     width: calc(100vw - 24px);
     max-height: calc(100vh - 180px);
+  }
+  .aqb-wrap--fullscreen.aqb-wrap--open .aqb-panel {
+    width: 100%;
+    height: 100%;
+    max-height: none;
   }
 }
 

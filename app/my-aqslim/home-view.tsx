@@ -2,7 +2,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import { CalendarIcon, ChevronIcon, MaterialsIcon } from './portal-icons'
-import { OpenBuddyButton } from './open-buddy-button'
 import { PortalShell } from './portal-shell'
 import styles from './portal.module.css'
 
@@ -19,6 +18,10 @@ function formatDate(value: string | null, language: 'es' | 'en', options?: Intl.
 function formatWeight(value: number | null, unit: 'lb' | 'kg') {
   if (value === null) return '—'
   return `${Math.round(value * 10) / 10} ${unit}`
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 type HomeViewProps = {
@@ -44,7 +47,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
     <PortalShell firstName={data.firstName} initialLanguage={data.language} demo={demo}>
       <section className={styles.welcome}>
         <p>{es ? `Hola, ${data.firstName}` : `Hello, ${data.firstName}`}</p>
-        <span>{today}</span>
+        <span>{capitalize(today)}</span>
       </section>
 
       <section className={`${styles.panel} ${styles.phasePanel}`}>
@@ -56,7 +59,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
               ? `${es ? 'Semana' : 'Week'} ${data.weekInPhase}`
               : (es ? 'Semana por confirmar' : 'Week to be confirmed')}
           </p>
-          <span className={styles.phaseLinkText}>{es ? 'Ver mi plan' : 'View my plan'} <ChevronIcon /></span>
+          <Link href={demo ? '/my-aqslim/demo/plan' : '/my-aqslim/plan'} className={styles.phaseLinkText}>{es ? 'Ver mi plan' : 'View my plan'} <ChevronIcon /></Link>
         </div>
         <div className={styles.phaseSeal} aria-hidden="true">
           <span>{phase.slice(0, 1).toUpperCase()}</span>
@@ -103,10 +106,11 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
         <div>
           <p className={styles.eyebrow}>AQ Buddy</p>
           <h2>{es ? '¿Cómo puedo ayudarte hoy?' : 'How can I help you today?'}</h2>
-          <OpenBuddyButton label={es ? 'Hablar con AQ Buddy' : 'Talk to AQ Buddy'} />
+          <Link href={demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'} className={styles.goldButton}>{es ? 'Hablar con AQ Buddy' : 'Talk to AQ Buddy'}</Link>
         </div>
       </section>
 
+      <Link href={demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'} className={styles.materialsPreviewLink}>
       <section className={styles.materialsPreview}>
         <div className={styles.sectionHeading}>
           <h2>{es ? 'Tus materiales' : 'Your materials'}</h2>
@@ -117,6 +121,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
           <div><MaterialsIcon /><span><b>{es ? 'Manual del Participante' : 'Participant Manual'}</b><small>{es ? 'Manual' : 'Manual'}</small></span></div>
         </div>
       </section>
+      </Link>
     </PortalShell>
   )
 }

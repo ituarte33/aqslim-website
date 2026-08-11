@@ -25,6 +25,9 @@ export type PatientPortalData = {
   phase: string | null
   weekInPhase: number | null
   phaseStartDate: string | null
+  estimatedPhaseChange: string | null
+  nextPhase: string | null
+  specialInstructions: string | null
   nextReview: string | null
   measurements: PortalMeasurement[]
   initialWeight: number | null
@@ -121,6 +124,9 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
         ? latestConsulta.fields['Semana en Fase Actual']
         : null),
     phaseStartDate: plan?.fields['Fecha Inicio Fase Actual'] ?? null,
+    estimatedPhaseChange: plan?.fields['Fecha Estimada Cambio de Fase'] ?? null,
+    nextPhase: asString(plan?.fields['Siguiente Fase']),
+    specialInstructions: plan?.fields['Instrucciones Especiales']?.trim() || null,
     nextReview: cliente.fields['Próxima Cita']
       ?? latestConsulta?.fields['Próxima Cita']
       ?? null,
