@@ -898,6 +898,36 @@ nav { padding:0 20px; }
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 8px 8px 8px 2px;
 }
+.aqb-rich-text { white-space: normal; }
+.aqb-rich-text > :first-child { margin-top: 0; }
+.aqb-rich-text > :last-child { margin-bottom: 0; }
+.aqb-rich-text p { margin: 0 0 .85em; }
+.aqb-rich-text h3 {
+  margin: 1.05em 0 .45em;
+  color: #E2C87A;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.aqb-rich-text ul,
+.aqb-rich-text ol { margin: .45em 0 .9em; padding-left: 1.35em; }
+.aqb-rich-text li { margin: .35em 0; padding-left: .15em; }
+.aqb-rich-text strong { color: #FFF4C6; font-weight: 600; }
+.aqb-starter {
+  align-self: flex-start;
+  max-width: min(88%, 390px);
+  border: 1px solid rgba(201,168,76,.4);
+  border-radius: 999px;
+  padding: 9px 13px;
+  color: #E2C87A;
+  background: rgba(201,168,76,.07);
+  font: 500 12px/1.4 'Montserrat', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.aqb-starter:hover,
+.aqb-starter:focus-visible { border-color: #E2C87A; background: rgba(201,168,76,.13); }
 .aqb-dot {
   display: inline-block;
   width: 6px; height: 6px;

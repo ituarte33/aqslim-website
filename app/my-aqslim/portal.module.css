@@ -10,6 +10,7 @@
   --portal-border: rgba(212, 167, 44, .42);
   --portal-line: rgba(255, 255, 255, .09);
   min-height: 100vh;
+  overflow-x: hidden;
   color: var(--portal-text);
   background:
     radial-gradient(circle at 88% 8%, rgba(212, 167, 44, .07), transparent 27rem),
@@ -196,7 +197,7 @@
 .nextStep > div:last-child { display: grid; gap: 7px; }
 .nextStep strong { font-size: 17px; font-weight: 400; line-height: 1.4; }
 .nextStep span { padding-top: 8px; border-top: 1px solid var(--portal-line); color: var(--portal-muted); font-size: 13px; }
-.nextStep b { color: var(--portal-gold-light); font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 400; text-transform: capitalize; }
+.nextStep b { color: var(--portal-gold-light); font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 400; }
 
 .progressSummary {
   display: grid;
@@ -260,7 +261,7 @@
 .materialsPreviewLink { display: block; color: inherit; text-decoration: none; }
 .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 13px; }
 .sectionHeading h2 { margin: 0; color: var(--portal-gold-light); font-size: 14px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
-.sectionHeading span { color: var(--portal-muted); font-size: 11px; }
+.sectionHeading span { flex: 0 0 auto; color: var(--portal-muted); font-size: 11px; white-space: nowrap; }
 .materialRows { overflow: hidden; border: 1px solid rgba(212, 167, 44, .28); border-radius: 16px; background: rgba(255, 255, 255, .025); }
 .materialRows > div { display: flex; align-items: center; gap: 13px; padding: 15px 17px; }
 .materialRows > div + div { border-top: 1px solid var(--portal-line); }
@@ -417,7 +418,7 @@
 .timelineIcon svg { width: 20px; }
 .timelineRows p { display: grid; gap: 4px; margin: 0; }
 .timelineRows small { color: var(--portal-muted); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
-.timelineRows strong { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 400; text-transform: capitalize; }
+.timelineRows strong { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 400; }
 .timelineRows em { color: var(--portal-muted); font-size: 10px; font-style: normal; }
 .instructionsPanel > p:last-child { margin: 0; color: var(--portal-text); font-family: 'Playfair Display', serif; font-size: 20px; line-height: 1.65; }
 .planActions { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 18px 0; }

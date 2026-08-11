@@ -117,7 +117,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
           <span>{es ? 'Vista previa' : 'Preview'}</span>
         </div>
         <div className={styles.materialRows}>
-          <div><MaterialsIcon /><span><b>{phase} Quick Start</b><small>{es ? 'Guía' : 'Guide'}</small></span></div>
+          <div><MaterialsIcon /><span><b>{es ? `Guía ${phase}` : `${phase} Guide`}</b><small>{es ? 'Guía de fase' : 'Phase guide'}</small></span></div>
           <div><MaterialsIcon /><span><b>{es ? 'Manual del Participante' : 'Participant Manual'}</b><small>{es ? 'Manual' : 'Manual'}</small></span></div>
         </div>
       </section>

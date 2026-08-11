@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { ChatMessage } from './chat-message'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -26,6 +27,7 @@ const LABELS = {
     placeholder: 'Escribe tu pregunta...',
     send: 'Enviar',
     welcome: '¡Hola! Soy AQ Buddy, tu asistente de bienestar AQSLIM. ¿En qué te puedo ayudar hoy?',
+    starter: 'Hola, ¿qué puedes hacer por mí?',
     thinking: 'Pensando...',
     error: 'Ocurrió un error. Intenta de nuevo.',
   },
@@ -35,6 +37,7 @@ const LABELS = {
     placeholder: 'Type your question...',
     send: 'Send',
     welcome: "Hi! I'm AQ Buddy, your AQSLIM wellness assistant. How can I help you today?",
+    starter: 'Hi, what can you help me with?',
     thinking: 'Thinking...',
     error: 'An error occurred. Please try again.',
   },
@@ -75,7 +78,9 @@ export function ChatWidget() {
   function increaseFontSize() { setFontSize(prev => Math.min(MAX_FONT, prev + 3)) }
   function decreaseFontSize() { setFontSize(prev => Math.max(MIN_FONT, prev - 3)) }
 
-  const bottomRef      = useRef<HTMLDivElement>(null)
+  const messagesRef    = useRef<HTMLDivElement>(null)
+  const latestUserRef  = useRef<HTMLDivElement>(null)
+  const pendingUserScrollRef = useRef(false)
   const inputRef       = useRef<HTMLTextAreaElement>(null)
   const idleTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const buddyStateRef  = useRef<BuddyState>('idle')
@@ -162,10 +167,24 @@ export function ChatWidget() {
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to bottom
+  // Keep a new question visible while a long streamed answer grows below it.
+  // Scrolling the message container directly also prevents the page-level demo
+  // banner from being pushed out of view by Element.scrollIntoView().
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streaming])
+    const container = messagesRef.current
+    if (!container) return
+
+    if (pendingUserScrollRef.current && latestUserRef.current) {
+      const top = latestUserRef.current.offsetTop - container.offsetTop - 12
+      container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      pendingUserScrollRef.current = false
+      return
+    }
+
+    if (messages.length === 1) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [messages.length])
 
   // Focus input on open
   useEffect(() => {
@@ -181,6 +200,7 @@ export function ChatWidget() {
 
     const userMsg: Message = { role: 'user', content: text }
     const history = [...messages, userMsg]
+    pendingUserScrollRef.current = true
     setMessages(history)
     setStreaming(true)
     setBuddyState('thinking')
@@ -296,19 +316,34 @@ export function ChatWidget() {
             </div>
           </div>
 
-          <div className="aqb-messages">
+          <div ref={messagesRef} className="aqb-messages">
             {messages.map((m, i) => (
-              <div key={i} className={`aqb-msg-row ${m.role}`}>
+              <div
+                key={i}
+                ref={m.role === 'user' ? latestUserRef : undefined}
+                className={`aqb-msg-row ${m.role}`}
+              >
                 <div className={`aqb-msg ${m.role}`} style={{ fontSize }}>
                   {m.content
-                    ? m.content
+                    ? m.role === 'assistant' ? <ChatMessage content={m.content} /> : m.content
                     : (streaming && i === messages.length - 1)
                       ? <><span className="aqb-dot" /><span className="aqb-dot" /><span className="aqb-dot" /></>
                       : null}
                 </div>
               </div>
             ))}
-            <div ref={bottomRef} />
+            {messages.length === 1 && !streaming ? (
+              <button
+                type="button"
+                className="aqb-starter"
+                onClick={() => {
+                  setInput(t.starter)
+                  inputRef.current?.focus()
+                }}
+              >
+                {t.starter}
+              </button>
+            ) : null}
           </div>
 
           <div className="aqb-input-row">
