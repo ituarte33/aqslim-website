@@ -143,6 +143,39 @@ export async function getClientes(): Promise<Cliente[]> {
   return records
 }
 
+export type ClientesPage = {
+  records: Cliente[]
+  offset: string | null
+}
+
+export async function getClientesPage({
+  offset,
+  query,
+  pageSize = 100,
+}: {
+  offset?: string | null
+  query?: string
+  pageSize?: number
+} = {}): Promise<ClientesPage> {
+  const params = new URLSearchParams({ pageSize: String(Math.min(Math.max(pageSize, 1), 100)) })
+  if (offset) params.set('offset', offset)
+
+  const normalizedQuery = query?.trim().replace(/[\u0000-\u001F\u007F]/g, '')
+  if (normalizedQuery) {
+    const escapedQuery = escapeAirtableString(normalizedQuery)
+    params.set(
+      'filterByFormula',
+      `OR(SEARCH("${escapedQuery.toLowerCase()}",LOWER({Nombre Completo})),SEARCH("${escapedQuery.toLowerCase()}",LOWER({Email})),SEARCH("${escapedQuery}",{Teléfono}&""))`,
+    )
+  }
+
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?${params}`)
+  return {
+    records: data.records ?? [],
+    offset: typeof data.offset === 'string' ? data.offset : null,
+  }
+}
+
 function escapeAirtableString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
