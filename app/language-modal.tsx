@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 const LANG_KEY = 'aqslim-lang'
 
 export function LanguageModal() {
+  const pathname = usePathname()
   const [visible, setVisible] = useState(false)
   const [animateIn, setAnimateIn] = useState(false)
 
@@ -25,7 +27,7 @@ export function LanguageModal() {
     setTimeout(() => setVisible(false), 300)
   }
 
-  if (!visible) return null
+  if (!visible || pathname.startsWith('/my-aqslim')) return null
 
   return (
     <div
