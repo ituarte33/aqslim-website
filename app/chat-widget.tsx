@@ -61,6 +61,7 @@ export function ChatWidget() {
   const pathname                  = usePathname()
   const router                    = useRouter()
   const inPatientPortal           = pathname.startsWith('/my-aqslim')
+  const inDashboard               = pathname.startsWith('/dashboard')
   const fullScreen                = inPatientPortal && pathname.endsWith('/buddy')
   const demo                      = pathname.startsWith('/my-aqslim/demo/')
   const [open, setOpen]           = useState(fullScreen)
@@ -265,7 +266,7 @@ export function ChatWidget() {
   }
 
   return (
-    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
+    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
       {/* Mascot — always at top */}
       <button
