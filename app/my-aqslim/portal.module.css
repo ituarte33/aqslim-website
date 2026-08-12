@@ -444,6 +444,28 @@
 .buddyPageAnchor { min-height: calc(100vh - 260px); }
 .buddyAction { font-family: Montserrat, sans-serif; }
 
+.buddyLoading {
+  position: fixed;
+  inset: 0 0 78px;
+  z-index: 44;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  color: var(--portal-text);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(212,167,44,.13), transparent 20rem),
+    #090a09;
+  text-align: center;
+}
+.buddyLoadingDemo { top: 42px; }
+.buddyLoading img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 0 22px rgba(212,167,44,.28)); }
+.buddyLoading strong { color: var(--portal-gold-light); font-family: 'Playfair Display', serif; font-size: 25px; font-weight: 400; }
+.buddyLoading span { color: var(--portal-muted); font-size: 12px; }
+.buddyLoading i { width: 90px; height: 2px; overflow: hidden; margin-top: 8px; background: rgba(212,167,44,.18); }
+.buddyLoading i::after { content: ''; display: block; width: 38px; height: 100%; background: var(--portal-gold-light); animation: buddyLoading 1s ease-in-out infinite alternate; }
+@keyframes buddyLoading { from { transform: translateX(0); } to { transform: translateX(52px); } }
+
 @media (min-width: 600px) {
   .topbar { padding: 0 28px; }
   .accountName { display: inline; }

@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import { ChevronIcon, InfoIcon, MaterialsIcon } from '../portal-icons'
 import { PortalShell } from '../portal-shell'
@@ -13,11 +15,16 @@ type MaterialsViewProps = {
 }
 
 export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
+  const router = useRouter()
+  const [openingBuddy, setOpeningBuddy] = useState(false)
   const [language] = usePortalLanguage(data.language)
   const es = language === 'es'
   const phase = data.phase || (es ? 'Tu fase' : 'Your phase')
   const week = data.weekInPhase
   const buddyPath = demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'
+  useEffect(() => {
+    router.prefetch(buddyPath)
+  }, [buddyPath, router])
   const items = [
     {
       title: es ? `Guía ${phase}` : `${phase} Guide`,
@@ -67,12 +74,22 @@ export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
 
       <div className={styles.materialHelp}>
         <p>{es ? '¿Necesitas ayuda con uno de tus materiales?' : 'Need help with one of your materials?'}</p>
-        <Link href={buddyPath} className={styles.goldButton}>{es ? 'Preguntar a AQ Buddy' : 'Ask AQ Buddy'} <ChevronIcon /></Link>
+        <Link
+          href={buddyPath}
+          className={styles.goldButton}
+          aria-busy={openingBuddy}
+          onClick={() => setOpeningBuddy(true)}
+        >
+          {openingBuddy
+            ? (es ? 'Abriendo AQ Buddy…' : 'Opening AQ Buddy…')
+            : (es ? 'Preguntar a AQ Buddy' : 'Ask AQ Buddy')}
+          <ChevronIcon />
+        </Link>
       </div>
 
       <div className={styles.dataNotice}>
         <InfoIcon />
-        <p>{es ? 'Esta biblioteca solo muestra materiales asignados a tu fase. Los archivos descargables se habilitarán desde el registro de contenido gobernado.' : 'This library shows only materials assigned to your phase. Downloadable files will be enabled from the governed content registry.'}</p>
+        <p>{es ? 'Esta biblioteca muestra los materiales asignados a tu fase. Los archivos descargables aparecerán aquí cuando se agreguen a tu plan.' : 'This library shows the materials assigned to your phase. Downloadable files will appear here when they are added to your plan.'}</p>
       </div>
     </PortalShell>
   )

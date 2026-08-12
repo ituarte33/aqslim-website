@@ -798,6 +798,14 @@ body.aqb-fullscreen-active {
 .aqb-wrap--fullscreen .aqb-panel-header { padding: 16px 20px; }
 .aqb-wrap--fullscreen .aqb-panel-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; letter-spacing: .04em; }
 .aqb-wrap--fullscreen .aqb-panel-subtitle { font-size: 11px; }
+.aqb-panel-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.aqb-header-avatar {
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(201,168,76,.38));
+}
 .aqb-wrap--fullscreen .aqb-messages { padding: 20px; }
 .aqb-wrap--fullscreen .aqb-input-row { padding: 12px 18px max(12px, env(safe-area-inset-bottom)); }
 
@@ -1093,6 +1101,7 @@ body.aqb-fullscreen-active {
     left: 0;
   }
   .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 42px; }
+  .aqb-header-avatar { width: 48px; height: 48px; flex-basis: 48px; }
   .aqb-wrap--portal.aqb-wrap--open .aqb-panel {
     width: calc(100vw - 24px);
     max-height: calc(100vh - 180px);

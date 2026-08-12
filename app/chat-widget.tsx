@@ -298,9 +298,15 @@ export function ChatWidget() {
       {open && (
         <div className="aqb-panel">
           <div className="aqb-panel-header">
-            <div>
-              <div className="aqb-panel-title">{t.title}</div>
-              <div className="aqb-panel-subtitle">{t.subtitle}</div>
+            <div className="aqb-panel-identity">
+              {fullScreen ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={STATE_IMAGES[buddyState]} alt="AQ Buddy" className="aqb-header-avatar" />
+              ) : null}
+              <div>
+                <div className="aqb-panel-title">{t.title}</div>
+                <div className="aqb-panel-subtitle">{t.subtitle}</div>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button
