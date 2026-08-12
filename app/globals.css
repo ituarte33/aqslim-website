@@ -769,7 +769,7 @@ nav { padding:0 20px; }
   display: none;
 }
 .aqb-wrap--fullscreen {
-  top: 74px;
+  top: 0;
   right: 0;
   bottom: 78px;
   left: 0;
@@ -777,9 +777,9 @@ nav { padding:0 20px; }
   display: block;
   animation: none;
 }
-.aqb-wrap--fullscreen.aqb-wrap--demo { top: 116px; }
-.aqb-wrap--fullscreen.aqb-wrap--open { top: 74px; left: 0; }
-.aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 116px; }
+.aqb-wrap--fullscreen.aqb-wrap--demo { top: 42px; }
+.aqb-wrap--fullscreen.aqb-wrap--open { top: 0; left: 0; }
+.aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 42px; }
 body.aqb-fullscreen-active {
   height: 100svh;
   overflow: hidden;
@@ -1087,12 +1087,12 @@ body.aqb-fullscreen-active {
     left: 12px;
   }
   .aqb-wrap--fullscreen.aqb-wrap--open {
-    top: 66px;
+    top: 0;
     right: 0;
     bottom: 78px;
     left: 0;
   }
-  .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 108px; }
+  .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 42px; }
   .aqb-wrap--portal.aqb-wrap--open .aqb-panel {
     width: calc(100vw - 24px);
     max-height: calc(100vh - 180px);
@@ -1102,6 +1102,10 @@ body.aqb-fullscreen-active {
     height: 100%;
     max-height: none;
   }
+}
+
+@media (max-width: 390px) {
+  .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 50px; }
 }
 
 /* ── Food Scanner Page ───────────────────────────────────────── */

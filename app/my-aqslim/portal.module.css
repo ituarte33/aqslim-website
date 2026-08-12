@@ -83,6 +83,9 @@
 .demoBanner strong { font-weight: 600; }
 .demoBanner span { opacity: .78; }
 
+.buddyPortal .topbar { display: none; }
+.buddyPortal .main { padding: 0; }
+
 .languageToggle button {
   border: 0;
   padding: 8px 3px;
@@ -490,7 +493,7 @@
   .buddyPanel > img { width: 108px; height: 108px; }
   .goldButton { font-size: 10px; padding-inline: 10px; }
   .navItem { font-size: 8px; }
-  .demoBanner { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .demoBanner { min-height: 50px; align-items: flex-start; flex-direction: column; gap: 2px; }
 }
 
 @media (max-width: 600px) {

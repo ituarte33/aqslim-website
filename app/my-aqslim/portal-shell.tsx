@@ -32,6 +32,7 @@ export function PortalShell({ firstName, initialLanguage, children, demo = false
   const pathname = usePathname()
   const [language, setLanguage] = useState(initialLanguage)
   const basePath = demo ? '/my-aqslim/demo' : '/my-aqslim'
+  const isBuddyPage = pathname.endsWith('/buddy')
 
   useEffect(() => {
     const savedLanguage = window.localStorage.getItem('myaq-language')
@@ -48,7 +49,7 @@ export function PortalShell({ firstName, initialLanguage, children, demo = false
   }, [language])
 
   return (
-    <div className={styles.portal} data-language={language}>
+    <div className={`${styles.portal} ${isBuddyPage ? styles.buddyPortal : ''}`} data-language={language}>
       <header className={styles.topbar}>
         <Link href={basePath} className={styles.brand} aria-label="My AQSLIM">
           <span className={styles.brandMark} aria-hidden="true">◈</span>
