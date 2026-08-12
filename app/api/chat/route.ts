@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { AuthorizationError, requireCapability } from '@/lib/auth'
 import { SYSTEM_PROMPT } from './system-prompt'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -139,6 +140,13 @@ function breastfeedingSafetyBlockFor(text: string) {
 }
 
 export async function POST(req: Request) {
+  try {
+    await requireCapability('buddy:chat')
+  } catch (error) {
+    const status = error instanceof AuthorizationError && error.code === 'FORBIDDEN' ? 403 : 401
+    return Response.json({ error: 'Unauthorized' }, { status })
+  }
+
   const { messages }: { messages: ChatMessage[] } = await req.json()
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')

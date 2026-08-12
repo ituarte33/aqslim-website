@@ -2,12 +2,11 @@ import 'server-only'
 
 import { cache } from 'react'
 import {
-  getClienteByEmail,
   getConsultasByCliente,
   getPlanById,
   type Consulta,
 } from '@/lib/airtable'
-import { getUserEmail } from '@/lib/auth'
+import { AuthorizationError, getOwnPatient, requireCapability } from '@/lib/auth'
 
 export type PortalMeasurement = {
   id: string
@@ -64,11 +63,14 @@ function measurementFromConsulta(
 }
 
 export const getPatientPortalData = cache(async (): Promise<PatientPortalData | null> => {
-  const email = await getUserEmail()
-  if (!email) return null
-
-  const cliente = await getClienteByEmail(email)
-  if (!cliente) return null
+  await requireCapability('portal:read:self')
+  let cliente
+  try {
+    cliente = await getOwnPatient()
+  } catch (error) {
+    if (error instanceof AuthorizationError && error.code === 'PATIENT_NOT_FOUND') return null
+    throw error
+  }
 
   const clienteNumber = cliente.fields['ID Cliente']
   const planId = cliente.fields['Plan AQSLIM']?.[0]
@@ -109,7 +111,7 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
     : null
 
   const latestConsulta = consultas[0]
-  const fullName = cliente.fields['Nombre Completo']?.trim() || email
+  const fullName = cliente.fields['Nombre Completo']?.trim() || 'Paciente AQSLIM'
   const preferredLanguage = String(cliente.fields['Idioma Preferido'] ?? '').toLowerCase()
 
   return {

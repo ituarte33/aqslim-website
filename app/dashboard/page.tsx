@@ -1,7 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClientes, getClienteByEmail, getConsultasByCliente, createProspecto, getClientesConCita, getConsultasRevenueSummary } from '@/lib/airtable'
-import { getRole, getUserEmail } from '@/lib/auth'
+import { getClientes, getConsultasByCliente, createProspecto, getClientesConCita, getConsultasRevenueSummary } from '@/lib/airtable'
+import { AuthorizationError, getOwnPatient, requireActor, requireCapability } from '@/lib/auth'
 import { getMonthlyRevenue, getTodaysBookingCount } from '@/lib/square'
 import { DashboardClient } from './dashboard-client'
 
@@ -9,13 +9,18 @@ export default async function DashboardPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const role = await getRole()
+  const actor = await requireActor()
+  const role = actor.role
 
   if (role === 'patient') {
-    const email = await getUserEmail()
-    if (!email) redirect('/sign-in')
-
-    const cliente = await getClienteByEmail(email)
+    const email = actor.email
+    let cliente
+    try {
+      cliente = await getOwnPatient()
+    } catch (error) {
+      if (!(error instanceof AuthorizationError) || error.code !== 'PATIENT_NOT_FOUND') throw error
+      cliente = null
+    }
 
     if (!cliente) {
       // First login — create record and go straight to onboarding
@@ -34,6 +39,7 @@ export default async function DashboardPage() {
   }
 
   // Admin path
+  await requireCapability('patients:read:any')
   const user = await currentUser()
   let patients: Awaited<ReturnType<typeof getClientes>> = []
   let upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>> = []

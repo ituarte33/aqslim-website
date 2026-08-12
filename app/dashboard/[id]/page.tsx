@@ -8,7 +8,7 @@ import {
   type Consulta,
   type CuestionarioSintoma,
 } from '@/lib/airtable'
-import { getRole, getUserEmail } from '@/lib/auth'
+import { requireActor, requireCapability, requirePatientOwnership } from '@/lib/auth'
 import { PatientDetailClient } from './patient-detail-client'
 
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +16,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
   if (!userId) redirect('/sign-in')
 
   const { id } = await params
-  const role = await getRole()
+  const actor = await requireActor()
 
   let patient: Cliente | null = null
   let consultations: Consulta[] = []
@@ -24,11 +24,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
   let error: string | null = null
 
   try {
-    patient = await getClienteById(id)
-
-    if (role === 'patient') {
-      const email = await getUserEmail()
-      if (!email || patient.fields['Email'] !== email) notFound()
+    if (actor.role === 'admin') {
+      await requireCapability('patients:read:any')
+      patient = await getClienteById(id)
+    } else {
+      patient = await requirePatientOwnership(id, 'portal:read:self')
     }
 
     const nombreCliente = patient.fields['Nombre Completo'] ?? ''
@@ -39,6 +39,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       ])
     }
   } catch (e) {
+    if (e instanceof Error && e.name === 'AuthorizationError') notFound()
     error = e instanceof Error ? e.message : String(e)
   }
 
@@ -48,7 +49,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       consultations={consultations}
       cuestionarios={cuestionarios}
       error={error}
-      isAdmin={role === 'admin'}
+      isAdmin={actor.role === 'admin'}
     />
   )
 }

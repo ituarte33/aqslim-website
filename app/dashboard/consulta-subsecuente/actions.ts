@@ -5,18 +5,23 @@ import {
   getConsultasByCliente, getCuestionariosByCliente,
   type Consulta, type CuestionarioSintoma,
 } from '@/lib/airtable'
+import { requireCapability } from '@/lib/auth'
 
 export async function fetchPatientConsultations(nombreCliente: string): Promise<Consulta[]> {
+  await requireCapability('consultations:read:any')
   if (!nombreCliente) return []
   return getConsultasByCliente(nombreCliente)
 }
 
 export async function fetchPatientCuestionarios(nombreCliente: string): Promise<CuestionarioSintoma[]> {
+  await requireCapability('consultations:read:any')
   if (!nombreCliente) return []
   return getCuestionariosByCliente(nombreCliente)
 }
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
+  await requireCapability('consultations:write:any')
+
   const clienteRecordId = (formData.get('clienteRecordId') as string).trim()
   const fechaConsulta   = (formData.get('fechaConsulta')   as string).trim()
   const nivelEnergia    = (formData.get('nivelEnergia')    as string | null) ?? ''

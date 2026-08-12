@@ -40,12 +40,14 @@ async function airtableFetch(path: string, options?: RequestInit) {
     cache: 'no-store',
   })
   if (!res.ok) {
-    const text = await res.text()
     const method = options?.method ?? 'GET'
-    console.error('[airtable] error', method, path)
-    if (options?.body) console.error('[airtable] request body:', options.body)
-    console.error('[airtable] response:', res.status, text)
-    throw new Error(`Airtable ${res.status}: ${text}`)
+    const correlationId = crypto.randomUUID()
+    console.error('[airtable] provider_request_failed', {
+      correlationId,
+      method,
+      status: res.status,
+    })
+    throw new Error(`Airtable request failed (${correlationId})`)
   }
   return res.json()
 }
@@ -141,10 +143,20 @@ export async function getClientes(): Promise<Cliente[]> {
   return records
 }
 
+function escapeAirtableString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export async function getClientesByEmail(email: string): Promise<Cliente[]> {
+  const normalizedEmail = escapeAirtableString(email.trim().toLowerCase())
+  const formula = encodeURIComponent(`LOWER({Email}) = "${normalizedEmail}"`)
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}&maxRecords=2`)
+  return data.records ?? []
+}
+
 export async function getClienteByEmail(email: string): Promise<Cliente | null> {
-  const formula = encodeURIComponent(`{Email} = "${email}"`)
-  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}`)
-  return data.records[0] ?? null
+  const records = await getClientesByEmail(email)
+  return records.length === 1 ? records[0] : null
 }
 
 export async function getClienteByNombre(nombre: string): Promise<Cliente | null> {

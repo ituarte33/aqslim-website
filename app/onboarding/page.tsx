@@ -1,19 +1,27 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClienteByEmail, hasCuestionario, hasConsulta } from '@/lib/airtable'
+import { hasCuestionario, hasConsulta } from '@/lib/airtable'
 import { hasUpcomingBookingByEmail } from '@/lib/square'
+import { AuthorizationError, getOwnPatient, requireActor } from '@/lib/auth'
 import { OnboardingClient } from './onboarding-client'
 
 export default async function OnboardingPage() {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
-
+  let actor
+  try {
+    actor = await requireActor()
+  } catch (error) {
+    if (error instanceof AuthorizationError && error.code === 'UNAUTHENTICATED') redirect('/sign-in')
+    throw error
+  }
   const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-  if (!email) redirect('/sign-in')
-
-  const cliente = await getClienteByEmail(email)
-  if (!cliente) redirect('/dashboard')
+  const email = actor.email
+  let cliente
+  try {
+    cliente = await getOwnPatient()
+  } catch (error) {
+    if (error instanceof AuthorizationError && error.code === 'PATIENT_NOT_FOUND') redirect('/dashboard')
+    throw error
+  }
 
   const profileFilled  = cliente.fields['He leído y acepto los términos anteriores'] === true
   const airtableBooked = cliente.fields['Cita Agendada'] === true
