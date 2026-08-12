@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
 import { MyAqslimAuthShell } from '../auth-shell'
+import { usePortalLanguage } from '../use-portal-language'
 import styles from '../auth.module.css'
 
 type Props = {
@@ -13,13 +13,13 @@ type Props = {
 }
 
 export function WelcomeView({ firstName, initialLanguage, destination = '/my-aqslim', demo = false }: Props) {
-  const [language, setLanguage] = useState(initialLanguage)
+  const [language, setLanguage] = usePortalLanguage(initialLanguage)
   const es = language === 'es'
 
   return (
     <MyAqslimAuthShell>
       <section className={styles.welcomeCard} aria-labelledby="welcome-title">
-        <h1 id="welcome-title">{es ? `Bienvenido, ${firstName}` : `Welcome, ${firstName}`}</h1>
+        <h1 id="welcome-title">{es ? `Hola, ${firstName}` : `Hello, ${firstName}`}</h1>
         <p>
           {es
             ? 'Este es tu espacio personal para acompañarte entre consultas, entender tu plan y seguir tu progreso.'
@@ -41,12 +41,15 @@ export function WelcomeView({ firstName, initialLanguage, destination = '/my-aqs
         <Link
           href={destination}
           className={styles.continueButton}
-          onClick={() => window.localStorage.setItem('myaq-language', language)}
         >
           {es ? 'Entrar a My AQSLIM' : 'Enter My AQSLIM'}
         </Link>
       </section>
-      {demo ? <p className={styles.demoBanner}>Vista de demostración · Los datos son ficticios.</p> : null}
+      {demo ? (
+        <p className={styles.demoBanner}>
+          {es ? 'Vista de demostración · Los datos son ficticios.' : 'Demo view · The information is fictional.'}
+        </p>
+      ) : null}
     </MyAqslimAuthShell>
   )
 }

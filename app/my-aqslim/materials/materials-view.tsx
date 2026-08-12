@@ -1,7 +1,10 @@
+'use client'
+
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import { ChevronIcon, InfoIcon, MaterialsIcon } from '../portal-icons'
 import { PortalShell } from '../portal-shell'
+import { usePortalLanguage } from '../use-portal-language'
 import styles from '../portal.module.css'
 
 type MaterialsViewProps = {
@@ -10,7 +13,8 @@ type MaterialsViewProps = {
 }
 
 export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
-  const es = data.language === 'es'
+  const [language] = usePortalLanguage(data.language)
+  const es = language === 'es'
   const phase = data.phase || (es ? 'Tu fase' : 'Your phase')
   const week = data.weekInPhase
   const buddyPath = demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'

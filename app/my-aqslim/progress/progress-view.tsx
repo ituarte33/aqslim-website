@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import {
@@ -9,6 +11,7 @@ import {
   ProgressIcon,
 } from '../portal-icons'
 import { PortalShell } from '../portal-shell'
+import { usePortalLanguage } from '../use-portal-language'
 import styles from '../portal.module.css'
 import { ProgressChart } from './progress-chart'
 
@@ -27,13 +30,22 @@ function formatWeight(value: number | null, unit: 'lb' | 'kg') {
   return `${Math.round(value * 10) / 10} ${unit}`
 }
 
+function formatSource(source: string | undefined, language: 'es' | 'en', demo: boolean) {
+  if (!source) return language === 'es' ? 'Origen no disponible' : 'Source unavailable'
+  if (demo && source === 'AQSLIM (Consulta)') {
+    return language === 'es' ? source : 'AQSLIM (Consultation)'
+  }
+  return source
+}
+
 type ProgressViewProps = {
   data: PatientPortalData
   demo?: boolean
 }
 
 export function ProgressView({ data, demo = false }: ProgressViewProps) {
-  const es = data.language === 'es'
+  const [language] = usePortalLanguage(data.language)
+  const es = language === 'es'
   const first = data.measurements[0] ?? null
   const latest = data.measurements.at(-1) ?? null
   const change = data.totalChange === null
@@ -61,7 +73,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
         <div className={styles.progressMetric}>
           <span>{es ? 'Peso inicial' : 'Starting weight'}</span>
           <strong>{formatWeight(data.initialWeight, data.unit)}</strong>
-          <small>{formatDate(first?.date ?? null, data.language)}</small>
+          <small>{formatDate(first?.date ?? null, language)}</small>
         </div>
         <div className={styles.changeRing} style={{ '--ring': `${Math.min(data.percentChange ?? 0, 100) * 3.6}deg` } as React.CSSProperties}>
           <strong>{change}</strong>
@@ -70,7 +82,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
         <div className={styles.progressMetric}>
           <span>{es ? 'Peso actual' : 'Current weight'}</span>
           <strong>{formatWeight(data.currentWeight, data.unit)}</strong>
-          <small>{formatDate(latest?.date ?? null, data.language)}</small>
+          <small>{formatDate(latest?.date ?? null, language)}</small>
           <b>{percent}</b>
           <em>{es ? 'de tu peso inicial' : 'of starting weight'}</em>
         </div>
@@ -81,7 +93,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
           <h2>{es ? 'Tendencia de peso' : 'Weight trend'}</h2>
           <span>{es ? 'Últimas mediciones' : 'Latest measurements'}</span>
         </div>
-        <ProgressChart measurements={data.measurements} language={data.language} unit={data.unit} />
+        <ProgressChart measurements={data.measurements} language={language} unit={data.unit} />
         <p className={styles.encouragement}>
           <span aria-hidden="true">↓</span>
           {data.totalChange !== null && data.totalChange <= 0
@@ -96,8 +108,8 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
           <div className={styles.roundIcon}><BuildingIcon /></div>
           <div className={styles.measurementValue}>
             <strong>{formatWeight(data.currentWeight, data.unit)}</strong>
-            <span>{formatDate(latest?.date ?? null, data.language)}</span>
-            <b>{latest?.source ?? (es ? 'Origen no disponible' : 'Source unavailable')}</b>
+            <span>{formatDate(latest?.date ?? null, language)}</span>
+            <b>{formatSource(latest?.source, language, demo)}</b>
           </div>
           <div className={styles.sourceText}>
             <span>{es ? 'Registrado en tu consulta con el equipo AQSLIM.' : 'Recorded during your consultation with the AQSLIM team.'}</span>
@@ -111,7 +123,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
         <div className={styles.actionGrid}>
           <a href="#historial"><ProgressIcon /><span>{es ? 'Ver historial de mediciones' : 'View measurement history'}</span></a>
           <a href="#tendencia"><ProgressIcon /><span>{es ? 'Ver tendencia detallada' : 'View detailed trend'}</span></a>
-          <span><CalendarIcon /><span>{es ? 'Próxima revisión' : 'Next review'}<b>{formatDate(data.nextReview, data.language, false)}</b></span></span>
+          <span><CalendarIcon /><span>{es ? 'Próxima revisión' : 'Next review'}<b>{formatDate(data.nextReview, language, false)}</b></span></span>
           <Link href={demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'} className={styles.buddyAction}><BuddyIcon /><span>{es ? 'Pregúntale a AQ Buddy' : 'Ask AQ Buddy'}</span></Link>
         </div>
       </section>
@@ -134,9 +146,9 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
           <div className={styles.historyRows}>
             {[...data.measurements].reverse().map(measurement => (
               <div key={measurement.id}>
-                <span>{formatDate(measurement.date, data.language)}</span>
+                <span>{formatDate(measurement.date, language)}</span>
                 <strong>{formatWeight(measurement.weight, data.unit)}</strong>
-                <small><BuildingIcon />{measurement.source}</small>
+                <small><BuildingIcon />{formatSource(measurement.source, language, demo)}</small>
               </div>
             ))}
           </div>

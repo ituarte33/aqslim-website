@@ -1,8 +1,11 @@
+'use client'
+
 import Image from 'next/image'
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import { CalendarIcon, ChevronIcon, MaterialsIcon } from './portal-icons'
 import { PortalShell } from './portal-shell'
+import { usePortalLanguage } from './use-portal-language'
 import styles from './portal.module.css'
 
 function formatDate(value: string | null, language: 'es' | 'en', options?: Intl.DateTimeFormatOptions) {
@@ -30,7 +33,8 @@ type HomeViewProps = {
 }
 
 export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
-  const es = data.language === 'es'
+  const [language] = usePortalLanguage(data.language)
+  const es = language === 'es'
   const today = new Intl.DateTimeFormat(es ? 'es-MX' : 'en-US', {
     timeZone: 'America/Los_Angeles',
     weekday: 'long',
@@ -74,7 +78,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
           <div>
             <strong>{es ? `Continúa con tu plan ${phase}.` : `Continue with your ${phase} plan.`}</strong>
             <span>{es ? 'Próxima revisión' : 'Next review'}</span>
-            <b>{formatDate(data.nextReview, data.language)}</b>
+            <b>{formatDate(data.nextReview, language)}</b>
           </div>
         </div>
       </section>

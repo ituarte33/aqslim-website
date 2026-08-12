@@ -117,7 +117,7 @@
   line-height: 1.05;
 }
 .welcome span,
-.progressHeader p { display: block; margin-top: 8px; color: var(--portal-muted); font-size: 14px; text-transform: capitalize; }
+.progressHeader p { display: block; margin-top: 8px; color: var(--portal-muted); font-size: 14px; }
 
 .panel {
   position: relative;

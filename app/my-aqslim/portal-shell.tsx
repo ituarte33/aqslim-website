@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import {
   BuddyIcon,
   HomeIcon,
@@ -11,6 +10,7 @@ import {
   PlanIcon,
   ProgressIcon,
 } from './portal-icons'
+import { usePortalLanguage } from './use-portal-language'
 import styles from './portal.module.css'
 
 type Props = {
@@ -30,23 +30,9 @@ const navItems = [
 
 export function PortalShell({ firstName, initialLanguage, children, demo = false }: Props) {
   const pathname = usePathname()
-  const [language, setLanguage] = useState(initialLanguage)
+  const [language, setLanguage] = usePortalLanguage(initialLanguage)
   const basePath = demo ? '/my-aqslim/demo' : '/my-aqslim'
   const isBuddyPage = pathname.endsWith('/buddy')
-
-  useEffect(() => {
-    const savedLanguage = window.localStorage.getItem('myaq-language')
-    if (savedLanguage === 'es' || savedLanguage === 'en') setLanguage(savedLanguage)
-  }, [])
-
-  useEffect(() => {
-    window.localStorage.setItem('myaq-language', language)
-    document.body.classList.remove('marketing')
-    document.body.classList.toggle('lang-es', language === 'es')
-    document.body.classList.toggle('lang-en', language === 'en')
-    document.documentElement.lang = language
-    window.dispatchEvent(new CustomEvent('aqslim-lang', { detail: language }))
-  }, [language])
 
   return (
     <div className={`${styles.portal} ${isBuddyPage ? styles.buddyPortal : ''}`} data-language={language}>
