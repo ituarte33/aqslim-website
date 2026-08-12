@@ -31,8 +31,8 @@ export default async function DashboardPage() {
     }
 
     // Only show dashboard if they have at least one consulta
-    const idCliente = cliente.fields['ID Cliente']
-    const consultas = idCliente ? await getConsultasByCliente(String(idCliente)) : []
+    const nombreCliente = cliente.fields['Nombre Completo']?.trim()
+    const consultas = nombreCliente ? await getConsultasByCliente(nombreCliente) : []
     if (consultas.length === 0) redirect('/onboarding')
 
     redirect('/my-aqslim')

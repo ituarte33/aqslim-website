@@ -72,11 +72,11 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
     throw error
   }
 
-  const clienteNumber = cliente.fields['ID Cliente']
+  const clienteName = cliente.fields['Nombre Completo']?.trim()
   const planId = cliente.fields['Plan AQSLIM']?.[0]
   const [consultas, plan] = await Promise.all([
-    clienteNumber
-      ? getConsultasByCliente(String(clienteNumber)).catch(() => [] as Consulta[])
+    clienteName
+      ? getConsultasByCliente(clienteName).catch(() => [] as Consulta[])
       : Promise.resolve([] as Consulta[]),
     planId ? getPlanById(planId).catch(() => null) : Promise.resolve(null),
   ])
