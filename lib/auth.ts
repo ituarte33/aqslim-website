@@ -8,7 +8,7 @@ import {
   assertPatientOwnership,
   assertRoleCapability,
   capabilitiesForRole,
-  selectUniquePatientId,
+  resolveAuthenticatedPatientScope,
   type AppRole,
   type Capability,
 } from '@/lib/authorization-policy'
@@ -68,7 +68,11 @@ export async function requireCapability(capability: Capability): Promise<Authent
 export const getOwnPatient = cache(async (): Promise<Cliente> => {
   const actor = await requireActor()
   const matches = actor.boundPatientId ? [] : await getClientesByEmail(actor.email)
-  const patientId = selectUniquePatientId(actor.boundPatientId, matches.map(patient => patient.id))
+  const patientId = resolveAuthenticatedPatientScope({
+    role: actor.role,
+    boundPatientId: actor.boundPatientId,
+    matchingPatientIds: matches.map(patient => patient.id),
+  })
   const patient = actor.boundPatientId
     ? await getClienteById(patientId)
     : matches[0]

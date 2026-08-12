@@ -79,3 +79,20 @@ export function selectUniquePatientId(
   }
   return matchingPatientIds[0]
 }
+
+export function resolveAuthenticatedPatientScope({
+  role,
+  boundPatientId,
+  matchingPatientIds,
+  requestedPatientId,
+}: {
+  role: AppRole
+  boundPatientId: string | null
+  matchingPatientIds: readonly string[]
+  requestedPatientId?: string
+}): string {
+  assertRoleCapability(role, 'portal:read:self')
+  const patientId = selectUniquePatientId(boundPatientId, matchingPatientIds)
+  if (requestedPatientId) assertPatientOwnership(patientId, requestedPatientId)
+  return patientId
+}
