@@ -7,6 +7,7 @@ import {
   type Consulta,
 } from '@/lib/airtable'
 import { AuthorizationError, getOwnPatient, requireCapability } from '@/lib/auth'
+import { toCanonicalPhaseName } from '@/lib/phase-names'
 
 export type PortalMeasurement = {
   id: string
@@ -120,14 +121,17 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
     fullName,
     language: preferredLanguage.includes('english') || preferredLanguage.includes('ingl') ? 'en' : 'es',
     unit,
-    phase: plan?.fields['Fase Actual'] ?? asString(latestConsulta?.fields['Fase de Dieta Actual']),
+    phase: toCanonicalPhaseName(
+      plan?.fields['Fase Actual']
+        ?? asString(latestConsulta?.fields['Fase de Dieta Actual']),
+    ),
     weekInPhase: plan?.fields['Semana en Fase Actual']
       ?? (typeof latestConsulta?.fields['Semana en Fase Actual'] === 'number'
         ? latestConsulta.fields['Semana en Fase Actual']
         : null),
     phaseStartDate: plan?.fields['Fecha Inicio Fase Actual'] ?? null,
     estimatedPhaseChange: plan?.fields['Fecha Estimada Cambio de Fase'] ?? null,
-    nextPhase: asString(plan?.fields['Siguiente Fase']),
+    nextPhase: toCanonicalPhaseName(asString(plan?.fields['Siguiente Fase'])),
     specialInstructions: plan?.fields['Instrucciones Especiales']?.trim() || null,
     nextReview: cliente.fields['Próxima Cita']
       ?? latestConsulta?.fields['Próxima Cita']
