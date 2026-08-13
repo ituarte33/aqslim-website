@@ -21,6 +21,18 @@ html { scroll-behavior:smooth; }
 body { font-family:'Montserrat',sans-serif; background:var(--black); color:var(--white); overflow-x:hidden; }
 body.marketing { cursor:none; }
 
+.finance-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 760px) {
+  .finance-attendance-grid,
+  .finance-revenue-grid { grid-template-columns: 1fr 1fr !important; }
+}
+
+@media (max-width: 460px) {
+  .finance-attendance-grid,
+  .finance-revenue-grid { grid-template-columns: 1fr !important; }
+}
+
 /* LANGUAGE MODAL */
 .lang-modal-overlay {
   position:fixed; inset:0; z-index:20000;
@@ -767,6 +779,27 @@ nav { padding:0 20px; }
   left: auto;
   align-items: flex-end;
   animation-delay: 0s;
+}
+.aqb-dashboard-launcher {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  color: #C9A84C;
+  background: rgba(10,10,10,.94);
+  border: 1px solid rgba(201,168,76,.42);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5);
+  transition: color .18s, border-color .18s, background .18s, transform .18s;
+}
+.aqb-dashboard-launcher:hover,
+.aqb-dashboard-launcher:focus-visible {
+  color: #E2C87A;
+  border-color: #C9A84C;
+  background: #171612;
+  transform: translateY(-2px);
+  outline: none;
 }
 .aqb-wrap--dashboard .aqb-img {
   width: 96px;

@@ -1,3 +1,5 @@
+import { parseSalesNotes } from './finance-metrics'
+
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
 export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
@@ -421,22 +423,9 @@ export interface FinanceRecord {
   montoCobrado: number
   metodoPago: string
   suppTotal: number
+  shippingTotal: number
   suppItems: Array<{ nombre: string; precio: number }>
   paciente: string
-}
-
-function parseSuppNotes(notes: string): { total: number; items: Array<{ nombre: string; precio: number }> } {
-  if (!notes || !notes.includes('Suplementos vendidos:')) return { total: 0, items: [] }
-  const items: Array<{ nombre: string; precio: number }> = []
-  let total = 0
-  for (const line of notes.split('\n')) {
-    const m = line.match(/^- (.+) \(\$([0-9.]+)\)$/)
-    if (m) items.push({ nombre: m[1], precio: parseFloat(m[2]) })
-    const t = line.match(/^Total: \$([0-9.]+)$/)
-    if (t) total = parseFloat(t[1])
-  }
-  if (total === 0 && items.length > 0) total = items.reduce((s, i) => s + i.precio, 0)
-  return { total, items }
 }
 
 export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
@@ -482,8 +471,8 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     const email        = Array.isArray(emailRaw) ? (emailRaw[0] as string ?? '') : ((emailRaw as string | undefined) ?? '')
     const paciente     = (clienteIds.length > 0 ? (nameMap.get(clienteIds[0]) ?? '') : '') || email || ''
 
-    const { total: suppTotal, items: suppItems } = parseSuppNotes(notas)
-    allRecords.push({ id: c.id, date, tipoConsulta, montoCobrado, metodoPago, suppTotal, suppItems, paciente })
+    const { supplementTotal: suppTotal, shippingTotal, items: suppItems } = parseSalesNotes(notas)
+    allRecords.push({ id: c.id, date, tipoConsulta, montoCobrado, metodoPago, suppTotal, shippingTotal, suppItems, paciente })
   }
   return allRecords
 }

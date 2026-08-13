@@ -157,7 +157,7 @@ export function ChatWidget() {
 
   // Idle bubble rotation — only when chat is closed and buddy is idle
   useEffect(() => {
-    if (open) { setBubble(''); return }
+    if (open || inDashboard) { setBubble(''); return }
     function showBubble() {
       if (buddyStateRef.current !== 'idle') return
       const bubbles = IDLE_BUBBLES[lang]
@@ -168,7 +168,7 @@ export function ChatWidget() {
     const first    = setTimeout(showBubble, 1200)
     const interval = setInterval(showBubble, 10000)
     return () => { clearTimeout(first); clearInterval(interval) }
-  }, [open, lang])
+  }, [open, lang, inDashboard])
 
   // Welcome message on first open
   useEffect(() => {
@@ -268,24 +268,40 @@ export function ChatWidget() {
   return (
     <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
-      {/* Mascot — always at top */}
-      <button
-        className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
-        onClick={() => fullScreen ? undefined : setOpen(v => !v)}
-        aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={STATE_IMAGES[buddyState]}
-          alt="AQ Buddy"
-          className="aqb-img"
-        />
-        {!open && (
-          <div className="aqb-cta-label">
-            💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
-          </div>
-        )}
-      </button>
+      {/* Admin pages use a compact launcher so patient and finance controls stay clear. */}
+      {inDashboard && !open ? (
+        <button
+          className="aqb-dashboard-launcher"
+          onClick={() => setOpen(true)}
+          aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
+          title="AQ Buddy"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5.4 17.2 4 21l4.2-1.7c1.1.5 2.4.7 3.8.7 4.9 0 8.8-3.6 8.8-8s-3.9-8-8.8-8-8.8 3.6-8.8 8c0 2 .8 3.8 2.2 5.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            <circle cx="8.5" cy="12" r="1" fill="currentColor" />
+            <circle cx="12" cy="12" r="1" fill="currentColor" />
+            <circle cx="15.5" cy="12" r="1" fill="currentColor" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
+          onClick={() => fullScreen ? undefined : setOpen(v => !v)}
+          aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={STATE_IMAGES[buddyState]}
+            alt="AQ Buddy"
+            className="aqb-img"
+          />
+          {!open && (
+            <div className="aqb-cta-label">
+              💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
+            </div>
+          )}
+        </button>
+      )}
 
       {/* Speech bubble — only when chat is closed */}
       {bubble && !open && (
