@@ -40,6 +40,7 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   }
 
   const tipoConsulta     = (formData.get('tipoConsulta')     as string | null)?.trim() || 'Cliente subsecuente'
+  const responsableReactivacion = (formData.get('responsableReactivacion') as string | null)?.trim() ?? ''
   const notasSuplemento  = (formData.get('notasSuplemento')  as string | null)?.trim() ?? ''
 
   const fields: Record<string, unknown> = {
@@ -49,6 +50,7 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   }
 
   if (notasSuplemento) fields['Notas del Terapeuta'] = notasSuplemento
+  if (responsableReactivacion) fields['Responsable de Reactivación'] = responsableReactivacion
 
 
   const peso             = num('pesoKg')
@@ -61,6 +63,9 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   const cumplimiento     = int('cumplimientoDieta')
   const comoSeSiente     = int('comoSeSiente')
   const montoCobrado     = num('montoCobrado')
+  const consultaCobrado  = num('consultaCobrado')
+  const suplementoCobrado = num('suplementoCobrado')
+  const envioCobrado     = num('envioCobrado')
 
   if (peso            !== undefined) fields['Peso (kg)']               = peso
   if (grasaCorporal   !== undefined) fields['% Grasa Corporal']        = grasaCorporal
@@ -72,6 +77,9 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   if (cumplimiento    !== undefined) fields['Cumplimiento Dieta (1-10)'] = cumplimiento
   if (comoSeSiente    !== undefined) fields['Cómo Se Siente (1-10)']   = comoSeSiente
   if (montoCobrado    !== undefined) fields['Monto Cobrado ($)']        = montoCobrado
+  if (consultaCobrado !== undefined) fields['Consulta Cobrado ($)'] = consultaCobrado
+  if (suplementoCobrado !== undefined) fields['Suplemento(s) Cobrado ($)'] = suplementoCobrado
+  if (envioCobrado !== undefined) fields['Envio (Shipping) Cobrado ($)'] = envioCobrado
   const ansiedad   = (formData.get('ansiedad')   as string | null) ?? ''
   const tuvoHambre = (formData.get('tuvoHambre') as string | null) ?? ''
   if (ansiedad)    fields['¿Ansiedad?']               = ansiedad

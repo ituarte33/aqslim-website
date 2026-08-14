@@ -25,11 +25,15 @@ body.marketing { cursor:none; }
 
 @media (max-width: 760px) {
   .finance-attendance-grid,
+  .finance-visit-grid,
+  .finance-growth-grid,
   .finance-revenue-grid { grid-template-columns: 1fr 1fr !important; }
 }
 
 @media (max-width: 460px) {
   .finance-attendance-grid,
+  .finance-visit-grid,
+  .finance-growth-grid,
   .finance-revenue-grid { grid-template-columns: 1fr !important; }
 }
 

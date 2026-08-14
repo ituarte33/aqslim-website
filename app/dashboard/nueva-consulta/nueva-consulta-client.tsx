@@ -65,6 +65,8 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
   const [idioma, setIdioma]               = useState<'English' | 'Español' | null>(null)
   const [unidadDePeso, setUnidadDePeso]   = useState<'Lbs' | 'Kg'>('Lbs')
   const [comoNosConocio, setComoNosConocio] = useState<string | null>(null)
+  const [canalPublicidad, setCanalPublicidad] = useState('')
+  const [responsableCaptacion, setResponsableCaptacion] = useState('')
   const [telefono, setTelefono]           = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
 
@@ -167,6 +169,8 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
     formData.set('idioma', idioma)
     formData.set('unidadDePeso', unidadDePeso)
     formData.set('comoNosConocio', comoNosConocio)
+    formData.set('canalPublicidad', canalPublicidad)
+    formData.set('responsableCaptacion', responsableCaptacion)
     const estaturaCmVal = estaturaUnit === 'cm'
       ? estaturaCm
       : (() => {
@@ -424,6 +428,24 @@ export function NuevaConsultaClient({ user, prefillNombre, prefillEmail }: Props
                 </button>
               ))}
             </div>
+          </div>
+
+          {['Anuncio', 'Google search', 'Redes Sociales'].includes(comoNosConocio ?? '') && (
+            <div>
+              <label htmlFor="canalPublicidad" style={labelStyle}>{es ? 'Canal de publicidad' : 'Advertising channel'}</label>
+              <select id="canalPublicidad" value={canalPublicidad} onChange={e => setCanalPublicidad(e.target.value)} style={inputStyle}>
+                <option value="">{es ? 'Seleccionar…' : 'Select…'}</option>
+                {['Facebook', 'Instagram', 'Google', 'TikTok', 'YouTube', 'Otro'].map(option => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="responsableCaptacion" style={labelStyle}>{es ? 'Responsable de captación' : 'Acquisition owner'}</label>
+            <select id="responsableCaptacion" value={responsableCaptacion} onChange={e => setResponsableCaptacion(e.target.value)} style={inputStyle}>
+              <option value="">{es ? 'Sin especificar' : 'Unspecified'}</option>
+              {['Hillary', 'Rómulo', 'Otro'].map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
           </div>
 
           <SectionDivider label={es ? 'Metas y Salud' : 'Goals & Health'} />

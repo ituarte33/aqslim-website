@@ -17,6 +17,8 @@ export const CLIENTES_FIELDS = {
   ZIP:                  'fldwbSOM9G3h3qYCG',
   IDIOMA_PREFERIDO:     'fldRpFEL77yUkfaPG',
   COMO_NOS_CONOCIO:     'fldE5rU0yD6dZqNKw',
+  CANAL_PUBLICIDAD:     'fld4SiXi1JGKAWqEJ',
+  RESPONSABLE_CAPTACION:'fldFGDQeQxXAKRgDM',
   ACEPTO_TERMINOS:      'fldaHiraHz4bhhjVD',
   ESTADO_DEL_CLIENTE:   'fldqyYielhA0GDF0h',
   META_DEL_CLIENTE:     'fldxBWCYYqlUJIqM1',
@@ -77,6 +79,8 @@ export interface Cliente {
     'Estado del Cliente'?: string
     'Idioma Preferido'?: string
     'Cómo Nos Conoció'?: string
+    'Canal de Publicidad'?: string
+    'Responsable de Captación'?: string
     'He leído y acepto los términos anteriores'?: boolean
     'Meta del Cliente'?: string
     'Condiciones Especiales / Alergias'?: string
@@ -426,6 +430,10 @@ export interface FinanceRecord {
   shippingTotal: number
   suppItems: Array<{ nombre: string; precio: number }>
   paciente: string
+  patientKey: string
+  acquisitionSource: string
+  advertisingChannel: string
+  attributionOwner: string
 }
 
 export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
@@ -447,10 +455,21 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     })(),
   ])
 
-  // Map Airtable record ID → Nombre Completo
-  const nameMap = new Map<string, string>()
+  // Keep acquisition data attached to the patient so every consultation can
+  // be analyzed without duplicating client records.
+  const clientMap = new Map<string, {
+    name: string
+    acquisitionSource: string
+    advertisingChannel: string
+    acquisitionOwner: string
+  }>()
   for (const c of clientes) {
-    nameMap.set(c.id, c.fields['Nombre Completo'] ?? '')
+    clientMap.set(c.id, {
+      name: c.fields['Nombre Completo'] ?? '',
+      acquisitionSource: (c.fields['Cómo Nos Conoció'] as string | undefined) ?? '',
+      advertisingChannel: c.fields['Canal de Publicidad'] ?? '',
+      acquisitionOwner: c.fields['Responsable de Captación'] ?? '',
+    })
   }
 
   const allRecords: FinanceRecord[] = []
@@ -469,10 +488,39 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     const clienteIds   = Array.isArray(idClienteRaw) ? (idClienteRaw as string[]) : []
     const emailRaw     = c.fields['Email Cliente']
     const email        = Array.isArray(emailRaw) ? (emailRaw[0] as string ?? '') : ((emailRaw as string | undefined) ?? '')
-    const paciente     = (clienteIds.length > 0 ? (nameMap.get(clienteIds[0]) ?? '') : '') || email || ''
+    const patientKey   = clienteIds[0] ?? email.toLocaleLowerCase('es-MX')
+    const client       = clienteIds.length > 0 ? clientMap.get(clienteIds[0]) : undefined
+    const paciente     = client?.name || email || ''
+    const acquisitionSource = client?.acquisitionSource ?? ''
+    const advertisingChannel = client?.advertisingChannel ?? ''
+    const attributionOwner = tipoConsulta === 'Cliente Re-Inicio'
+      ? ((c.fields['Responsable de Reactivación'] as string | undefined) ?? '')
+      : (client?.acquisitionOwner ?? '')
 
-    const { supplementTotal: suppTotal, shippingTotal, items: suppItems } = parseSalesNotes(notas)
-    allRecords.push({ id: c.id, date, tipoConsulta, montoCobrado, metodoPago, suppTotal, shippingTotal, suppItems, paciente })
+    const parsedSales = parseSalesNotes(notas)
+    const structuredSupp = c.fields['Suplemento(s) Cobrado ($)']
+    const structuredShipping = c.fields['Envio (Shipping) Cobrado ($)']
+    const structuredConsultation = c.fields['Consulta Cobrado ($)']
+    const suppTotal = typeof structuredSupp === 'number' ? structuredSupp : parsedSales.supplementTotal
+    const shippingTotal = typeof structuredShipping === 'number' ? structuredShipping : parsedSales.shippingTotal
+    const normalizedMonto = typeof structuredConsultation === 'number'
+      ? structuredConsultation + suppTotal + shippingTotal
+      : montoCobrado
+    allRecords.push({
+      id: c.id,
+      date,
+      tipoConsulta,
+      montoCobrado: normalizedMonto,
+      metodoPago,
+      suppTotal,
+      shippingTotal,
+      suppItems: parsedSales.items,
+      paciente,
+      patientKey,
+      acquisitionSource,
+      advertisingChannel,
+      attributionOwner,
+    })
   }
   return allRecords
 }

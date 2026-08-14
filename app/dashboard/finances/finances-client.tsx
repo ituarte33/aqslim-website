@@ -5,7 +5,7 @@ import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
 import type { FinanceRecord } from '@/lib/airtable'
 import type { getFinancesSummary, SquarePayment } from '@/lib/square'
-import { getFinanceMetrics } from '@/lib/finance-metrics'
+import { getFinanceMetrics, getGrowthMetrics } from '@/lib/finance-metrics'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -210,6 +210,7 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
   )
 
   const metrics = useMemo(() => getFinanceMetrics(filtered), [filtered])
+  const growth = useMemo(() => getGrowthMetrics(filtered), [filtered])
   const { totalRevenue, supplementRevenue: totalSupp, shippingRevenue: totalShipping, consultationRevenue: consultaRevenue } = metrics
 
   const byMethod = useMemo(() => {
@@ -299,28 +300,42 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
         <SectionSubtitle>
           {filtered.length > 0
             ? `${filtered.length} ${es
-                ? (filtered.length === 1 ? 'consulta registrada' : 'consultas registradas')
-                : (filtered.length === 1 ? 'recorded consultation' : 'recorded consultations')}`
-            : (es ? 'Sin consultas en este período' : 'No consultations in this period')}
+                ? (filtered.length === 1 ? 'movimiento registrado' : 'movimientos registrados')
+                : (filtered.length === 1 ? 'recorded transaction' : 'recorded transactions')}`
+            : (es ? 'Sin movimientos en este período' : 'No transactions in this period')}
         </SectionSubtitle>
 
         <div className="finance-attendance-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           {[
             {
-              label: es ? 'Pacientes que vinieron' : 'Patients who attended',
+              label: es ? 'Pacientes distintos atendidos' : 'Distinct patients attended',
               value: metrics.uniquePatients,
-              note: es ? 'Personas únicas en el período' : 'Unique people in the period',
+              note: es ? 'Cada persona se cuenta una sola vez' : 'Each person is counted once',
             },
             {
-              label: es ? 'Visitas realizadas' : 'Visits completed',
+              label: es ? 'Total de visitas' : 'Total visits',
               value: metrics.visitCount,
-              note: es ? 'Consultas nuevas, subsecuentes y reinicios' : 'New, returning and restart consultations',
+              note: es ? 'Una persona puede tener más de una visita' : 'One person may have more than one visit',
             },
           ].map(card => (
             <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.04)', padding: '24px 28px' }}>
               <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: pt.sans, marginBottom: 8 }}>{card.label}</div>
               <div style={{ fontSize: 40, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1 }}>{card.value}</div>
               <div style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans, marginTop: 8 }}>{card.note}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="finance-visit-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
+          {[
+            { label: es ? 'Nuevas' : 'New', value: metrics.newVisitCount, note: es ? 'Primera consulta' : 'First consultation' },
+            { label: es ? 'Subsecuentes' : 'Returning', value: metrics.subsequentVisitCount, note: es ? 'Seguimientos' : 'Follow-up visits' },
+            { label: es ? 'Reinicios' : 'Restarts', value: metrics.restartVisitCount, note: es ? 'Regresaron al programa' : 'Returned to the program' },
+          ].map(card => (
+            <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.2)', padding: '18px 22px' }}>
+              <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>{card.label}</div>
+              <div style={{ fontSize: 32, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1 }}>{card.value}</div>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', marginTop: 7 }}>{card.note}</div>
             </div>
           ))}
         </div>
@@ -364,6 +379,43 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
             </div>
           </div>
         )}
+
+        <div style={{ marginTop: 32, marginBottom: 24 }}>
+          <SectionTitle>{es ? 'Crecimiento y adquisición' : 'Growth and acquisition'}</SectionTitle>
+          <SectionSubtitle>
+            {es ? 'Origen de pacientes nuevos y responsable de captación o reactivación' : 'Source of new patients and acquisition or reactivation owner'}
+          </SectionSubtitle>
+          <div className="finance-growth-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
+            {[
+              { label: es ? 'Pacientes nuevos' : 'New patients', value: growth.newPatients, note: es ? 'En el período' : 'In the period' },
+              { label: es ? 'Referidos' : 'Referrals', value: growth.referred, note: es ? 'Fuente: Referido' : 'Source: Referral' },
+              { label: es ? 'Publicidad' : 'Advertising', value: growth.advertising, note: es ? 'Anuncio, Google o redes' : 'Ads, Google or social' },
+              { label: 'Hillary', value: growth.hillary, note: es ? 'Captación o reactivación' : 'Acquisition or reactivation' },
+            ].map(card => (
+              <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.24)', background: 'rgba(201,168,76,0.025)', padding: '20px 22px' }}>
+                <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>{card.label}</div>
+                <div style={{ fontSize: 34, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1 }}>{card.value}</div>
+                <div style={{ fontSize: pt.xs, color: '#6A6560', marginTop: 8 }}>{card.note}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ border: '1px solid rgba(201,168,76,0.15)', padding: '16px 20px', display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
+              {es ? 'Mejor canal publicitario' : 'Best advertising channel'}:{' '}
+              <span style={{ color: '#FAFAF8' }}>
+                {growth.bestAdvertisingChannel
+                  ? `${growth.bestAdvertisingChannel.channel} (${growth.bestAdvertisingChannel.count})`
+                  : (es ? 'Aún sin datos en este período' : 'No data yet in this period')}
+              </span>
+            </div>
+            {growth.unclassified > 0 && (
+              <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
+                {es ? 'Nuevos sin origen registrado' : 'New patients without a recorded source'}:{' '}
+                <span style={{ color: '#E2C87A' }}>{growth.unclassified}</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Consultation detail table */}
         {filtered.length > 0 && (

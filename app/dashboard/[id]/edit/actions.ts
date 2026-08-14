@@ -172,6 +172,8 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   const unidadDePeso   = (formData.get('unidadDePeso')   as string).trim()
   const pesoMeta       = ((formData.get('pesoMeta')      as string) ?? '').trim()
   const comoNosConocio = ((formData.get('comoNosConocio') as string) ?? '').trim()
+  const canalPublicidad = ((formData.get('canalPublicidad') as string) ?? '').trim()
+  const responsableCaptacion = ((formData.get('responsableCaptacion') as string) ?? '').trim()
   const estadoDelCliente=(formData.get('estadoDelCliente') as string).trim()
   const metaDelCliente = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones    = ((formData.get('condiciones')   as string) ?? '').trim()
@@ -199,6 +201,8 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   if (zip)        fields[CLIENTES_FIELDS.ZIP]              = parseInt(zip, 10)
   if (pesoMeta)   fields[CLIENTES_FIELDS.PESO_META]        = parseInt(pesoMeta, 10)
   if (estaturaCm) fields[CLIENTES_FIELDS.ESTATURA_CM]      = parseInt(estaturaCm, 10)
+  if (canalPublicidad) fields[CLIENTES_FIELDS.CANAL_PUBLICIDAD] = canalPublicidad
+  if (responsableCaptacion) fields[CLIENTES_FIELDS.RESPONSABLE_CAPTACION] = responsableCaptacion
 
   await updateCliente(clienteId, fields)
 }

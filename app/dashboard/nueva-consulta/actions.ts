@@ -138,6 +138,8 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
   const unidadDePeso    = (formData.get('unidadDePeso')    as string).trim()
   const pesoMeta        = ((formData.get('pesoMeta')       as string) ?? '').trim()
   const comoNosConocio  = (formData.get('comoNosConocio')  as string).trim()
+  const canalPublicidad = ((formData.get('canalPublicidad') as string) ?? '').trim()
+  const responsableCaptacion = ((formData.get('responsableCaptacion') as string) ?? '').trim()
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones')    as string) ?? '').trim()
   const estaturaCm      = ((formData.get('estaturaCm')     as string) ?? '').trim()
@@ -166,6 +168,8 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
   if (pesoMeta)    fields[CLIENTES_FIELDS.PESO_META]            = parseInt(pesoMeta, 10)
   if (condiciones) fields[CLIENTES_FIELDS.CONDICIONES_ALERGIAS] = condiciones
   if (estaturaCm)  fields[CLIENTES_FIELDS.ESTATURA_CM]          = parseInt(estaturaCm, 10)
+  if (canalPublicidad) fields[CLIENTES_FIELDS.CANAL_PUBLICIDAD] = canalPublicidad
+  if (responsableCaptacion) fields[CLIENTES_FIELDS.RESPONSABLE_CAPTACION] = responsableCaptacion
 
   const cliente = await createCliente(fields)
 
