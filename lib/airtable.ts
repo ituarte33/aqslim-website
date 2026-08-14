@@ -1,4 +1,5 @@
 import { parseSalesNotes } from './finance-metrics'
+import { isUpcomingAppointment } from './appointment-metrics'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
@@ -225,12 +226,17 @@ export async function updateCliente(id: string, fields: Record<string, unknown>)
 }
 
 export async function getClientesConCita(): Promise<Cliente[]> {
-  const formula = encodeURIComponent('{Cita Agendada} = TRUE()')
+  const formula = encodeURIComponent(
+    'AND({Cita Agendada} = TRUE(), {Próxima Cita}, IS_AFTER({Próxima Cita}, NOW()))',
+  )
   const field = encodeURIComponent('Próxima Cita')
   const data = await airtableFetch(
     `/${CLIENTES_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${field}&sort%5B0%5D%5Bdirection%5D=asc`
   )
-  return data.records
+  const now = new Date()
+  return (data.records ?? []).filter((cliente: Cliente) =>
+    isUpcomingAppointment(cliente.fields['Próxima Cita'], now),
+  )
 }
 
 export async function createCliente(fields: Record<string, unknown>): Promise<Cliente> {

@@ -5,7 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/authorization-policy.test.mts tests/authenticated-patient-flow.test.mts tests/patient-portal-phase.test.mts tests/finance-metrics.test.mts"
+    "test:authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/authorization-policy.test.mts tests/authenticated-patient-flow.test.mts tests/patient-portal-phase.test.mts tests/finance-metrics.test.mts tests/upcoming-appointments.test.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
