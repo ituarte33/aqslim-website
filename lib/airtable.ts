@@ -433,7 +433,8 @@ export interface FinanceRecord {
   patientKey: string
   acquisitionSource: string
   advertisingChannel: string
-  attributionOwner: string
+  acquisitionOwner: string
+  reactivationOwner: string
 }
 
 export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
@@ -493,9 +494,8 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     const paciente     = client?.name || email || ''
     const acquisitionSource = client?.acquisitionSource ?? ''
     const advertisingChannel = client?.advertisingChannel ?? ''
-    const attributionOwner = tipoConsulta === 'Cliente Re-Inicio'
-      ? ((c.fields['Responsable de Reactivación'] as string | undefined) ?? '')
-      : (client?.acquisitionOwner ?? '')
+    const acquisitionOwner = client?.acquisitionOwner ?? ''
+    const reactivationOwner = (c.fields['Responsable de Reactivación'] as string | undefined) ?? ''
 
     const parsedSales = parseSalesNotes(notas)
     const structuredSupp = c.fields['Suplemento(s) Cobrado ($)']
@@ -519,7 +519,8 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
       patientKey,
       acquisitionSource,
       advertisingChannel,
-      attributionOwner,
+      acquisitionOwner,
+      reactivationOwner,
     })
   }
   return allRecords

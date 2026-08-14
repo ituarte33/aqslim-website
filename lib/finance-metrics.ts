@@ -10,7 +10,8 @@ export interface FinanceMetricRecord {
   patientKey?: string
   acquisitionSource?: string
   advertisingChannel?: string
-  attributionOwner?: string
+  acquisitionOwner?: string
+  reactivationOwner?: string
 }
 
 const SUPPLEMENT_ONLY_TYPES = new Set(['suplementos', 'suplementos + envio', 'suplementos + envío'])
@@ -62,6 +63,9 @@ export function getGrowthMetrics(records: FinanceMetricRecord[]) {
   const newPatients = records.filter(record =>
     record.tipoConsulta.trim().toLocaleLowerCase('es-MX') === 'cliente nuevo',
   )
+  const restarts = records.filter(record =>
+    record.tipoConsulta.trim().toLocaleLowerCase('es-MX') === 'cliente re-inicio',
+  )
 
   const referred = newPatients.filter(record =>
     record.acquisitionSource?.trim().toLocaleLowerCase('es-MX') === 'referido',
@@ -69,10 +73,18 @@ export function getGrowthMetrics(records: FinanceMetricRecord[]) {
   const advertising = newPatients.filter(record =>
     DIGITAL_SOURCES.has(record.acquisitionSource?.trim().toLocaleLowerCase('es-MX') ?? ''),
   ).length
-  const hillary = records.filter(record =>
-    record.attributionOwner?.trim().toLocaleLowerCase('es-MX') === 'hillary',
+  const hillaryNewPatients = newPatients.filter(record =>
+    record.acquisitionOwner?.trim().toLocaleLowerCase('es-MX') === 'hillary',
   ).length
-  const attributionRecorded = records.filter(record => record.attributionOwner?.trim()).length
+  const hillaryRestarts = restarts.filter(record =>
+    record.reactivationOwner?.trim().toLocaleLowerCase('es-MX') === 'hillary',
+  ).length
+  const attributionRecorded =
+    newPatients.filter(record => record.acquisitionOwner?.trim()).length +
+    restarts.filter(record => record.reactivationOwner?.trim()).length
+  const missingOwner =
+    newPatients.filter(record => !record.acquisitionOwner?.trim()).length +
+    restarts.filter(record => !record.reactivationOwner?.trim()).length
   const unclassified = newPatients.filter(record => !record.acquisitionSource?.trim()).length
 
   const channels = new Map<string, number>()
@@ -90,8 +102,11 @@ export function getGrowthMetrics(records: FinanceMetricRecord[]) {
     newPatients: newPatients.length,
     referred,
     advertising,
-    hillary,
+    hillary: hillaryNewPatients + hillaryRestarts,
+    hillaryNewPatients,
+    hillaryRestarts,
     attributionRecorded,
+    missingOwner,
     unclassified,
     bestAdvertisingChannel: channelRanking[0] ?? null,
     channelRanking,

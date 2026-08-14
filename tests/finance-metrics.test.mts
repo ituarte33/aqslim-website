@@ -47,10 +47,11 @@ test('counts visits and unique patients without counting supplement-only sales',
 test('separates acquisition sources and ranks advertising channels', () => {
   const records = [
     { date: '2026-08-01', tipoConsulta: 'Cliente Nuevo', montoCobrado: 40, suppTotal: 0, shippingTotal: 0, paciente: 'Ana', acquisitionSource: 'Referido' },
-    { date: '2026-08-02', tipoConsulta: 'Cliente Nuevo', montoCobrado: 40, suppTotal: 0, shippingTotal: 0, paciente: 'Luis', acquisitionSource: 'Redes Sociales', advertisingChannel: 'Instagram', attributionOwner: 'Hillary' },
+    { date: '2026-08-02', tipoConsulta: 'Cliente Nuevo', montoCobrado: 40, suppTotal: 0, shippingTotal: 0, paciente: 'Luis', acquisitionSource: 'Redes Sociales', advertisingChannel: 'Instagram', acquisitionOwner: 'Hillary' },
     { date: '2026-08-03', tipoConsulta: 'Cliente Nuevo', montoCobrado: 40, suppTotal: 0, shippingTotal: 0, paciente: 'Marta', acquisitionSource: 'Anuncio', advertisingChannel: 'Instagram' },
-    { date: '2026-08-04', tipoConsulta: 'Cliente Re-Inicio', montoCobrado: 30, suppTotal: 0, shippingTotal: 0, paciente: 'Eva', attributionOwner: 'Hillary' },
+    { date: '2026-08-04', tipoConsulta: 'Cliente Re-Inicio', montoCobrado: 30, suppTotal: 0, shippingTotal: 0, paciente: 'Eva', reactivationOwner: 'Hillary' },
     { date: '2026-08-05', tipoConsulta: 'Cliente Nuevo', montoCobrado: 40, suppTotal: 0, shippingTotal: 0, paciente: 'José' },
+    { date: '2026-08-06', tipoConsulta: 'Cliente subsecuente', montoCobrado: 30, suppTotal: 0, shippingTotal: 0, paciente: 'Luis', acquisitionOwner: 'Hillary' },
   ]
 
   const growth = getGrowthMetrics(records)
@@ -58,7 +59,10 @@ test('separates acquisition sources and ranks advertising channels', () => {
   assert.equal(growth.referred, 1)
   assert.equal(growth.advertising, 2)
   assert.equal(growth.hillary, 2)
+  assert.equal(growth.hillaryNewPatients, 1)
+  assert.equal(growth.hillaryRestarts, 1)
   assert.equal(growth.attributionRecorded, 2)
+  assert.equal(growth.missingOwner, 3)
   assert.equal(growth.unclassified, 1)
   assert.deepEqual(growth.bestAdvertisingChannel, { channel: 'Instagram', count: 2 })
 })

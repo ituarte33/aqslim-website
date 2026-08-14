@@ -394,7 +394,9 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
                 label: 'Hillary',
                 value: growth.attributionRecorded > 0 ? growth.hillary : '—',
                 note: growth.attributionRecorded > 0
-                  ? (es ? 'Captación o reactivación' : 'Acquisition or reactivation')
+                  ? (es
+                      ? `Nuevos ${growth.hillaryNewPatients} · Reinicios ${growth.hillaryRestarts}`
+                      : `New ${growth.hillaryNewPatients} · Restarts ${growth.hillaryRestarts}`)
                   : (es ? 'Se empezará a registrar desde ahora' : 'Tracking starts now'),
               },
             ].map(card => (
@@ -418,6 +420,12 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
               <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
                 {es ? 'Nuevos sin origen registrado' : 'New patients without a recorded source'}:{' '}
                 <span style={{ color: '#E2C87A' }}>{growth.unclassified}</span>
+              </div>
+            )}
+            {growth.missingOwner > 0 && (
+              <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
+                {es ? 'Nuevos o reinicios sin responsable' : 'New patients or restarts without an owner'}:{' '}
+                <span style={{ color: '#E2C87A' }}>{growth.missingOwner}</span>
               </div>
             )}
           </div>
