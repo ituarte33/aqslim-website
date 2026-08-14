@@ -1,4 +1,5 @@
 import { parseSalesNotes } from './finance-metrics'
+import { isUpcomingAppointment } from './appointment-metrics'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
@@ -225,12 +226,17 @@ export async function updateCliente(id: string, fields: Record<string, unknown>)
 }
 
 export async function getClientesConCita(): Promise<Cliente[]> {
-  const formula = encodeURIComponent('{Cita Agendada} = TRUE()')
+  const formula = encodeURIComponent(
+    'AND({Cita Agendada} = TRUE(), {Próxima Cita}, IS_AFTER({Próxima Cita}, NOW()))',
+  )
   const field = encodeURIComponent('Próxima Cita')
   const data = await airtableFetch(
     `/${CLIENTES_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${field}&sort%5B0%5D%5Bdirection%5D=asc`
   )
-  return data.records
+  const now = new Date()
+  return (data.records ?? []).filter((cliente: Cliente) =>
+    isUpcomingAppointment(cliente.fields['Próxima Cita'], now),
+  )
 }
 
 export async function createCliente(fields: Record<string, unknown>): Promise<Cliente> {
@@ -433,7 +439,8 @@ export interface FinanceRecord {
   patientKey: string
   acquisitionSource: string
   advertisingChannel: string
-  attributionOwner: string
+  acquisitionOwner: string
+  reactivationOwner: string
 }
 
 export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
@@ -493,9 +500,8 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     const paciente     = client?.name || email || ''
     const acquisitionSource = client?.acquisitionSource ?? ''
     const advertisingChannel = client?.advertisingChannel ?? ''
-    const attributionOwner = tipoConsulta === 'Cliente Re-Inicio'
-      ? ((c.fields['Responsable de Reactivación'] as string | undefined) ?? '')
-      : (client?.acquisitionOwner ?? '')
+    const acquisitionOwner = client?.acquisitionOwner ?? ''
+    const reactivationOwner = (c.fields['Responsable de Reactivación'] as string | undefined) ?? ''
 
     const parsedSales = parseSalesNotes(notas)
     const structuredSupp = c.fields['Suplemento(s) Cobrado ($)']
@@ -519,7 +525,8 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
       patientKey,
       acquisitionSource,
       advertisingChannel,
-      attributionOwner,
+      acquisitionOwner,
+      reactivationOwner,
     })
   }
   return allRecords
@@ -717,6 +724,29 @@ export async function countTodayScans(userId: string, date: string): Promise<num
     `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&fields%5B%5D=${MEAL_LOGS_FIELDS.USER_ID}`
   )
   return Array.isArray(data?.records) ? data.records.length : 0
+}
+
+export async function countScansBetween(
+  userId: string,
+  startUtc: string,
+  endUtc: string,
+): Promise<number> {
+  const formula = encodeURIComponent(
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} >= "${startUtc}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} < "${endUtc}")`,
+  )
+  let count = 0
+  let offset: string | undefined
+
+  do {
+    const offsetParam = offset ? `&offset=${encodeURIComponent(offset)}` : ''
+    const data = await airtableFetch(
+      `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&fields%5B%5D=${MEAL_LOGS_FIELDS.USER_ID}&pageSize=100${offsetParam}`,
+    )
+    count += Array.isArray(data?.records) ? data.records.length : 0
+    offset = typeof data?.offset === 'string' ? data.offset : undefined
+  } while (offset)
+
+  return count
 }
 
 export async function getMealLogsByUser(userId: string, limit = 20): Promise<MealLog[]> {

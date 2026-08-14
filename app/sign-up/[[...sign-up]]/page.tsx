@@ -1,6 +1,6 @@
-import { SignIn } from '@clerk/nextjs'
+import { SignUp } from '@clerk/nextjs'
 
-export default function SignInPage() {
+export default function SignUpPage() {
   return (
     <div style={{
       minHeight: '100vh',
@@ -9,10 +9,10 @@ export default function SignInPage() {
       justifyContent: 'center',
       background: '#0A0A0A',
     }}>
-      <SignIn
-        path="/sign-in"
+      <SignUp
+        path="/sign-up"
         routing="path"
-        signUpUrl="/sign-up"
+        signInUrl="/sign-in"
         forceRedirectUrl="/food-scanner"
       />
     </div>

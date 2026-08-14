@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { FoodLogWidget, type LogEntry } from '../food-log-widget'
+import type { FoodScanPlan } from '@/lib/food-scan-policy'
 
-type Plan = 'free' | 'mid' | 'top'
+type Plan = FoodScanPlan
 
 interface ScanResult {
   food: string
@@ -16,6 +17,37 @@ interface ScanResult {
   used: number
   limit: number
   remaining: number
+  monthlyUsed: number
+  monthlyLimit: number
+  monthlyRemaining: number
+}
+
+const DISCLOSURE_KEY = 'aqslim-food-scan-disclosure-v1'
+const MAX_IMAGE_EDGE = 1600
+
+async function dataUrlFromBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function optimizeImage(file: File): Promise<{ dataUrl: string; mimeType: 'image/jpeg' }> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Canvas unavailable')
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(value => value ? resolve(value) : reject(new Error('Image conversion failed')), 'image/jpeg', 0.82)
+  })
+  return { dataUrl: await dataUrlFromBlob(blob), mimeType: 'image/jpeg' }
 }
 
 function getLang(): 'es' | 'en' {
@@ -25,10 +57,11 @@ function getLang(): 'es' | 'en' {
 
 const COPY = {
   es: {
-    sub:        'Escáner de Alimentos',
+    sub:        'Escáner de AQ Buddy',
     dashboard:  '← Panel',
     home:       '← Inicio',
     usage:      (name: string) => `${name ? name + ' · ' : ''}Escaneos de hoy`,
+    monthlyUsage: (used: number, limit: number) => `${used} de ${limit} este mes`,
     remaining:  (n: number) => `${n} restante${n !== 1 ? 's' : ''}`,
     limitReached: 'Límite alcanzado',
     uploadTitle: 'Sube una foto de tu comida',
@@ -36,30 +69,36 @@ const COPY = {
     dropHint:   'JPG, PNG, WEBP · máx. 5 MB',
     mealTypes:  { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<string, string>,
     clear:      'Borrar',
-    analyze:    'Analizar Comida',
+    analyze:    'Analizar con AQ Buddy',
     analyzing:  'Analizando…',
-    nutritionTitle: 'Análisis Nutricional',
+    nutritionTitle: 'Estimación Nutricional',
     carbs:      'Carbos',
     fats:       'Grasas',
     protein:    'Proteína',
     kcal:       'kcal',
     placeholder: 'Los resultados aparecerán aquí tras el análisis',
     wantMore:   '¿Quieres más escaneos?',
-    upgradeText: 'Mejora tu plan para escanear 3× o comidas ilimitadas por día.',
+    upgradeText: 'Con Kenkho Start, Plus o Elite puedes registrar más comidas cada día.',
     viewPlans:  'Ver Planes',
-    plans:      { free: 'Edición Gratuita', mid: 'Nivel Medio', top: 'Nivel Premium' } as Record<Plan, string>,
-    limitError: (limit: number, plan: string) =>
-      `Límite diario alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}). Mejora para más.`,
+    plans:      { free: 'Edición Gratuita', start: 'Kenkho Start', plus: 'Kenkho Plus', elite: 'Kenkho Elite', pilot: 'Soft Start' } as Record<Plan, string>,
+    limitError: (limit: number, plan: string, period: 'day' | 'month') =>
+      `Límite ${period === 'month' ? 'mensual' : 'diario'} alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}).`,
+    estimateNotice: 'Valores aproximados para fines informativos. Confirma las porciones e ingredientes para mejorar la estimación.',
+    disclosureTitle: 'Antes de tu primer análisis',
+    disclosureBody: 'AQ Buddy utiliza análisis automatizado de imágenes para estimar calorías, carbohidratos, grasas y proteínas. Los resultados pueden contener errores y variar según las porciones, los ingredientes y la preparación.',
+    disclosureDetail: 'Esta referencia no sustituye una etiqueta nutricional ni la orientación de un profesional de salud.',
+    disclosureAccept: 'Entiendo · Continuar',
     failError:    'El análisis falló. Inténtalo de nuevo.',
     networkError: 'Error de red. Inténtalo de nuevo.',
     imageError:   'Por favor sube un archivo de imagen.',
     sizeError:    'La imagen debe ser menor a 5 MB.',
   },
   en: {
-    sub:        'Food Scanner',
+    sub:        'AQ Buddy Scanner',
     dashboard:  '← Dashboard',
     home:       '← Home',
     usage:      (name: string) => `${name ? name + ' · ' : ''}Today's scans`,
+    monthlyUsage: (used: number, limit: number) => `${used} of ${limit} this month`,
     remaining:  (n: number) => `${n} remaining`,
     limitReached: 'Limit reached',
     uploadTitle: 'Upload a meal photo',
@@ -67,20 +106,25 @@ const COPY = {
     dropHint:   'JPG, PNG, WEBP · max 5 MB',
     mealTypes:  { Breakfast: 'Breakfast', Lunch: 'Lunch', Dinner: 'Dinner', Snack: 'Snack', Other: 'Other' } as Record<string, string>,
     clear:      'Clear',
-    analyze:    'Analyze Meal',
+    analyze:    'Analyze with AQ Buddy',
     analyzing:  'Analyzing…',
-    nutritionTitle: 'Nutrition Breakdown',
+    nutritionTitle: 'Nutrition Estimate',
     carbs:      'Carbs',
     fats:       'Fats',
     protein:    'Protein',
     kcal:       'kcal',
     placeholder: 'Results will appear here after analysis',
     wantMore:   'Want more scans?',
-    upgradeText: 'Upgrade your plan to scan 3× or unlimited meals per day.',
+    upgradeText: 'Kenkho Start, Plus, or Elite lets you log more meals each day.',
     viewPlans:  'View Plans',
-    plans:      { free: 'Free Edition', mid: 'Mid Tier', top: 'Top Tier' } as Record<Plan, string>,
-    limitError: (limit: number, plan: string) =>
-      `Daily limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}). Upgrade for more.`,
+    plans:      { free: 'Free Edition', start: 'Kenkho Start', plus: 'Kenkho Plus', elite: 'Kenkho Elite', pilot: 'Soft Start' } as Record<Plan, string>,
+    limitError: (limit: number, plan: string, period: 'day' | 'month') =>
+      `${period === 'month' ? 'Monthly' : 'Daily'} limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}).`,
+    estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
+    disclosureTitle: 'Before your first analysis',
+    disclosureBody: 'AQ Buddy uses automated image analysis to estimate calories, carbohydrates, fats, and protein. Results may contain errors and vary with portions, ingredients, and preparation.',
+    disclosureDetail: 'This reference does not replace a nutrition label or guidance from a healthcare professional.',
+    disclosureAccept: 'I understand · Continue',
     failError:    'Analysis failed. Please try again.',
     networkError: 'Network error. Please try again.',
     imageError:   'Please upload an image file.',
@@ -100,11 +144,14 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [error, setError]        = useState<string | null>(null)
   const [used, setUsed]          = useState(0)
   const [limit, setLimit]        = useState(1)
+  const [monthlyUsed, setMonthlyUsed] = useState(0)
+  const [monthlyLimit, setMonthlyLimit] = useState(30)
   const [logs, setLogs]          = useState<LogEntry[]>([])
   const [logToday, setLogToday]  = useState('')
   const [logWeekStart, setLogWeekStart]   = useState('')
   const [logMonthStart, setLogMonthStart] = useState('')
   const [dragging, setDragging]  = useState(false)
+  const [disclosureAccepted, setDisclosureAccepted] = useState<boolean | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Sync language with body class
@@ -119,11 +166,17 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
   // Load today's usage + monthly log history on mount
   useEffect(() => {
+    setDisclosureAccepted(localStorage.getItem(DISCLOSURE_KEY) === 'accepted')
+  }, [])
+
+  useEffect(() => {
     fetch('/api/food-scan')
       .then(r => r.json())
       .then(d => {
         setUsed(d.used ?? 0)
         setLimit(d.limit ?? 1)
+        setMonthlyUsed(d.monthlyUsed ?? 0)
+        setMonthlyLimit(d.monthlyLimit ?? 30)
         setLogs(d.logs ?? [])
         setLogToday(d.today ?? '')
         setLogWeekStart(d.weekStart ?? '')
@@ -134,7 +187,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
   const t = COPY[lang]
 
-  function loadFile(file: File) {
+  async function loadFile(file: File) {
     if (!file.type.startsWith('image/')) {
       setError(t.imageError)
       return
@@ -145,17 +198,20 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     }
     setError(null)
     setResult(null)
-    setMimeType(file.type as typeof mimeType)
-    const reader = new FileReader()
-    reader.onload = e => setImage(e.target?.result as string)
-    reader.readAsDataURL(file)
+    try {
+      const optimized = await optimizeImage(file)
+      setMimeType(optimized.mimeType)
+      setImage(optimized.dataUrl)
+    } catch {
+      setError(t.imageError)
+    }
   }
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
     const file = e.dataTransfer.files[0]
-    if (file) loadFile(file)
+    if (file) void loadFile(file)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function analyze() {
@@ -175,9 +231,13 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
       if (!res.ok) {
         if (data.error === 'limit_reached') {
-          setError(t.limitError(data.limit, t.plans[typedPlan]))
+          const period = data.period === 'month' ? 'month' : 'day'
+          const periodLimit = period === 'month' ? data.monthlyLimit : data.limit
+          setError(t.limitError(periodLimit, t.plans[typedPlan], period))
           setUsed(data.used ?? data.limit)   // disable button immediately
           setLimit(data.limit ?? limit)
+          setMonthlyUsed(data.monthlyUsed ?? monthlyUsed)
+          setMonthlyLimit(data.monthlyLimit ?? monthlyLimit)
         } else {
           setError(t.failError)
         }
@@ -186,6 +246,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
       setResult(data)
       setUsed(data.used)
+      setMonthlyUsed(data.monthlyUsed)
+      setMonthlyLimit(data.monthlyLimit)
       setLogs(prev => [{
         id:          Date.now().toString(),
         createdTime: new Date().toISOString(),
@@ -207,7 +269,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     }
   }
 
-  const remaining = limit - used
+  const remaining = Math.min(limit - used, monthlyLimit - monthlyUsed)
   const pct = (val: number, total: number) => total > 0 ? Math.min(100, Math.round((val / total) * 100)) : 0
 
   return (
@@ -226,6 +288,26 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           </div>
         </div>
       </header>
+
+      {disclosureAccepted === false && (
+        <div className="fs-disclosure-backdrop" role="presentation">
+          <section className="fs-disclosure" role="dialog" aria-modal="true" aria-labelledby="food-scan-disclosure-title">
+            <div className="fs-disclosure-mark" aria-hidden="true">AQ</div>
+            <h1 id="food-scan-disclosure-title">{t.disclosureTitle}</h1>
+            <p>{t.disclosureBody}</p>
+            <p className="fs-disclosure-detail">{t.disclosureDetail}</p>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem(DISCLOSURE_KEY, 'accepted')
+                setDisclosureAccepted(true)
+              }}
+            >
+              {t.disclosureAccept}
+            </button>
+          </section>
+        </div>
+      )}
 
       <main className="fs-main">
         {/* Usage bar */}
@@ -249,6 +331,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             {remaining > 0 ? t.remaining(remaining) : t.limitReached}
           </span>
         </div>
+        <div className="fs-monthly-usage">{t.monthlyUsage(monthlyUsed, monthlyLimit)}</div>
 
         <div className="fs-grid">
           {/* Upload panel */}
@@ -285,7 +368,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               type="file"
               accept="image/*"
               style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) loadFile(f) }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) void loadFile(f) }}
             />
 
             <div className="fs-meal-type-row">
@@ -348,6 +431,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               {result.notes && (
                 <div className="fs-notes">{result.notes}</div>
               )}
+              <div className="fs-estimate-notice">{t.estimateNotice}</div>
 
               <div className="fs-ratio-row">
                 {[

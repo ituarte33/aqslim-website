@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
 import type { SquareBooking } from '@/lib/square'
+import { formatAppointmentDate } from '@/lib/appointment-metrics'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 
@@ -18,21 +19,6 @@ type Props = {
   bookings: SquareBooking[]
   airtableHrefs: Record<string, string>
   squareError: string | null
-}
-
-function formatDate(iso: string, lang: 'es' | 'en'): string {
-  try {
-    return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
-      timeZone: 'America/Los_Angeles',
-      weekday: 'short',
-      month:   'short',
-      day:     'numeric',
-      hour:    'numeric',
-      minute:  '2-digit',
-    }).format(new Date(iso))
-  } catch {
-    return iso
-  }
 }
 
 const STATUS_MAP: Record<string, { es: string; en: string; color: string; border: string }> = {
@@ -279,7 +265,7 @@ function BookingRow({ booking, href, lang, zebra }: {
 
       <div>
         <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans, display: 'block' }}>
-          {formatDate(booking.start_at, lang)}
+          {formatAppointmentDate(booking.start_at, lang)}
         </span>
         {booking.duration_minutes > 0 && (
           <span style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans }}>

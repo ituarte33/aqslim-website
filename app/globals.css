@@ -1238,6 +1238,60 @@ body.aqb-fullscreen-active {
   padding: 32px 24px 80px;
 }
 
+.fs-disclosure-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, .82);
+  backdrop-filter: blur(10px);
+}
+.fs-disclosure {
+  width: min(100%, 520px);
+  padding: 30px;
+  border: 1px solid rgba(201, 168, 76, .48);
+  border-radius: 12px;
+  color: #FAFAF8;
+  background: linear-gradient(145deg, #181816, #0f100f);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .55);
+}
+.fs-disclosure-mark {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 20px;
+  border: 1px solid #C9A84C;
+  border-radius: 50%;
+  color: #E2C87A;
+  font-family: 'Playfair Display', serif;
+}
+.fs-disclosure h1 {
+  margin: 0 0 14px;
+  font-family: 'Playfair Display', serif;
+  font-size: 30px;
+  font-weight: 500;
+}
+.fs-disclosure p { margin: 0 0 13px; color: #b5b0a9; font-size: 16px; line-height: 1.7; }
+.fs-disclosure .fs-disclosure-detail { color: #817c75; font-size: 14px; }
+.fs-disclosure button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 15px 18px;
+  border: 0;
+  border-radius: 3px;
+  color: #0A0A0A;
+  background: #C9A84C;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 /* Usage bar */
 .fs-usage-bar {
   display: flex;
@@ -1290,6 +1344,14 @@ body.aqb-fullscreen-active {
   font-size: 15px;
   color: #9A9590;
   white-space: nowrap;
+}
+.fs-monthly-usage {
+  margin: -18px 2px 24px;
+  color: #6A6560;
+  font-size: 13px;
+  letter-spacing: .12em;
+  text-align: right;
+  text-transform: uppercase;
 }
 
 /* Grid */
@@ -1524,6 +1586,15 @@ body.aqb-fullscreen-active {
   padding-top: 12px;
   margin-top: 4px;
 }
+.fs-estimate-notice {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-left: 2px solid rgba(201, 168, 76, .65);
+  color: #8f8a83;
+  background: rgba(201, 168, 76, .045);
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 /* Placeholder */
 .fs-result-placeholder {
@@ -1667,7 +1738,15 @@ body.aqb-fullscreen-active {
   line-height: 2;
   color: var(--gray);
   font-weight: 300;
-  margin-bottom: 36px;
+  margin-bottom: 14px;
+}
+.fsp-disclaimer {
+  margin: 0 0 32px;
+  padding-left: 13px;
+  border-left: 2px solid rgba(201, 168, 76, .55);
+  color: var(--gray-dark);
+  font-size: 14px;
+  line-height: 1.7;
 }
 .fsp-tiers {
   display: flex;
