@@ -72,6 +72,7 @@ export function getGrowthMetrics(records: FinanceMetricRecord[]) {
   const hillary = records.filter(record =>
     record.attributionOwner?.trim().toLocaleLowerCase('es-MX') === 'hillary',
   ).length
+  const attributionRecorded = records.filter(record => record.attributionOwner?.trim()).length
   const unclassified = newPatients.filter(record => !record.acquisitionSource?.trim()).length
 
   const channels = new Map<string, number>()
@@ -90,6 +91,7 @@ export function getGrowthMetrics(records: FinanceMetricRecord[]) {
     referred,
     advertising,
     hillary,
+    attributionRecorded,
     unclassified,
     bestAdvertisingChannel: channelRanking[0] ?? null,
     channelRanking,

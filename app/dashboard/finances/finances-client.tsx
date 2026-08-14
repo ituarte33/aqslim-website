@@ -390,7 +390,13 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
               { label: es ? 'Pacientes nuevos' : 'New patients', value: growth.newPatients, note: es ? 'En el período' : 'In the period' },
               { label: es ? 'Referidos' : 'Referrals', value: growth.referred, note: es ? 'Fuente: Referido' : 'Source: Referral' },
               { label: es ? 'Publicidad' : 'Advertising', value: growth.advertising, note: es ? 'Anuncio, Google o redes' : 'Ads, Google or social' },
-              { label: 'Hillary', value: growth.hillary, note: es ? 'Captación o reactivación' : 'Acquisition or reactivation' },
+              {
+                label: 'Hillary',
+                value: growth.attributionRecorded > 0 ? growth.hillary : '—',
+                note: growth.attributionRecorded > 0
+                  ? (es ? 'Captación o reactivación' : 'Acquisition or reactivation')
+                  : (es ? 'Se empezará a registrar desde ahora' : 'Tracking starts now'),
+              },
             ].map(card => (
               <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.24)', background: 'rgba(201,168,76,0.025)', padding: '20px 22px' }}>
                 <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>{card.label}</div>

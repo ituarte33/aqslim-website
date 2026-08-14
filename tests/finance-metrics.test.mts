@@ -58,6 +58,7 @@ test('separates acquisition sources and ranks advertising channels', () => {
   assert.equal(growth.referred, 1)
   assert.equal(growth.advertising, 2)
   assert.equal(growth.hillary, 2)
+  assert.equal(growth.attributionRecorded, 2)
   assert.equal(growth.unclassified, 1)
   assert.deepEqual(growth.bestAdvertisingChannel, { channel: 'Instagram', count: 2 })
 })
