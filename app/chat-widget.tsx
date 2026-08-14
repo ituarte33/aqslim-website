@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { ChatMessage } from './chat-message'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -25,6 +27,7 @@ const LABELS = {
     placeholder: 'Escribe tu pregunta...',
     send: 'Enviar',
     welcome: '¡Hola! Soy AQ Buddy, tu asistente de bienestar AQSLIM. ¿En qué te puedo ayudar hoy?',
+    starter: 'Hola, ¿qué puedes hacer por mí?',
     thinking: 'Pensando...',
     error: 'Ocurrió un error. Intenta de nuevo.',
   },
@@ -34,6 +37,7 @@ const LABELS = {
     placeholder: 'Type your question...',
     send: 'Send',
     welcome: "Hi! I'm AQ Buddy, your AQSLIM wellness assistant. How can I help you today?",
+    starter: 'Hi, what can you help me with?',
     thinking: 'Thinking...',
     error: 'An error occurred. Please try again.',
   },
@@ -54,7 +58,13 @@ function detectState(text: string): BuddyState {
 }
 
 export function ChatWidget() {
-  const [open, setOpen]           = useState(false)
+  const pathname                  = usePathname()
+  const router                    = useRouter()
+  const inPatientPortal           = pathname.startsWith('/my-aqslim')
+  const inDashboard               = pathname.startsWith('/dashboard')
+  const fullScreen                = inPatientPortal && pathname.endsWith('/buddy')
+  const demo                      = pathname.startsWith('/my-aqslim/demo/')
+  const [open, setOpen]           = useState(fullScreen)
   const [lang, setLang]           = useState<'es' | 'en'>('es')
   const [buddyState, setBuddyState] = useState<BuddyState>('idle')
   const [bubble, setBubble]       = useState('')
@@ -69,7 +79,9 @@ export function ChatWidget() {
   function increaseFontSize() { setFontSize(prev => Math.min(MAX_FONT, prev + 3)) }
   function decreaseFontSize() { setFontSize(prev => Math.max(MIN_FONT, prev - 3)) }
 
-  const bottomRef      = useRef<HTMLDivElement>(null)
+  const messagesRef    = useRef<HTMLDivElement>(null)
+  const latestUserRef  = useRef<HTMLDivElement>(null)
+  const pendingUserScrollRef = useRef(false)
   const inputRef       = useRef<HTMLTextAreaElement>(null)
   const idleTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const buddyStateRef  = useRef<BuddyState>('idle')
@@ -111,6 +123,28 @@ export function ChatWidget() {
     }
   }, [setStateWithTimeout])
 
+  // Allow prominent portal actions to open the existing governed chat surface.
+  useEffect(() => {
+    function openChat() { setOpen(true) }
+    window.addEventListener('aq-buddy-open', openChat)
+    return () => window.removeEventListener('aq-buddy-open', openChat)
+  }, [])
+
+  useEffect(() => {
+    if (fullScreen) setOpen(true)
+  }, [fullScreen])
+
+  // The full-screen patient chat owns the mobile viewport. Locking the page
+  // underneath prevents iOS from scrolling the portal header away when the
+  // text area receives focus.
+  useEffect(() => {
+    if (!fullScreen) return
+
+    window.scrollTo(0, 0)
+    document.body.classList.add('aqb-fullscreen-active')
+    return () => document.body.classList.remove('aqb-fullscreen-active')
+  }, [fullScreen])
+
   // Sync language with body class
   useEffect(() => {
     function sync() { setLang(getLang()) }
@@ -123,7 +157,7 @@ export function ChatWidget() {
 
   // Idle bubble rotation — only when chat is closed and buddy is idle
   useEffect(() => {
-    if (open) { setBubble(''); return }
+    if (open || inDashboard) { setBubble(''); return }
     function showBubble() {
       if (buddyStateRef.current !== 'idle') return
       const bubbles = IDLE_BUBBLES[lang]
@@ -134,7 +168,7 @@ export function ChatWidget() {
     const first    = setTimeout(showBubble, 1200)
     const interval = setInterval(showBubble, 10000)
     return () => { clearTimeout(first); clearInterval(interval) }
-  }, [open, lang])
+  }, [open, lang, inDashboard])
 
   // Welcome message on first open
   useEffect(() => {
@@ -145,10 +179,24 @@ export function ChatWidget() {
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to bottom
+  // Keep a new question visible while a long streamed answer grows below it.
+  // Scrolling the message container directly also prevents the page-level demo
+  // banner from being pushed out of view by Element.scrollIntoView().
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streaming])
+    const container = messagesRef.current
+    if (!container) return
+
+    if (pendingUserScrollRef.current && latestUserRef.current) {
+      const top = latestUserRef.current.offsetTop - container.offsetTop - 12
+      container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      pendingUserScrollRef.current = false
+      return
+    }
+
+    if (messages.length === 1) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [messages.length])
 
   // Focus input on open
   useEffect(() => {
@@ -164,6 +212,7 @@ export function ChatWidget() {
 
     const userMsg: Message = { role: 'user', content: text }
     const history = [...messages, userMsg]
+    pendingUserScrollRef.current = true
     setMessages(history)
     setStreaming(true)
     setBuddyState('thinking')
@@ -211,27 +260,48 @@ export function ChatWidget() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
-  return (
-    <div className="aqb-wrap">
+  function closeChat() {
+    if (fullScreen) router.back()
+    else setOpen(false)
+  }
 
-      {/* Mascot — always at top */}
-      <button
-        className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
-        onClick={() => setOpen(v => !v)}
-        aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={STATE_IMAGES[buddyState]}
-          alt="AQ Buddy"
-          className="aqb-img"
-        />
-        {!open && (
-          <div className="aqb-cta-label">
-            💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
-          </div>
-        )}
-      </button>
+  return (
+    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
+
+      {/* Admin pages use a compact launcher so patient and finance controls stay clear. */}
+      {inDashboard && !open ? (
+        <button
+          className="aqb-dashboard-launcher"
+          onClick={() => setOpen(true)}
+          aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
+          title="AQ Buddy"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5.4 17.2 4 21l4.2-1.7c1.1.5 2.4.7 3.8.7 4.9 0 8.8-3.6 8.8-8s-3.9-8-8.8-8-8.8 3.6-8.8 8c0 2 .8 3.8 2.2 5.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            <circle cx="8.5" cy="12" r="1" fill="currentColor" />
+            <circle cx="12" cy="12" r="1" fill="currentColor" />
+            <circle cx="15.5" cy="12" r="1" fill="currentColor" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
+          onClick={() => fullScreen ? undefined : setOpen(v => !v)}
+          aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={STATE_IMAGES[buddyState]}
+            alt="AQ Buddy"
+            className="aqb-img"
+          />
+          {!open && (
+            <div className="aqb-cta-label">
+              💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
+            </div>
+          )}
+        </button>
+      )}
 
       {/* Speech bubble — only when chat is closed */}
       {bubble && !open && (
@@ -245,9 +315,15 @@ export function ChatWidget() {
       {open && (
         <div className="aqb-panel">
           <div className="aqb-panel-header">
-            <div>
-              <div className="aqb-panel-title">{t.title}</div>
-              <div className="aqb-panel-subtitle">{t.subtitle}</div>
+            <div className="aqb-panel-identity">
+              {fullScreen ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={STATE_IMAGES[buddyState]} alt="AQ Buddy" className="aqb-header-avatar" />
+              ) : null}
+              <div>
+                <div className="aqb-panel-title">{t.title}</div>
+                <div className="aqb-panel-subtitle">{t.subtitle}</div>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button
@@ -266,7 +342,7 @@ export function ChatWidget() {
               >
                 A+
               </button>
-              <button className="aqb-panel-close" onClick={() => setOpen(false)} aria-label="Close">
+              <button className="aqb-panel-close" onClick={closeChat} aria-label="Close">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                   <path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>
@@ -274,19 +350,34 @@ export function ChatWidget() {
             </div>
           </div>
 
-          <div className="aqb-messages">
+          <div ref={messagesRef} className="aqb-messages">
             {messages.map((m, i) => (
-              <div key={i} className={`aqb-msg-row ${m.role}`}>
+              <div
+                key={i}
+                ref={m.role === 'user' ? latestUserRef : undefined}
+                className={`aqb-msg-row ${m.role}`}
+              >
                 <div className={`aqb-msg ${m.role}`} style={{ fontSize }}>
                   {m.content
-                    ? m.content
+                    ? m.role === 'assistant' ? <ChatMessage content={m.content} /> : m.content
                     : (streaming && i === messages.length - 1)
                       ? <><span className="aqb-dot" /><span className="aqb-dot" /><span className="aqb-dot" /></>
                       : null}
                 </div>
               </div>
             ))}
-            <div ref={bottomRef} />
+            {messages.length === 1 && !streaming ? (
+              <button
+                type="button"
+                className="aqb-starter"
+                onClick={() => {
+                  setInput(t.starter)
+                  inputRef.current?.focus()
+                }}
+              >
+                {t.starter}
+              </button>
+            ) : null}
           </div>
 
           <div className="aqb-input-row">

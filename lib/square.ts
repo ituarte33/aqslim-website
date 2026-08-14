@@ -14,8 +14,13 @@ async function squareFetch(path: string, options?: RequestInit) {
     cache: 'no-store',
   })
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Square ${res.status}: ${text}`)
+    const correlationId = crypto.randomUUID()
+    console.error('[square] provider_request_failed', {
+      correlationId,
+      method: options?.method ?? 'GET',
+      status: res.status,
+    })
+    throw new Error(`Square request failed (${correlationId})`)
   }
   return res.json()
 }

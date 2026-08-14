@@ -21,6 +21,22 @@ html { scroll-behavior:smooth; }
 body { font-family:'Montserrat',sans-serif; background:var(--black); color:var(--white); overflow-x:hidden; }
 body.marketing { cursor:none; }
 
+.finance-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 760px) {
+  .finance-attendance-grid,
+  .finance-visit-grid,
+  .finance-growth-grid,
+  .finance-revenue-grid { grid-template-columns: 1fr 1fr !important; }
+}
+
+@media (max-width: 460px) {
+  .finance-attendance-grid,
+  .finance-visit-grid,
+  .finance-growth-grid,
+  .finance-revenue-grid { grid-template-columns: 1fr !important; }
+}
+
 /* LANGUAGE MODAL */
 .lang-modal-overlay {
   position:fixed; inset:0; z-index:20000;
@@ -760,6 +776,97 @@ nav { padding:0 20px; }
   animation-delay: 1s;
 }
 .aqb-wrap > * { pointer-events: auto; }
+.aqb-wrap--dashboard {
+  top: auto;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  left: auto;
+  align-items: flex-end;
+  animation-delay: 0s;
+}
+.aqb-dashboard-launcher {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  color: #C9A84C;
+  background: rgba(10,10,10,.94);
+  border: 1px solid rgba(201,168,76,.42);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5);
+  transition: color .18s, border-color .18s, background .18s, transform .18s;
+}
+.aqb-dashboard-launcher:hover,
+.aqb-dashboard-launcher:focus-visible {
+  color: #E2C87A;
+  border-color: #C9A84C;
+  background: #171612;
+  transform: translateY(-2px);
+  outline: none;
+}
+.aqb-wrap--dashboard .aqb-img {
+  width: 96px;
+  height: 96px;
+}
+.aqb-wrap--dashboard .aqb-cta-label {
+  padding: 5px 12px;
+  font-size: 10px;
+}
+.aqb-wrap--dashboard .aqb-bubble { display: none; }
+.aqb-wrap--dashboard.aqb-wrap--open .aqb-mascot { display: none; }
+.aqb-wrap--dashboard.aqb-wrap--open .aqb-panel {
+  width: min(360px, calc(100vw - 40px));
+  max-height: min(540px, calc(100svh - 104px));
+}
+.aqb-wrap--portal:not(.aqb-wrap--fullscreen) { display: none; }
+.aqb-wrap--portal.aqb-wrap--open {
+  top: 90px;
+  left: calc(50% - 180px);
+}
+.aqb-wrap--portal.aqb-wrap--open .aqb-mascot {
+  display: none;
+}
+.aqb-wrap--fullscreen {
+  top: 0;
+  right: 0;
+  bottom: 78px;
+  left: 0;
+  z-index: 44;
+  display: block;
+  animation: none;
+}
+.aqb-wrap--fullscreen.aqb-wrap--demo { top: 42px; }
+.aqb-wrap--fullscreen.aqb-wrap--open { top: 0; left: 0; }
+.aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 42px; }
+body.aqb-fullscreen-active {
+  height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.aqb-wrap--fullscreen .aqb-panel {
+  width: min(100%, 860px);
+  height: 100%;
+  max-height: none;
+  margin: 0 auto;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: 0 0 70px rgba(0,0,0,.38);
+}
+.aqb-wrap--fullscreen .aqb-panel-header { padding: 16px 20px; }
+.aqb-wrap--fullscreen .aqb-panel-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; letter-spacing: .04em; }
+.aqb-wrap--fullscreen .aqb-panel-subtitle { font-size: 11px; }
+.aqb-panel-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.aqb-header-avatar {
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(201,168,76,.38));
+}
+.aqb-wrap--fullscreen .aqb-messages { padding: 20px; }
+.aqb-wrap--fullscreen .aqb-input-row { padding: 12px 18px max(12px, env(safe-area-inset-bottom)); }
 
 /* Chat panel */
 .aqb-panel {
@@ -863,6 +970,36 @@ nav { padding:0 20px; }
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 8px 8px 8px 2px;
 }
+.aqb-rich-text { white-space: normal; }
+.aqb-rich-text > :first-child { margin-top: 0; }
+.aqb-rich-text > :last-child { margin-bottom: 0; }
+.aqb-rich-text p { margin: 0 0 .85em; }
+.aqb-rich-text h3 {
+  margin: 1.05em 0 .45em;
+  color: #E2C87A;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.aqb-rich-text ul,
+.aqb-rich-text ol { margin: .45em 0 .9em; padding-left: 1.35em; }
+.aqb-rich-text li { margin: .35em 0; padding-left: .15em; }
+.aqb-rich-text strong { color: #FFF4C6; font-weight: 600; }
+.aqb-starter {
+  align-self: flex-start;
+  max-width: min(88%, 390px);
+  border: 1px solid rgba(201,168,76,.4);
+  border-radius: 999px;
+  padding: 9px 13px;
+  color: #E2C87A;
+  background: rgba(201,168,76,.07);
+  font: 500 12px/1.4 'Montserrat', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.aqb-starter:hover,
+.aqb-starter:focus-visible { border-color: #E2C87A; background: rgba(201,168,76,.13); }
 .aqb-dot {
   display: inline-block;
   width: 6px; height: 6px;
@@ -1011,6 +1148,44 @@ nav { padding:0 20px; }
   .aqb-img   { width: 110px; height: 110px; }
   .aqb-bubble { max-width: 180px; }
   .aqb-cta-label { font-size: 11px; padding: 5px 14px; }
+  .aqb-wrap--dashboard {
+    top: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: auto;
+  }
+  .aqb-wrap--dashboard .aqb-img { width: 82px; height: 82px; }
+  .aqb-wrap--dashboard .aqb-cta-label { font-size: 9px; padding: 4px 10px; }
+  .aqb-wrap--dashboard.aqb-wrap--open .aqb-panel {
+    width: calc(100vw - 24px);
+    max-height: calc(100svh - 88px);
+  }
+  .aqb-wrap--portal.aqb-wrap--open {
+    top: 82px;
+    right: 12px;
+    left: 12px;
+  }
+  .aqb-wrap--fullscreen.aqb-wrap--open {
+    top: 0;
+    right: 0;
+    bottom: 78px;
+    left: 0;
+  }
+  .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 42px; }
+  .aqb-header-avatar { width: 48px; height: 48px; flex-basis: 48px; }
+  .aqb-wrap--portal.aqb-wrap--open .aqb-panel {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 180px);
+  }
+  .aqb-wrap--fullscreen.aqb-wrap--open .aqb-panel {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+}
+
+@media (max-width: 390px) {
+  .aqb-wrap--fullscreen.aqb-wrap--demo.aqb-wrap--open { top: 50px; }
 }
 
 /* ── Food Scanner Page ───────────────────────────────────────── */

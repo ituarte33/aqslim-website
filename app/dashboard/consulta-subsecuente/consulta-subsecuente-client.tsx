@@ -582,6 +582,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [nivelEnergia,    setNivelEnergia]    = useState<string | null>(null)
   const [calidadSueno,    setCalidadSueno]    = useState<string | null>(null)
   const [metodoPago,      setMetodoPago]      = useState<string | null>(null)
+  const [responsableReactivacion, setResponsableReactivacion] = useState('')
   const [ansiedad,        setAnsiedad]        = useState<string | null>(null)
   const [tuvoHambre,      setTuvoHambre]      = useState<string | null>(null)
   const [cumplimiento,    setCumplimiento]    = useState<number | null>(null)
@@ -660,6 +661,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     formData.set('clienteRecordId', patient.id)
     formData.set('tipoConsulta', tipoConsulta)
     formData.set('montoCobrado', montoCobradoTotal > 0 ? String(montoCobradoTotal) : '')
+    formData.set('consultaCobrado', String(parseFloat(consultaFee) || 0))
+    formData.set('suplementoCobrado', String(supplementTotal))
+    formData.set('envioCobrado', String(shippingCost))
+    if (responsableReactivacion) formData.set('responsableReactivacion', responsableReactivacion)
     if (ansiedad)   formData.set('ansiedad',   ansiedad)
     if (tuvoHambre) formData.set('tuvoHambre', tuvoHambre)
     if (nivelEnergia)  formData.set('nivelEnergia',       nivelEnergia)
@@ -860,6 +865,23 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
               </button>
             ))}
           </div>
+
+          {tipoConsulta === 'Cliente Re-Inicio' && (
+            <div>
+              <label htmlFor="cs-responsable-reactivacion" style={labelStyle}>
+                {es ? 'Responsable de reactivación' : 'Reactivation owner'}
+              </label>
+              <select
+                id="cs-responsable-reactivacion"
+                value={responsableReactivacion}
+                onChange={e => setResponsableReactivacion(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">{es ? 'Sin especificar' : 'Unspecified'}</option>
+                {['Hillary', 'Rómulo', 'Otro'].map(option => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+          )}
 
           <SectionDivider label={es ? 'Fecha' : 'Date'} />
 

@@ -1,3 +1,5 @@
+import { parseSalesNotes } from './finance-metrics'
+
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
 export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
@@ -15,6 +17,8 @@ export const CLIENTES_FIELDS = {
   ZIP:                  'fldwbSOM9G3h3qYCG',
   IDIOMA_PREFERIDO:     'fldRpFEL77yUkfaPG',
   COMO_NOS_CONOCIO:     'fldE5rU0yD6dZqNKw',
+  CANAL_PUBLICIDAD:     'fld4SiXi1JGKAWqEJ',
+  RESPONSABLE_CAPTACION:'fldFGDQeQxXAKRgDM',
   ACEPTO_TERMINOS:      'fldaHiraHz4bhhjVD',
   ESTADO_DEL_CLIENTE:   'fldqyYielhA0GDF0h',
   META_DEL_CLIENTE:     'fldxBWCYYqlUJIqM1',
@@ -40,12 +44,14 @@ async function airtableFetch(path: string, options?: RequestInit) {
     cache: 'no-store',
   })
   if (!res.ok) {
-    const text = await res.text()
     const method = options?.method ?? 'GET'
-    console.error('[airtable] error', method, path)
-    if (options?.body) console.error('[airtable] request body:', options.body)
-    console.error('[airtable] response:', res.status, text)
-    throw new Error(`Airtable ${res.status}: ${text}`)
+    const correlationId = crypto.randomUUID()
+    console.error('[airtable] provider_request_failed', {
+      correlationId,
+      method,
+      status: res.status,
+    })
+    throw new Error(`Airtable request failed (${correlationId})`)
   }
   return res.json()
 }
@@ -73,6 +79,8 @@ export interface Cliente {
     'Estado del Cliente'?: string
     'Idioma Preferido'?: string
     'Cómo Nos Conoció'?: string
+    'Canal de Publicidad'?: string
+    'Responsable de Captación'?: string
     'He leído y acepto los términos anteriores'?: boolean
     'Meta del Cliente'?: string
     'Condiciones Especiales / Alergias'?: string
@@ -80,6 +88,7 @@ export interface Cliente {
     'Cita Agendada'?: boolean
     'Próxima Cita'?: string
     'Servicio Próxima Cita'?: string
+    'Plan AQSLIM'?: string[]
     [key: string]: unknown
   }
 }
@@ -140,10 +149,53 @@ export async function getClientes(): Promise<Cliente[]> {
   return records
 }
 
+export type ClientesPage = {
+  records: Cliente[]
+  offset: string | null
+}
+
+export async function getClientesPage({
+  offset,
+  query,
+  pageSize = 100,
+}: {
+  offset?: string | null
+  query?: string
+  pageSize?: number
+} = {}): Promise<ClientesPage> {
+  const params = new URLSearchParams({ pageSize: String(Math.min(Math.max(pageSize, 1), 100)) })
+  if (offset) params.set('offset', offset)
+
+  const normalizedQuery = query?.trim().replace(/[\u0000-\u001F\u007F]/g, '')
+  if (normalizedQuery) {
+    const escapedQuery = escapeAirtableString(normalizedQuery)
+    params.set(
+      'filterByFormula',
+      `OR(SEARCH("${escapedQuery.toLowerCase()}",LOWER({Nombre Completo})),SEARCH("${escapedQuery.toLowerCase()}",LOWER({Email})),SEARCH("${escapedQuery}",{Teléfono}&""))`,
+    )
+  }
+
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?${params}`)
+  return {
+    records: data.records ?? [],
+    offset: typeof data.offset === 'string' ? data.offset : null,
+  }
+}
+
+function escapeAirtableString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export async function getClientesByEmail(email: string): Promise<Cliente[]> {
+  const normalizedEmail = escapeAirtableString(email.trim().toLowerCase())
+  const formula = encodeURIComponent(`LOWER({Email}) = "${normalizedEmail}"`)
+  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}&maxRecords=2`)
+  return data.records ?? []
+}
+
 export async function getClienteByEmail(email: string): Promise<Cliente | null> {
-  const formula = encodeURIComponent(`{Email} = "${email}"`)
-  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}`)
-  return data.records[0] ?? null
+  const records = await getClientesByEmail(email)
+  return records.length === 1 ? records[0] : null
 }
 
 export async function getClienteByNombre(nombre: string): Promise<Cliente | null> {
@@ -375,22 +427,13 @@ export interface FinanceRecord {
   montoCobrado: number
   metodoPago: string
   suppTotal: number
+  shippingTotal: number
   suppItems: Array<{ nombre: string; precio: number }>
   paciente: string
-}
-
-function parseSuppNotes(notes: string): { total: number; items: Array<{ nombre: string; precio: number }> } {
-  if (!notes || !notes.includes('Suplementos vendidos:')) return { total: 0, items: [] }
-  const items: Array<{ nombre: string; precio: number }> = []
-  let total = 0
-  for (const line of notes.split('\n')) {
-    const m = line.match(/^- (.+) \(\$([0-9.]+)\)$/)
-    if (m) items.push({ nombre: m[1], precio: parseFloat(m[2]) })
-    const t = line.match(/^Total: \$([0-9.]+)$/)
-    if (t) total = parseFloat(t[1])
-  }
-  if (total === 0 && items.length > 0) total = items.reduce((s, i) => s + i.precio, 0)
-  return { total, items }
+  patientKey: string
+  acquisitionSource: string
+  advertisingChannel: string
+  attributionOwner: string
 }
 
 export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
@@ -412,10 +455,21 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     })(),
   ])
 
-  // Map Airtable record ID → Nombre Completo
-  const nameMap = new Map<string, string>()
+  // Keep acquisition data attached to the patient so every consultation can
+  // be analyzed without duplicating client records.
+  const clientMap = new Map<string, {
+    name: string
+    acquisitionSource: string
+    advertisingChannel: string
+    acquisitionOwner: string
+  }>()
   for (const c of clientes) {
-    nameMap.set(c.id, c.fields['Nombre Completo'] ?? '')
+    clientMap.set(c.id, {
+      name: c.fields['Nombre Completo'] ?? '',
+      acquisitionSource: (c.fields['Cómo Nos Conoció'] as string | undefined) ?? '',
+      advertisingChannel: c.fields['Canal de Publicidad'] ?? '',
+      acquisitionOwner: c.fields['Responsable de Captación'] ?? '',
+    })
   }
 
   const allRecords: FinanceRecord[] = []
@@ -434,10 +488,39 @@ export async function getConsultasFinanceData(): Promise<FinanceRecord[]> {
     const clienteIds   = Array.isArray(idClienteRaw) ? (idClienteRaw as string[]) : []
     const emailRaw     = c.fields['Email Cliente']
     const email        = Array.isArray(emailRaw) ? (emailRaw[0] as string ?? '') : ((emailRaw as string | undefined) ?? '')
-    const paciente     = (clienteIds.length > 0 ? (nameMap.get(clienteIds[0]) ?? '') : '') || email || ''
+    const patientKey   = clienteIds[0] ?? email.toLocaleLowerCase('es-MX')
+    const client       = clienteIds.length > 0 ? clientMap.get(clienteIds[0]) : undefined
+    const paciente     = client?.name || email || ''
+    const acquisitionSource = client?.acquisitionSource ?? ''
+    const advertisingChannel = client?.advertisingChannel ?? ''
+    const attributionOwner = tipoConsulta === 'Cliente Re-Inicio'
+      ? ((c.fields['Responsable de Reactivación'] as string | undefined) ?? '')
+      : (client?.acquisitionOwner ?? '')
 
-    const { total: suppTotal, items: suppItems } = parseSuppNotes(notas)
-    allRecords.push({ id: c.id, date, tipoConsulta, montoCobrado, metodoPago, suppTotal, suppItems, paciente })
+    const parsedSales = parseSalesNotes(notas)
+    const structuredSupp = c.fields['Suplemento(s) Cobrado ($)']
+    const structuredShipping = c.fields['Envio (Shipping) Cobrado ($)']
+    const structuredConsultation = c.fields['Consulta Cobrado ($)']
+    const suppTotal = typeof structuredSupp === 'number' ? structuredSupp : parsedSales.supplementTotal
+    const shippingTotal = typeof structuredShipping === 'number' ? structuredShipping : parsedSales.shippingTotal
+    const normalizedMonto = typeof structuredConsultation === 'number'
+      ? structuredConsultation + suppTotal + shippingTotal
+      : montoCobrado
+    allRecords.push({
+      id: c.id,
+      date,
+      tipoConsulta,
+      montoCobrado: normalizedMonto,
+      metodoPago,
+      suppTotal,
+      shippingTotal,
+      suppItems: parsedSales.items,
+      paciente,
+      patientKey,
+      acquisitionSource,
+      advertisingChannel,
+      attributionOwner,
+    })
   }
   return allRecords
 }
@@ -470,6 +553,35 @@ export async function getConsultasByCliente(nombreCliente: string): Promise<Cons
   const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
   return data.records
+}
+
+// ---------- Plan AQSLIM ----------
+
+export interface PlanAqslim {
+  id: string
+  fields: {
+    'ID Plan'?: number
+    'ID Cliente'?: string[]
+    'Nombre Cliente'?: string
+    'Fecha Inicio Tratamiento'?: string
+    'Semanas Totales en Tratamiento'?: number
+    'Fase Actual'?: string
+    'Semana en Fase Actual'?: number
+    'Fecha Inicio Fase Actual'?: string
+    'Fecha Estimada Cambio de Fase'?: string
+    'Peso Inicio (kg)'?: number
+    'Peso Actual (kg)'?: number
+    'Peso Meta (kg)'?: number
+    'Total Bajado (kg)'?: number
+    '% Progreso hacia Meta'?: string
+    'Siguiente Fase'?: string[]
+    'Instrucciones Especiales'?: string
+    [key: string]: unknown
+  }
+}
+
+export async function getPlanById(id: string): Promise<PlanAqslim> {
+  return airtableFetch(`/Plan%20AQSLIM/${id}`)
 }
 
 // ---------- Suplementos ----------

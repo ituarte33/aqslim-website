@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
   // Fetch the full email body
   const { data: email, error } = await resend.emails.receiving.get(email_id)
   if (error || !email?.text) {
-    console.error('[booking-webhook] Failed to fetch email body:', error)
+    console.error('[booking-webhook] email_body_fetch_failed', {
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+    })
     return NextResponse.json({ ok: true })
   }
 
@@ -51,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   const cliente = await getClienteByEmail(customerEmail).catch(() => null)
   if (!cliente) {
-    console.log('[booking-webhook] No Airtable record for email:', customerEmail)
+    console.log('[booking-webhook] patient_record_not_found')
     return NextResponse.json({ ok: true })
   }
 
@@ -67,14 +69,14 @@ export async function POST(request: NextRequest) {
       [CLIENTES_FIELDS.PROXIMA_CITA]:          appointmentDatetime ?? null,
       [CLIENTES_FIELDS.SERVICIO_PROXIMA_CITA]: serviceName ?? null,
     })
-    console.log(`[booking-webhook] Booked for ${customerEmail} — ${serviceName} @ ${appointmentDatetime}`)
+    console.log('[booking-webhook] booking_recorded')
   } else {
     await updateCliente(cliente.id, {
       [CLIENTES_FIELDS.CITA_AGENDADA]:         false,
       [CLIENTES_FIELDS.PROXIMA_CITA]:          null,
       [CLIENTES_FIELDS.SERVICIO_PROXIMA_CITA]: null,
     })
-    console.log(`[booking-webhook] Cancelled for ${customerEmail}`)
+    console.log('[booking-webhook] cancellation_recorded')
   }
 
   return NextResponse.json({ ok: true })

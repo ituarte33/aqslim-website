@@ -1,8 +1,8 @@
 'use server'
 
-import { currentUser } from '@clerk/nextjs/server'
 import { Resend } from 'resend'
-import { getClienteByEmail, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
+import { updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
+import { getOwnPatient, requireCapability } from '@/lib/auth'
 
 const CUESTIONARIO_URL  = 'https://aqslim.com/cuestionario'
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -101,10 +101,8 @@ function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
 }
 
 export async function updateProfileAndAcceptTerminos(formData: FormData) {
-  const user = await currentUser()
-  if (!user) throw new Error('Not authenticated')
-  const email = user.emailAddresses[0]?.emailAddress
-  if (!email) throw new Error('No email')
+  await requireCapability('profile:write:self')
+  const cliente = await getOwnPatient()
 
   const firstName       = (formData.get('firstName')       as string).trim()
   const lastName        = (formData.get('lastName')        as string).trim()
@@ -121,9 +119,6 @@ export async function updateProfileAndAcceptTerminos(formData: FormData) {
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones')    as string) ?? '').trim()
   const estaturaCm      = ((formData.get('estaturaCm')     as string) ?? '').trim()
-
-  const cliente = await getClienteByEmail(email)
-  if (!cliente) throw new Error('Registro no encontrado')
 
   const fields: Record<string, unknown> = {
     [CLIENTES_FIELDS.NOMBRE_COMPLETO]:   [firstName, lastName].filter(Boolean).join(' '),
@@ -149,21 +144,15 @@ export async function updateProfileAndAcceptTerminos(formData: FormData) {
 }
 
 export async function acceptTerminos() {
-  const user = await currentUser()
-  if (!user) throw new Error('Not authenticated')
-  const email = user.emailAddresses[0]?.emailAddress
-  if (!email) throw new Error('No email')
-  const cliente = await getClienteByEmail(email)
-  if (!cliente) throw new Error('Registro no encontrado')
+  await requireCapability('profile:write:self')
+  const cliente = await getOwnPatient()
   await updateCliente(cliente.id, { [CLIENTES_FIELDS.ACEPTO_TERMINOS]: true })
 }
 
 export async function saveProfile(formData: FormData) {
-  const user = await currentUser()
-  if (!user) throw new Error('Not authenticated')
-
-  const email = user.emailAddresses[0]?.emailAddress
-  if (!email) throw new Error('No email')
+  const actor = await requireCapability('profile:write:self')
+  const cliente = await getOwnPatient()
+  const email = actor.email
 
   const firstName       = (formData.get('firstName') as string).trim()
   const lastName        = (formData.get('lastName') as string).trim()
@@ -180,9 +169,6 @@ export async function saveProfile(formData: FormData) {
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones') as string) ?? '').trim()
   const estaturaCm      = ((formData.get('estaturaCm')  as string) ?? '').trim()
-
-  const cliente = await getClienteByEmail(email)
-  if (!cliente) throw new Error('Registro no encontrado')
 
   const fields: Record<string, unknown> = {
     [CLIENTES_FIELDS.NOMBRE_COMPLETO]:    [firstName, lastName].filter(Boolean).join(' '),
@@ -222,8 +208,10 @@ export async function saveProfile(formData: FormData) {
       subject,
       html: cuestionarioEmailHtml(nombre, lang),
     })
-    console.log(`[saveProfile] Sent questionnaire email to ${email}`)
+    console.log('[saveProfile] questionnaire_email_sent')
   } catch (err) {
-    console.error('[saveProfile] Failed to send questionnaire email:', err)
+    console.error('[saveProfile] questionnaire_email_failed', {
+      errorType: err instanceof Error ? err.name : 'UnknownError',
+    })
   }
 }

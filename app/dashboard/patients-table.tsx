@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Cliente } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
@@ -20,8 +20,7 @@ function safeStr(val: unknown): string {
 
 const PREFERRED_FIRST = ['Nombre Completo', 'ID Cliente', 'Edad']
 
-export function PatientsTable({ patients }: { patients: Cliente[] }) {
-  const [search, setSearch] = useState('')
+export function PatientsTable({ patients, lang }: { patients: Cliente[]; lang: 'es' | 'en' }) {
   const router = useRouter()
 
   const columns = useMemo(() => {
@@ -32,40 +31,8 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
     return [...preferred, ...rest]
   }, [patients])
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return patients
-    const q = search.toLowerCase()
-    return patients.filter(p =>
-      columns.some(col => safeStr(p.fields[col]).toLowerCase().includes(q))
-    )
-  }, [patients, search, columns])
-
   return (
     <div>
-      {/* Search */}
-      <div style={{ marginBottom: 24 }}>
-        <input
-          type="text"
-          placeholder="Buscar paciente..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{
-            width: '100%', maxWidth: 380,
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(201,168,76,0.3)',
-            color: '#FAFAF8',
-            padding: '10px 16px',
-            fontSize: pt.base,
-            outline: 'none',
-          }}
-        />
-        {search && (
-          <span style={{ marginLeft: 16, fontSize: pt.sm, color: '#9A9590' }}>
-            {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
-          </span>
-        )}
-      </div>
-
       {/* Table */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: pt.base }}>
@@ -82,7 +49,7 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p, i) => (
+            {patients.map((p, i) => (
               <tr
                 key={p.id}
                 onClick={() => router.push(`/dashboard/${p.id}`)}
@@ -109,9 +76,9 @@ export function PatientsTable({ patients }: { patients: Cliente[] }) {
         </table>
       </div>
 
-      {filtered.length === 0 && (
+      {patients.length === 0 && (
         <p style={{ color: '#6A6560', fontSize: pt.base, marginTop: 32, textAlign: 'center' }}>
-          No se encontraron resultados para &ldquo;{search}&rdquo;
+          {lang === 'es' ? 'No se encontraron pacientes.' : 'No patients were found.'}
         </p>
       )}
     </div>

@@ -5,10 +5,11 @@ import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
 import type { FinanceRecord } from '@/lib/airtable'
 import type { getFinancesSummary, SquarePayment } from '@/lib/square'
+import { getFinanceMetrics, getGrowthMetrics } from '@/lib/finance-metrics'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type PeriodType = 'day' | 'week' | 'month'
+type PeriodType = 'day' | 'week' | 'month' | 'year'
 
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
@@ -74,6 +75,7 @@ function getMondayOfWeek(dateStr: string): string {
 
 function getInitialAnchor(type: PeriodType): string {
   const today = getTodayStr()
+  if (type === 'year') return today.slice(0, 4) + '-01-01'
   if (type === 'month') return today.slice(0, 7) + '-01'
   if (type === 'week')  return getMondayOfWeek(today)
   return today
@@ -86,6 +88,10 @@ function getPeriodBounds(
 ): { start: string; end: string; label: string } {
   const [y, m, d] = anchor.split('-').map(Number)
   const locale = lang === 'es' ? 'es-MX' : 'en-US'
+
+  if (type === 'year') {
+    return { start: `${y}-01-01`, end: `${y}-12-31`, label: String(y) }
+  }
 
   if (type === 'month') {
     const start = `${y}-${String(m).padStart(2, '0')}-01`
@@ -119,7 +125,8 @@ function navigateAnchor(anchor: string, type: PeriodType, dir: -1 | 1): string {
   const date = new Date(Date.UTC(y, m - 1, d))
   if (type === 'day')       date.setUTCDate(date.getUTCDate() + dir)
   else if (type === 'week') date.setUTCDate(date.getUTCDate() + dir * 7)
-  else                      date.setUTCMonth(date.getUTCMonth() + dir)
+  else if (type === 'month') date.setUTCMonth(date.getUTCMonth() + dir)
+  else                       date.setUTCFullYear(date.getUTCFullYear() + dir)
   return date.toISOString().slice(0, 10)
 }
 
@@ -127,7 +134,8 @@ function isNextFuture(anchor: string, type: PeriodType): boolean {
   const today = getTodayStr()
   if (type === 'day')  return anchor > today
   if (type === 'week') return anchor > getMondayOfWeek(today)
-  return anchor.slice(0, 7) > today.slice(0, 7)
+  if (type === 'month') return anchor.slice(0, 7) > today.slice(0, 7)
+  return anchor.slice(0, 4) > today.slice(0, 4)
 }
 
 function formatShortDate(dateStr: string, lang: 'es' | 'en'): string {
@@ -168,6 +176,7 @@ const PERIOD_LABELS: Record<PeriodType, { es: string; en: string }> = {
   day:   { es: 'Día',    en: 'Day'   },
   week:  { es: 'Semana', en: 'Week'  },
   month: { es: 'Mes',    en: 'Month' },
+  year:  { es: 'Año',    en: 'Year'  },
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
@@ -200,9 +209,9 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
     [records, start, end],
   )
 
-  const totalRevenue    = filtered.reduce((s, r) => s + r.montoCobrado, 0)
-  const totalSupp       = filtered.reduce((s, r) => s + r.suppTotal, 0)
-  const consultaRevenue = totalRevenue - totalSupp
+  const metrics = useMemo(() => getFinanceMetrics(filtered), [filtered])
+  const growth = useMemo(() => getGrowthMetrics(filtered), [filtered])
+  const { totalRevenue, supplementRevenue: totalSupp, shippingRevenue: totalShipping, consultationRevenue: consultaRevenue } = metrics
 
   const byMethod = useMemo(() => {
     const map = new Map<string, { total: number; count: number }>()
@@ -231,8 +240,8 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
       </h1>
       <p style={{ fontSize: pt.base, color: '#6A6560', marginBottom: 40, marginTop: 0 }}>
         {es
-          ? 'Ingresos del mes según los registros de consultas y Square.'
-          : 'Monthly revenue from consultation records and Square.'}
+          ? 'Pacientes atendidos e ingresos según los registros de consultas y Square.'
+          : 'Patient visits and revenue from consultation records and Square.'}
       </p>
 
       {airtableError && (
@@ -252,7 +261,7 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
 
         {/* Period tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {(['day', 'week', 'month'] as PeriodType[]).map(type => (
+          {(['day', 'week', 'month', 'year'] as PeriodType[]).map(type => (
             <button
               key={type}
               onClick={() => handlePeriodTypeChange(type)}
@@ -291,17 +300,53 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
         <SectionSubtitle>
           {filtered.length > 0
             ? `${filtered.length} ${es
-                ? (filtered.length === 1 ? 'consulta registrada' : 'consultas registradas')
-                : (filtered.length === 1 ? 'recorded consultation' : 'recorded consultations')}`
-            : (es ? 'Sin consultas en este período' : 'No consultations in this period')}
+                ? (filtered.length === 1 ? 'movimiento registrado' : 'movimientos registrados')
+                : (filtered.length === 1 ? 'recorded transaction' : 'recorded transactions')}`
+            : (es ? 'Sin movimientos en este período' : 'No transactions in this period')}
         </SectionSubtitle>
 
-        {/* Summary cards: Total | Consultas | Suplementos */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div className="finance-attendance-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          {[
+            {
+              label: es ? 'Pacientes distintos atendidos' : 'Distinct patients attended',
+              value: metrics.uniquePatients,
+              note: es ? 'Cada persona se cuenta una sola vez' : 'Each person is counted once',
+            },
+            {
+              label: es ? 'Total de visitas' : 'Total visits',
+              value: metrics.visitCount,
+              note: es ? 'Una persona puede tener más de una visita' : 'One person may have more than one visit',
+            },
+          ].map(card => (
+            <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.04)', padding: '24px 28px' }}>
+              <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: pt.sans, marginBottom: 8 }}>{card.label}</div>
+              <div style={{ fontSize: 40, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1 }}>{card.value}</div>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', fontFamily: pt.sans, marginTop: 8 }}>{card.note}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="finance-visit-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
+          {[
+            { label: es ? 'Nuevas' : 'New', value: metrics.newVisitCount, note: es ? 'Primera consulta' : 'First consultation' },
+            { label: es ? 'Subsecuentes' : 'Returning', value: metrics.subsequentVisitCount, note: es ? 'Seguimientos' : 'Follow-up visits' },
+            { label: es ? 'Reinicios' : 'Restarts', value: metrics.restartVisitCount, note: es ? 'Regresaron al programa' : 'Returned to the program' },
+          ].map(card => (
+            <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.2)', padding: '18px 22px' }}>
+              <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>{card.label}</div>
+              <div style={{ fontSize: 32, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1 }}>{card.value}</div>
+              <div style={{ fontSize: pt.xs, color: '#6A6560', marginTop: 7 }}>{card.note}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Summary cards: Total | Consultas | Suplementos | Envíos */}
+        <div className="finance-revenue-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
           {[
             { label: es ? 'Total del Período' : 'Period Total',  value: totalRevenue,    accent: true  },
             { label: es ? 'Consultas'          : 'Consultations', value: consultaRevenue, accent: false },
             { label: es ? 'Suplementos'        : 'Supplements',   value: totalSupp,       accent: false },
+            { label: es ? 'Envíos'              : 'Shipping',      value: totalShipping,   accent: false },
           ].map(({ label: cardLabel, value, accent }) => (
             <div key={cardLabel} style={{
               border: `1px solid rgba(201,168,76,${accent ? '0.35' : '0.22'})`,
@@ -335,13 +380,57 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
           </div>
         )}
 
+        <div style={{ marginTop: 32, marginBottom: 24 }}>
+          <SectionTitle>{es ? 'Crecimiento y adquisición' : 'Growth and acquisition'}</SectionTitle>
+          <SectionSubtitle>
+            {es ? 'Origen de pacientes nuevos y responsable de captación o reactivación' : 'Source of new patients and acquisition or reactivation owner'}
+          </SectionSubtitle>
+          <div className="finance-growth-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
+            {[
+              { label: es ? 'Pacientes nuevos' : 'New patients', value: growth.newPatients, note: es ? 'En el período' : 'In the period' },
+              { label: es ? 'Referidos' : 'Referrals', value: growth.referred, note: es ? 'Fuente: Referido' : 'Source: Referral' },
+              { label: es ? 'Publicidad' : 'Advertising', value: growth.advertising, note: es ? 'Anuncio, Google o redes' : 'Ads, Google or social' },
+              {
+                label: 'Hillary',
+                value: growth.attributionRecorded > 0 ? growth.hillary : '—',
+                note: growth.attributionRecorded > 0
+                  ? (es ? 'Captación o reactivación' : 'Acquisition or reactivation')
+                  : (es ? 'Se empezará a registrar desde ahora' : 'Tracking starts now'),
+              },
+            ].map(card => (
+              <div key={card.label} style={{ border: '1px solid rgba(201,168,76,0.24)', background: 'rgba(201,168,76,0.025)', padding: '20px 22px' }}>
+                <div style={{ fontSize: pt.xs, color: '#9A9590', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>{card.label}</div>
+                <div style={{ fontSize: 34, fontFamily: pt.serif, color: '#C9A84C', lineHeight: 1 }}>{card.value}</div>
+                <div style={{ fontSize: pt.xs, color: '#6A6560', marginTop: 8 }}>{card.note}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ border: '1px solid rgba(201,168,76,0.15)', padding: '16px 20px', display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
+              {es ? 'Mejor canal publicitario' : 'Best advertising channel'}:{' '}
+              <span style={{ color: '#FAFAF8' }}>
+                {growth.bestAdvertisingChannel
+                  ? `${growth.bestAdvertisingChannel.channel} (${growth.bestAdvertisingChannel.count})`
+                  : (es ? 'Aún sin datos en este período' : 'No data yet in this period')}
+              </span>
+            </div>
+            {growth.unclassified > 0 && (
+              <div style={{ fontSize: pt.sm, color: '#9A9590' }}>
+                {es ? 'Nuevos sin origen registrado' : 'New patients without a recorded source'}:{' '}
+                <span style={{ color: '#E2C87A' }}>{growth.unclassified}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Consultation detail table */}
         {filtered.length > 0 && (
-          <div>
+          <div className="finance-table-scroll">
             {/* Header row */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '88px minmax(100px,1fr) 148px 80px 80px 90px 108px',
+              gridTemplateColumns: '88px minmax(140px,1fr) 148px 80px 80px 70px 90px 108px',
+              minWidth: 920,
               gap: 12, padding: '8px 16px 10px',
               borderBottom: '1px solid rgba(201,168,76,0.2)',
             }}>
@@ -351,6 +440,7 @@ export function FinancesClient({ user, records, squareSummary, squareError, airt
                 es ? 'Tipo'     : 'Type',
                 es ? 'Consulta' : 'Consult.',
                 es ? 'Suplem.'  : 'Suppl.',
+                es ? 'Envío'    : 'Shipping',
                 'Total',
                 es ? 'Método'   : 'Method',
               ].map(h => (
@@ -507,7 +597,7 @@ function ConsultaRow({
   zebra: boolean
 }) {
   const es = lang === 'es'
-  const consultaFee = Math.max(0, record.montoCobrado - record.suppTotal)
+  const consultaFee = Math.max(0, record.montoCobrado - record.suppTotal - record.shippingTotal)
   const hasSupp = record.suppTotal > 0 || record.suppItems.length > 0
 
   return (
@@ -517,7 +607,8 @@ function ConsultaRow({
     }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '88px minmax(100px,1fr) 148px 80px 80px 90px 108px',
+        gridTemplateColumns: '88px minmax(140px,1fr) 148px 80px 80px 70px 90px 108px',
+        minWidth: 920,
         gap: 12, padding: '13px 16px', alignItems: 'center',
       }}>
         <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans }}>
@@ -541,6 +632,9 @@ function ConsultaRow({
         <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans, textAlign: 'right' }}>
           {hasSupp ? formatUSD(record.suppTotal) : '—'}
         </span>
+        <span style={{ fontSize: pt.sm, color: '#9A9590', fontFamily: pt.sans, textAlign: 'right' }}>
+          {record.shippingTotal > 0 ? formatUSD(record.shippingTotal) : '—'}
+        </span>
         <span style={{ fontSize: pt.base, color: '#C9A84C', fontFamily: pt.serif, textAlign: 'right' }}>
           {formatUSD(record.montoCobrado)}
         </span>
@@ -555,7 +649,7 @@ function ConsultaRow({
 
       {/* Supplement items */}
       {record.suppItems.length > 0 && (
-        <div style={{ padding: '0 16px 10px 340px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ padding: '0 16px 10px 384px', display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 920 }}>
           {record.suppItems.map((item, i) => (
             <span key={i} style={{
               fontSize: pt.xs, color: '#9A9590', fontFamily: pt.sans,

@@ -1,18 +1,10 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClienteByEmail, hasCuestionario } from '@/lib/airtable'
+import { hasCuestionario } from '@/lib/airtable'
+import { requireOwnPatient } from '@/lib/auth'
 import { CuestionarioClient } from './cuestionario-client'
 
 export default async function CuestionarioPage() {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
-
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-  if (!email) redirect('/sign-in')
-
-  const cliente = await getClienteByEmail(email)
-  if (!cliente) redirect('/onboarding')
+  const cliente = await requireOwnPatient('questionnaire:write:self')
 
   const alreadySubmitted = await hasCuestionario(cliente.fields['Nombre Completo'] ?? '')
   if (alreadySubmitted) redirect('/onboarding')

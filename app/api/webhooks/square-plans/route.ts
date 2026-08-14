@@ -135,8 +135,10 @@ async function updateClerkUserPlan(email: string, plan: string): Promise<void> {
     await clerk.users.updateUserMetadata(users.data[0].id, {
       privateMetadata: { plan },
     })
-    console.log(`[square-plans] ${email} → plan: ${plan}`)
+    console.log('[square-plans] plan_metadata_updated')
   } catch (err) {
-    console.error('[square-plans] Failed to update Clerk metadata:', err)
+    console.error('[square-plans] plan_metadata_update_failed', {
+      errorType: err instanceof Error ? err.name : 'UnknownError',
+    })
   }
 }

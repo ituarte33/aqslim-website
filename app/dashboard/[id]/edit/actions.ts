@@ -2,6 +2,7 @@
 
 import { Resend } from 'resend'
 import { getClienteById, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
+import { requireCapability } from '@/lib/auth'
 
 const CUESTIONARIO_URL   = 'https://aqslim.com/cuestionario'
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -112,6 +113,7 @@ function noShowEmailHtml(nombre: string, lang: 'es' | 'en'): string {
 }
 
 export async function sendNoShowEmail(clienteId: string): Promise<void> {
+  await requireCapability('patients:write:any')
   const patient = await getClienteById(clienteId)
   const email  = patient.fields['Email']
   const nombre = String(patient.fields['Nombre Completo'] ?? '')
@@ -129,6 +131,7 @@ export async function sendNoShowEmail(clienteId: string): Promise<void> {
 }
 
 export async function sendReinitiationEmail(clienteId: string): Promise<void> {
+  await requireCapability('patients:write:any')
   const patient = await getClienteById(clienteId)
   const email  = patient.fields['Email']
   const nombre = patient.fields['Nombre Completo'] ?? ''
@@ -153,6 +156,8 @@ function mmddyyyyToISO(date: string): string | undefined {
 }
 
 export async function updatePaciente(formData: FormData): Promise<void> {
+  await requireCapability('patients:write:any')
+
   const clienteId      = (formData.get('clienteId')       as string).trim()
   const firstName      = (formData.get('firstName')       as string).trim()
   const lastName       = (formData.get('lastName')        as string).trim()
@@ -167,6 +172,8 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   const unidadDePeso   = (formData.get('unidadDePeso')   as string).trim()
   const pesoMeta       = ((formData.get('pesoMeta')      as string) ?? '').trim()
   const comoNosConocio = ((formData.get('comoNosConocio') as string) ?? '').trim()
+  const canalPublicidad = ((formData.get('canalPublicidad') as string) ?? '').trim()
+  const responsableCaptacion = ((formData.get('responsableCaptacion') as string) ?? '').trim()
   const estadoDelCliente=(formData.get('estadoDelCliente') as string).trim()
   const metaDelCliente = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones    = ((formData.get('condiciones')   as string) ?? '').trim()
@@ -194,6 +201,8 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   if (zip)        fields[CLIENTES_FIELDS.ZIP]              = parseInt(zip, 10)
   if (pesoMeta)   fields[CLIENTES_FIELDS.PESO_META]        = parseInt(pesoMeta, 10)
   if (estaturaCm) fields[CLIENTES_FIELDS.ESTATURA_CM]      = parseInt(estaturaCm, 10)
+  if (canalPublicidad) fields[CLIENTES_FIELDS.CANAL_PUBLICIDAD] = canalPublicidad
+  if (responsableCaptacion) fields[CLIENTES_FIELDS.RESPONSABLE_CAPTACION] = responsableCaptacion
 
   await updateCliente(clienteId, fields)
 }

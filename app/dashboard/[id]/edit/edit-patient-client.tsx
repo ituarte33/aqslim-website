@@ -97,6 +97,8 @@ export function EditPatientClient({ patient }: Props) {
     (f['Unidad de Peso'] as 'Lbs' | 'Kg') ?? 'Lbs'
   )
   const [comoNosConocio, setComoNosConocio] = useState<string | null>(f['Cómo Nos Conoció'] ?? null)
+  const [canalPublicidad, setCanalPublicidad] = useState((f['Canal de Publicidad'] as string | undefined) ?? '')
+  const [responsableCaptacion, setResponsableCaptacion] = useState((f['Responsable de Captación'] as string | undefined) ?? '')
   const [telefono, setTelefono]             = useState(f['Teléfono'] ?? '')
   const [fechaNacimiento, setFechaNacimiento] = useState(isoToMmddyyyy(f['Fecha Nacimiento']))
 
@@ -166,6 +168,8 @@ export function EditPatientClient({ patient }: Props) {
     formData.set('idioma',          idioma)
     formData.set('unidadDePeso',    unidadDePeso)
     formData.set('comoNosConocio',  comoNosConocio ?? '')
+    formData.set('canalPublicidad', canalPublicidad)
+    formData.set('responsableCaptacion', responsableCaptacion)
     const estaturaCmVal = estaturaUnit === 'cm'
       ? estaturaCm
       : (() => {
@@ -412,6 +416,24 @@ export function EditPatientClient({ patient }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {['Anuncio', 'Google search', 'Redes Sociales'].includes(comoNosConocio ?? '') && (
+            <div>
+              <label htmlFor="canalPublicidad" style={labelStyle}>Canal de Publicidad</label>
+              <select id="canalPublicidad" value={canalPublicidad} onChange={e => setCanalPublicidad(e.target.value)} style={inputStyle}>
+                <option value="">Seleccionar…</option>
+                {['Facebook', 'Instagram', 'Google', 'TikTok', 'YouTube', 'Otro'].map(option => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="responsableCaptacion" style={labelStyle}>Responsable de Captación</label>
+            <select id="responsableCaptacion" value={responsableCaptacion} onChange={e => setResponsableCaptacion(e.target.value)} style={inputStyle}>
+              <option value="">Sin especificar</option>
+              {['Hillary', 'Rómulo', 'Otro'].map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
           </div>
 
           <SectionDivider label="Metas y Salud" />

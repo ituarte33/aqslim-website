@@ -2,6 +2,7 @@
 
 import { Resend } from 'resend'
 import { createCliente, CLIENTES_FIELDS } from '@/lib/airtable'
+import { requireCapability } from '@/lib/auth'
 
 const CUESTIONARIO_URL   = 'https://aqslim.com/cuestionario'
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -122,6 +123,8 @@ function welcomeEmailHtml(nombre: string, lang: 'es' | 'en'): string {
 }
 
 export async function registerPaciente(formData: FormData): Promise<{ id: string; nombre: string }> {
+  await requireCapability('patients:write:any')
+
   const firstName       = (formData.get('firstName')       as string).trim()
   const lastName        = (formData.get('lastName')        as string).trim()
   const email           = (formData.get('email')           as string).trim().toLowerCase()
@@ -135,6 +138,8 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
   const unidadDePeso    = (formData.get('unidadDePeso')    as string).trim()
   const pesoMeta        = ((formData.get('pesoMeta')       as string) ?? '').trim()
   const comoNosConocio  = (formData.get('comoNosConocio')  as string).trim()
+  const canalPublicidad = ((formData.get('canalPublicidad') as string) ?? '').trim()
+  const responsableCaptacion = ((formData.get('responsableCaptacion') as string) ?? '').trim()
   const metaDelCliente  = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones     = ((formData.get('condiciones')    as string) ?? '').trim()
   const estaturaCm      = ((formData.get('estaturaCm')     as string) ?? '').trim()
@@ -163,6 +168,8 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
   if (pesoMeta)    fields[CLIENTES_FIELDS.PESO_META]            = parseInt(pesoMeta, 10)
   if (condiciones) fields[CLIENTES_FIELDS.CONDICIONES_ALERGIAS] = condiciones
   if (estaturaCm)  fields[CLIENTES_FIELDS.ESTATURA_CM]          = parseInt(estaturaCm, 10)
+  if (canalPublicidad) fields[CLIENTES_FIELDS.CANAL_PUBLICIDAD] = canalPublicidad
+  if (responsableCaptacion) fields[CLIENTES_FIELDS.RESPONSABLE_CAPTACION] = responsableCaptacion
 
   const cliente = await createCliente(fields)
 
@@ -180,7 +187,9 @@ export async function registerPaciente(formData: FormData): Promise<{ id: string
       html: isReinicio ? reinitiationEmailHtml(nombre, lang) : welcomeEmailHtml(nombre, lang),
     })
   } catch (err) {
-    console.error('[registerPaciente] Failed to send email:', err)
+    console.error('[registerPaciente] welcome_email_failed', {
+      errorType: err instanceof Error ? err.name : 'UnknownError',
+    })
   }
 
   return { id: cliente.id, nombre }

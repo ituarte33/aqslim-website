@@ -1,11 +1,14 @@
 'use server'
 
 import { updateConsulta } from '@/lib/airtable'
+import { requireCapability } from '@/lib/auth'
 
 export async function updateConsultaRecord(
   consultaId: string,
   formData: FormData,
 ): Promise<void> {
+  await requireCapability('consultations:write:any')
+
   function num(key: string): number | null {
     const v = parseFloat((formData.get(key) as string | null) ?? '')
     return isNaN(v) ? null : v
