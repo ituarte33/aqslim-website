@@ -1,8 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getClientes, getConsultasByCliente, createProspecto, getClientesConCita, getConsultasRevenueSummary } from '@/lib/airtable'
+import { getClientes, getConsultasByCliente, createProspecto, getConsultasRevenueSummary } from '@/lib/airtable'
 import { AuthorizationError, getOwnPatient, requireActor, requireCapability } from '@/lib/auth'
-import { getMonthlyRevenue, getTodaysBookingCount } from '@/lib/square'
+import { getMonthlyRevenue, getTodaysBookingCount, getUpcomingBookings } from '@/lib/square'
 import { DashboardClient } from './dashboard-client'
 
 export default async function DashboardPage() {
@@ -42,25 +42,27 @@ export default async function DashboardPage() {
   await requireCapability('patients:read:any')
   const user = await currentUser()
   let patients: Awaited<ReturnType<typeof getClientes>> = []
-  let upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>> = []
+  let upcomingBookings: Awaited<ReturnType<typeof getUpcomingBookings>> = []
   let monthlyRevenue: number | null = null
   let todaysBookingCount: number | null = null
   let consultasCash: number | null = null
   let consultasCard: number | null = null
   let airtableError: string | null = null
   try {
-    ;[patients, upcomingCitas] = await Promise.all([getClientes(), getClientesConCita()])
+    patients = await getClientes()
   } catch (e) {
     airtableError = e instanceof Error ? e.message : String(e)
   }
   // Non-blocking — Square or Airtable being down should not break the dashboard
-  const [_rev, _bookings, _consultas] = await Promise.all([
+  const [_rev, _bookings, _upcoming, _consultas] = await Promise.all([
     getMonthlyRevenue().catch((): null => null),
     getTodaysBookingCount().catch((): null => null),
+    getUpcomingBookings().catch(() => []),
     getConsultasRevenueSummary().catch((): null => null),
   ])
   monthlyRevenue  = _rev
   todaysBookingCount = _bookings
+  upcomingBookings = _upcoming
   consultasCash  = _consultas?.cash ?? null
   consultasCard  = _consultas?.card ?? null
 
@@ -68,7 +70,7 @@ export default async function DashboardPage() {
     <DashboardClient
       user={user ? { firstName: user.firstName, lastName: user.lastName } : null}
       patients={patients}
-      upcomingCitas={upcomingCitas}
+      upcomingBookings={upcomingBookings}
       monthlyRevenue={monthlyRevenue}
       todaysBookingCount={todaysBookingCount}
       consultasCash={consultasCash}

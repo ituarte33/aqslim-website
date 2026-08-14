@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { DashboardShell } from './dashboard-shell'
-import type { getClientes, getClientesConCita } from '@/lib/airtable'
+import type { getClientes } from '@/lib/airtable'
+import type { SquareBooking } from '@/lib/square'
+import { formatAppointmentDate } from '@/lib/appointment-metrics'
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
@@ -11,7 +13,7 @@ import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
   patients: Awaited<ReturnType<typeof getClientes>>
-  upcomingCitas: Awaited<ReturnType<typeof getClientesConCita>>
+  upcomingBookings: SquareBooking[]
   monthlyRevenue: number | null
   todaysBookingCount: number | null
   consultasCash: number | null
@@ -73,27 +75,11 @@ const copy = {
   },
 }
 
-function formatCitaDate(iso: string | undefined, lang: 'es' | 'en'): string {
-  if (!iso) return lang === 'es' ? 'Fecha pendiente' : 'Date pending'
-  try {
-    return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
-      timeZone: 'America/Los_Angeles',
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(new Date(iso))
-  } catch {
-    return iso
-  }
-}
-
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
 }
 
-export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue, todaysBookingCount, consultasCash, consultasCard, airtableError }: Props) {
+export function DashboardClient({ user, patients, upcomingBookings, monthlyRevenue, todaysBookingCount, consultasCash, consultasCard, airtableError }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const t = copy[lang]
   const es = lang === 'es'
@@ -171,22 +157,22 @@ export function DashboardClient({ user, patients, upcomingCitas, monthlyRevenue,
           description={t.appointments.desc}
           linkLabel={t.appointments.link}
           preview={
-            upcomingCitas.length === 0 ? (
+            upcomingBookings.length === 0 ? (
               <p style={{ fontSize: pt.sm, color: '#6A6560', margin: 0 }}>
                 {t.appointments.none}
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {upcomingCitas.slice(0, 3).map(c => (
-                  <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                {upcomingBookings.slice(0, 3).map(booking => (
+                  <div key={booking.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                     <span style={{ fontSize: pt.sm, color: '#FAFAF8', fontFamily: pt.sans }}>
-                      {c.fields['Nombre Completo'] ?? c.fields['Email']}
+                      {booking.customer_name ?? booking.customer_email ?? booking.customer_phone ?? (es ? 'Sin nombre' : 'No name')}
                     </span>
                     <span style={{ fontSize: pt.xs, color: '#9A9590', fontFamily: pt.sans, flexShrink: 0 }}>
-                      {c.fields['Servicio Próxima Cita']
-                        ? `${c.fields['Servicio Próxima Cita']} · `
+                      {booking.service_name
+                        ? `${booking.service_name} · `
                         : ''}
-                      {formatCitaDate(c.fields['Próxima Cita'], lang)}
+                      {formatAppointmentDate(booking.start_at, lang)}
                     </span>
                   </div>
                 ))}
