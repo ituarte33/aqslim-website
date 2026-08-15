@@ -1,0 +1,48 @@
+.page { min-height: 100svh; color: #f7f3e8; background: #080908; font-family: Montserrat, sans-serif; }
+.header { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px clamp(20px,5vw,56px); border-bottom: 1px solid rgba(201,168,76,.3); background: #101110; }
+.brand { color: #f7f3e8; font: 500 25px/1 'Playfair Display',serif; letter-spacing: .11em; text-decoration: none; }
+.brand span { color: #c9a84c; }
+.header > span { padding: 9px 14px; border: 1px solid rgba(201,168,76,.55); color: #d8b85a; font-size: 10px; letter-spacing: .22em; }
+.content { width: min(760px,calc(100% - 32px)); margin: 0 auto; padding: 34px 0 110px; }
+.back { color: #b7b1a8; font-size: 12px; text-decoration: none; }
+.content > h1 { margin: 38px 0 12px; color: #e1bd56; font: 400 clamp(32px,7vw,54px)/1.08 'Playfair Display',serif; }
+.intro { max-width: 650px; margin: 0 0 30px; color: #aaa49c; font-size: 16px; line-height: 1.7; }
+.formPanel { display: grid; gap: 18px; padding: clamp(20px,5vw,36px); border: 1px solid rgba(201,168,76,.35); background: #111210; }
+.upload { min-height: 250px; display: grid; place-items: center; align-content: center; gap: 12px; overflow: hidden; border: 1px dashed rgba(201,168,76,.52); color: #a6a198; background: #0d0e0d; cursor: pointer; }
+.upload b { color: #c9a84c; font-size: 36px; font-weight: 400; }
+.upload span { font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
+.upload small { color: #716d67; font-size: 12px; letter-spacing: .08em; }
+.upload img { width: 100%; max-height: 390px; object-fit: contain; }
+.field { display: grid; gap: 9px; }
+.field span,.context > span { color: #8d8881; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+.field input { min-height: 52px; padding: 0 15px; border: 1px solid rgba(201,168,76,.3); border-radius: 0; color: #f7f3e8; background: #151614; font: 16px Montserrat,sans-serif; }
+.field input:focus { border-color: #c9a84c; outline: none; }
+.context { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px; border: 1px solid rgba(201,168,76,.25); }
+.context strong { color: #d8b85a; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
+.analyze { min-height: 58px; border: 0; color: #090a09; background: #d1ad4b; font: 700 12px/1.2 Montserrat,sans-serif; letter-spacing: .18em; text-transform: uppercase; cursor: pointer; }
+.analyze:disabled { opacity: .38; cursor: not-allowed; }
+.error { margin: 0; color: #e67a65; font-size: 13px; }
+.disclosure { margin: 0; color: #858078; font-size: 12px; line-height: 1.65; text-align: center; }
+.results { margin-top: 40px; }
+.results h2 { margin: 0 0 18px; color: #f7f3e8; font: 400 27px 'Playfair Display',serif; }
+.result { display: grid; grid-template-columns: 42px 1fr; gap: 16px; margin: 10px 0; padding: 20px; border: 1px solid rgba(201,168,76,.28); background: #111210; }
+.rank { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; color: #c9a84c; }
+.result h3 { margin: 0 0 8px; color: #c9a84c; font-size: 12px; letter-spacing: .17em; text-transform: uppercase; }
+.result strong { display: block; color: #f2eee5; font: 400 20px 'Playfair Display',serif; }
+.result p { margin: 7px 0; color: #aaa49c; font-size: 14px; line-height: 1.55; }
+.result small { color: #d0cbc1; font-size: 12px; line-height: 1.55; }
+.best h3,.best .rank { color: #9bc459; }
+.avoid h3,.avoid .rank { color: #e06b57; }
+.confidence { margin: 18px 0 0; color: #858078; font-size: 12px; line-height: 1.6; }
+@media (max-width: 520px) {
+  .header { min-height: 64px; padding: 12px 18px; }
+  .header > span { max-width: 130px; text-align: center; }
+  .content { width: min(100% - 24px,760px); padding-top: 24px; }
+  .content > h1 { margin-top: 26px; }
+  .intro { font-size: 14px; }
+  .formPanel { padding: 16px; }
+  .upload { min-height: 210px; }
+  .context { align-items: flex-start; flex-direction: column; }
+  .result { grid-template-columns: 34px 1fr; padding: 16px 14px; }
+  .rank { width: 32px; height: 32px; }
+}

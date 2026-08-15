@@ -46,7 +46,8 @@ const FEATURES: FeatureDefinition[] = [
     icon: '🍽',
     title: { es: '¿Qué puedo comer aquí?', en: 'What can I eat here?' },
     description: { es: 'Orientación de AQ Buddy a partir del menú del restaurante.', en: 'AQ Buddy guidance from a restaurant menu.' },
-    released: false,
+    href: '/my-aqslim/pilot/restaurant',
+    released: true,
   },
   {
     id: 'fridge_recipes',

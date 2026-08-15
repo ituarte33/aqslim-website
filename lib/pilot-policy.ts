@@ -13,10 +13,10 @@ export type PilotFeature =
 export const ACTIVE_PILOT_FEATURES: readonly PilotFeature[] = [
   'aq_buddy',
   'food_scan',
+  'restaurant_advisor',
 ]
 
 export const PLANNED_PILOT_FEATURES: readonly PilotFeature[] = [
-  'restaurant_advisor',
   'fridge_recipes',
   'weekly_summary',
 ]

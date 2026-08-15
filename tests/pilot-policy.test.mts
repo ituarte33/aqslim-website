@@ -19,7 +19,7 @@ test('active pilot features are always available to an enrolled participant', ()
       cohort: PILOT_COHORT_ID,
       role: 'technical',
       language: 'en',
-      features: ['restaurant_advisor', 'unknown_feature'],
+      features: ['unknown_feature'],
     },
   })
   assert.ok(access)
