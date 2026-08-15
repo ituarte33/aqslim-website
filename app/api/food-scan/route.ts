@@ -2,10 +2,12 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { countScansBetween, createMealLog, getMealLogsSince, type MealType } from '@/lib/airtable'
 import {
+  effectiveFoodScanPlan,
   evaluateFoodScanUsage,
   foodScanPeriodBoundaries,
   foodScanPolicyFor,
 } from '@/lib/food-scan-policy'
+import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -21,8 +23,12 @@ export async function POST(req: Request) {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user  = await currentUser()
-  const policy = foodScanPolicyFor(user?.privateMetadata?.plan)
+  const user = await currentUser()
+  const privateMetadata = user?.privateMetadata
+  const policy = foodScanPolicyFor(effectiveFoodScanPlan(
+    privateMetadata?.plan,
+    pilotAccessFromMetadata(privateMetadata) !== null,
+  ))
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
@@ -143,8 +149,12 @@ export async function GET() {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user  = await currentUser()
-  const policy = foodScanPolicyFor(user?.privateMetadata?.plan)
+  const user = await currentUser()
+  const privateMetadata = user?.privateMetadata
+  const policy = foodScanPolicyFor(effectiveFoodScanPlan(
+    privateMetadata?.plan,
+    pilotAccessFromMetadata(privateMetadata) !== null,
+  ))
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
 

@@ -1,7 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { ScannerClient } from './scanner-client'
-import { normalizeFoodScanPlan } from '@/lib/food-scan-policy'
+import { effectiveFoodScanPlan } from '@/lib/food-scan-policy'
+import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
 
 export const metadata = {
   title: 'AQ Buddy Food Scanner — AQSLIM',
@@ -13,7 +14,11 @@ export default async function FoodScannerPage() {
   if (!userId) redirect('/sign-in')
 
   const user = await currentUser()
-  const plan      = normalizeFoodScanPlan(user?.privateMetadata?.plan)
+  const privateMetadata = user?.privateMetadata
+  const plan = effectiveFoodScanPlan(
+    privateMetadata?.plan,
+    pilotAccessFromMetadata(privateMetadata) !== null,
+  )
   const firstName = user?.firstName ?? ''
 
   return <ScannerClient plan={plan} userName={firstName} />

@@ -798,6 +798,63 @@ nav { padding:0 20px; }
   transition: color .18s, border-color .18s, background .18s, transform .18s;
 }
 .aqb-mobile-launcher { display: none; }
+.aqb-wrap--compact {
+  top: auto;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: auto;
+  align-items: flex-end;
+  animation-delay: 0s;
+}
+.aqb-compact-launcher {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  color: #17130A;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,.62));
+  transition: transform .18s ease, filter .18s ease;
+}
+.aqb-compact-img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 11px rgba(201,168,76,.38));
+}
+.aqb-compact-label {
+  min-width: 78px;
+  padding: 5px 10px;
+  color: #17130A;
+  background: linear-gradient(135deg, #E4C663, #B88B25);
+  border: 1px solid rgba(255,235,164,.6);
+  border-radius: 999px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.aqb-compact-launcher:hover,
+.aqb-compact-launcher:focus-visible {
+  transform: translateY(-2px) scale(1.02);
+  filter: drop-shadow(0 10px 24px rgba(0,0,0,.7));
+  outline: none;
+}
+.aqb-compact-launcher:focus-visible .aqb-compact-label {
+  outline: 2px solid rgba(226,200,122,.72);
+  outline-offset: 3px;
+}
+.aqb-wrap--compact.aqb-wrap--open .aqb-panel {
+  width: min(360px, calc(100vw - 40px));
+  max-height: min(540px, calc(100svh - 104px));
+}
 .aqb-dashboard-launcher:hover,
 .aqb-dashboard-launcher:focus-visible {
   color: #E2C87A;
@@ -1172,6 +1229,16 @@ body.aqb-fullscreen-active {
     outline-offset: 3px;
   }
   .aqb-panel { width: calc(100vw - 40px); max-height: 420px; }
+  .aqb-wrap--compact {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .aqb-compact-img { width: 68px; height: 68px; }
+  .aqb-compact-label { min-width: 72px; padding: 5px 9px; font-size: 8px; }
+  .aqb-wrap--compact.aqb-wrap--open .aqb-panel {
+    width: calc(100vw - 24px);
+    max-height: calc(100svh - 88px);
+  }
   .aqb-img   { width: 110px; height: 110px; }
   .aqb-bubble { max-width: 180px; }
   .aqb-cta-label { font-size: 11px; padding: 5px 14px; }

@@ -62,6 +62,7 @@ export function ChatWidget() {
   const router                    = useRouter()
   const inPatientPortal           = pathname.startsWith('/my-aqslim')
   const inDashboard               = pathname.startsWith('/dashboard')
+  const compactLauncher           = inDashboard || pathname.startsWith('/food-scanner')
   const fullScreen                = inPatientPortal && pathname.endsWith('/buddy')
   const demo                      = pathname.startsWith('/my-aqslim/demo/')
   const [open, setOpen]           = useState(fullScreen)
@@ -266,23 +267,29 @@ export function ChatWidget() {
   }
 
   return (
-    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
+    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${compactLauncher ? ' aqb-wrap--compact' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
-      {/* Admin pages use a compact launcher so patient and finance controls stay clear. */}
-      {inDashboard && !open ? (
-        <button
-          className="aqb-dashboard-launcher"
-          onClick={() => setOpen(true)}
-          aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
-          title="AQ Buddy"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M5.4 17.2 4 21l4.2-1.7c1.1.5 2.4.7 3.8.7 4.9 0 8.8-3.6 8.8-8s-3.9-8-8.8-8-8.8 3.6-8.8 8c0 2 .8 3.8 2.2 5.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-            <circle cx="8.5" cy="12" r="1" fill="currentColor" />
-            <circle cx="12" cy="12" r="1" fill="currentColor" />
-            <circle cx="15.5" cy="12" r="1" fill="currentColor" />
-          </svg>
-        </button>
+      {/* Dashboard and scanner surfaces keep AQ Buddy visible without covering the work area. */}
+      {compactLauncher ? (
+        !open && !fullScreen ? (
+          <button
+            className="aqb-compact-launcher"
+            onClick={() => setOpen(true)}
+            aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
+            title="AQ Buddy"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={STATE_IMAGES[buddyState]}
+              alt=""
+              className="aqb-compact-img"
+              aria-hidden="true"
+            />
+            <span className="aqb-compact-label">
+              {lang === 'es' ? '¿Hablamos?' : 'Let’s chat'}
+            </span>
+          </button>
+        ) : null
       ) : (
         <>
           {!open && !fullScreen ? (
@@ -321,7 +328,7 @@ export function ChatWidget() {
       )}
 
       {/* Speech bubble — only when chat is closed */}
-      {bubble && !open && (
+      {bubble && !open && !compactLauncher && (
         <div className="aqb-bubble">
           <div className="aqb-bubble-text">{bubble}</div>
           <div className="aqb-bubble-tail" />

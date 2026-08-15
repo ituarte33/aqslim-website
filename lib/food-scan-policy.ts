@@ -54,6 +54,10 @@ export function normalizeFoodScanPlan(value: unknown): FoodScanPlan {
   return LEGACY_PLAN_MAP[normalized] ?? 'free'
 }
 
+export function effectiveFoodScanPlan(value: unknown, hasPilotAccess: boolean): FoodScanPlan {
+  return hasPilotAccess ? 'pilot' : normalizeFoodScanPlan(value)
+}
+
 export function foodScanPolicyFor(value: unknown): FoodScanPolicy {
   return POLICIES[normalizeFoodScanPlan(value)]
 }

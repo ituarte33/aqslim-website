@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  effectiveFoodScanPlan,
   evaluateFoodScanUsage,
   foodScanPeriodBoundaries,
   foodScanPolicyFor,
@@ -18,6 +19,12 @@ test('canonical and legacy plan names resolve to governed limits', () => {
     { daily: foodScanPolicyFor('pilot').dailyLimit, monthly: foodScanPolicyFor('pilot').monthlyLimit },
     { daily: 15, monthly: 450 },
   )
+})
+
+test('active Soft Start access takes precedence over a free or missing plan', () => {
+  assert.equal(effectiveFoodScanPlan('free', true), 'pilot')
+  assert.equal(effectiveFoodScanPlan(undefined, true), 'pilot')
+  assert.equal(effectiveFoodScanPlan('plus', false), 'plus')
 })
 
 test('daily and monthly limits fail closed independently', () => {
