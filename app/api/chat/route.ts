@@ -162,13 +162,15 @@ async function resolveVerifiedContext(value: unknown, clerkUserId: string): Prom
   ])
   if (!mealLog) return ''
 
-  const validCarbs = todaysMealLogs
+  const consumedMealLogs = todaysMealLogs
+    ?.filter((log) => log.fields['Consumption Status'] === 'Consumed')
+  const validCarbs = consumedMealLogs
     ?.map((log) => log.fields['Carbs (g)'])
     .filter((carbs): carbs is number => typeof carbs === 'number' && Number.isFinite(carbs) && carbs >= 0)
   const carbsLoggedToday = validCarbs
     ? validCarbs.reduce((total, carbs) => total + carbs, 0)
     : null
-  const currentMealWasLoggedToday = todaysMealLogs?.some((log) => log.id === mealLog.id) ?? false
+  const currentMealWasLoggedToday = consumedMealLogs?.some((log) => log.id === mealLog.id) ?? false
   const currentMealCarbs = mealLog.fields['Carbs (g)']
   const carbsLoggedTodayExcludingCurrentMeal = carbsLoggedToday !== null
     ? Math.max(
@@ -190,6 +192,7 @@ async function resolveVerifiedContext(value: unknown, clerkUserId: string): Prom
     mealType: mealLog.fields['Meal Type'] ?? null,
     phase: portal?.phase ?? null,
     weekInPhase: portal?.weekInPhase ?? null,
+    consumptionStatus: mealLog.fields['Consumption Status'] ?? 'Unconfirmed',
     carbsLoggedToday,
     carbsLoggedTodayExcludingCurrentMeal,
   })

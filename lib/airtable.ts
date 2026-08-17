@@ -639,9 +639,11 @@ export const MEAL_LOGS_FIELDS = {
   PLAN:             'fldDToUQRdKhv89aF',
   NOTES:            'fldaKtk9h5u2riid3',
   MEAL_TYPE:        'fld7Pc0AxN4ujVWvZ',
+  CONSUMPTION_STATUS:'fldASx146GvUjwhI6',
 } as const
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'
+export type ConsumptionStatus = 'Unconfirmed' | 'Consumed' | 'Reference only'
 
 export interface MealLog {
   id: string
@@ -659,6 +661,7 @@ export interface MealLog {
     'Plan'?: string
     'Notes'?: string
     'Meal Type'?: MealType
+    'Consumption Status'?: ConsumptionStatus
   }
 }
 
@@ -695,9 +698,26 @@ export async function createMealLog(data: {
         [MEAL_LOGS_FIELDS.PROTEINS_G]:       data.proteins,
         [MEAL_LOGS_FIELDS.TIMESTAMP]:        new Date().toISOString(),
         [MEAL_LOGS_FIELDS.PLAN]:             data.plan,
+        [MEAL_LOGS_FIELDS.CONSUMPTION_STATUS]:'Unconfirmed',
         ...(data.notes    ? { [MEAL_LOGS_FIELDS.NOTES]:     data.notes }    : {}),
         ...(data.mealType ? { [MEAL_LOGS_FIELDS.MEAL_TYPE]: data.mealType } : {}),
       },
+    }),
+  })
+}
+
+export async function updateMealLogConsumptionStatus(
+  recordId: string,
+  userId: string,
+  status: Exclude<ConsumptionStatus, 'Unconfirmed'>,
+): Promise<MealLog | null> {
+  const record = await getMealLogForUser(recordId, userId)
+  if (!record) return null
+
+  return airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: { [MEAL_LOGS_FIELDS.CONSUMPTION_STATUS]: status },
     }),
   })
 }

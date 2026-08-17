@@ -8,6 +8,8 @@ import type { FoodScanPlan } from '@/lib/food-scan-policy'
 type Plan = FoodScanPlan
 
 interface ScanResult {
+  mealLogId: string
+  consumptionStatus: 'Unconfirmed' | 'Consumed' | 'Reference only'
   food: string
   calories: number
   carbs: number
@@ -90,12 +92,20 @@ const COPY = {
     kcal:       'kcal',
     placeholder: 'Los resultados aparecerán aquí tras el análisis',
     wantMore:   '¿Quieres más escaneos?',
-    upgradeText: 'Con Kenkho Start, Plus o Elite puedes registrar más comidas cada día.',
+    upgradeText: 'Con Kenkho Start, Plus o Elite puedes analizar más platos cada día.',
     viewPlans:  'Ver Planes',
     plans:      { free: 'Edición Gratuita', start: 'Kenkho Start', plus: 'Kenkho Plus', elite: 'Kenkho Elite', pilot: 'Soft Start' } as Record<Plan, string>,
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `Límite ${period === 'month' ? 'mensual' : 'diario'} alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}).`,
     estimateNotice: 'Valores aproximados para fines informativos. Confirma las porciones e ingredientes para mejorar la estimación.',
+    confirmationTitle: '¿Qué deseas hacer con este escaneo?',
+    confirmationDetail: 'Solo las comidas confirmadas se suman a tu presupuesto diario de carbohidratos.',
+    confirmConsumed: 'Registrar como consumido',
+    confirmReference: 'Solo estoy evaluándolo',
+    confirmationSaving: 'Guardando…',
+    confirmedConsumed: 'Registrado como consumido. Ya cuenta en tu presupuesto de hoy.',
+    confirmedReference: 'Guardado solo como referencia. No cuenta como alimento consumido.',
+    confirmationError: 'No pudimos guardar tu elección. Inténtalo de nuevo.',
     disclosureTitle: 'Antes de tu primer análisis',
     disclosureBody: 'AQ Buddy utiliza análisis automatizado de imágenes para estimar calorías, carbohidratos, grasas y proteínas. Los resultados pueden contener errores y variar según las porciones, los ingredientes y la preparación.',
     disclosureDetail: 'Esta referencia no sustituye una etiqueta nutricional ni la orientación de un profesional de salud.',
@@ -130,12 +140,20 @@ const COPY = {
     kcal:       'kcal',
     placeholder: 'Results will appear here after analysis',
     wantMore:   'Want more scans?',
-    upgradeText: 'Kenkho Start, Plus, or Elite lets you log more meals each day.',
+    upgradeText: 'Kenkho Start, Plus, or Elite lets you analyze more plates each day.',
     viewPlans:  'View Plans',
     plans:      { free: 'Free Edition', start: 'Kenkho Start', plus: 'Kenkho Plus', elite: 'Kenkho Elite', pilot: 'Soft Start' } as Record<Plan, string>,
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `${period === 'month' ? 'Monthly' : 'Daily'} limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}).`,
     estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
+    confirmationTitle: 'What would you like to do with this scan?',
+    confirmationDetail: 'Only confirmed meals are added to your daily carbohydrate budget.',
+    confirmConsumed: 'Log as consumed',
+    confirmReference: 'I am only evaluating it',
+    confirmationSaving: 'Saving…',
+    confirmedConsumed: 'Logged as consumed. It now counts toward today’s budget.',
+    confirmedReference: 'Saved for reference only. It does not count as food consumed.',
+    confirmationError: 'We could not save your choice. Please try again.',
     disclosureTitle: 'Before your first analysis',
     disclosureBody: 'AQ Buddy uses automated image analysis to estimate calories, carbohydrates, fats, and protein. Results may contain errors and vary with portions, ingredients, and preparation.',
     disclosureDetail: 'This reference does not replace a nutrition label or guidance from a healthcare professional.',
@@ -159,6 +177,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [mealType, setMealType]  = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'>('Other')
   const [scanning, setScanning]  = useState(false)
   const [result, setResult]      = useState<ScanResult | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const [error, setError]        = useState<string | null>(null)
   const [used, setUsed]          = useState(0)
   const [limit, setLimit]        = useState(1)
@@ -217,6 +237,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     }
     setError(null)
     setResult(null)
+    setConfirmationError(null)
     try {
       const optimized = await optimizeImage(file)
       setMimeType(optimized.mimeType)
@@ -237,6 +258,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     if (!image || scanning) return
     setScanning(true)
     setError(null)
+    setConfirmationError(null)
 
     const base64 = image.split(',')[1]
 
@@ -286,12 +308,37 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           'Date':             logToday || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()),
           'Timestamp':        new Date().toISOString(),
           'Meal Type':        mealType,
+          'Consumption Status': data.consumptionStatus,
         },
       }, ...prev])
     } catch {
       setError(t.networkError)
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function confirmConsumption(consumptionStatus: 'Consumed' | 'Reference only') {
+    if (!result || confirming) return
+    setConfirming(true)
+    setConfirmationError(null)
+    try {
+      const response = await fetch('/api/food-scan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mealLogId: result.mealLogId, consumptionStatus }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error('confirmation_failed')
+
+      setResult(current => current ? { ...current, consumptionStatus: data.consumptionStatus } : current)
+      setLogs(current => current.map(log => log.id === result.mealLogId
+        ? { ...log, fields: { ...log.fields, 'Consumption Status': data.consumptionStatus } }
+        : log))
+    } catch {
+      setConfirmationError(t.confirmationError)
+    } finally {
+      setConfirming(false)
     }
   }
 
@@ -414,7 +461,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               {image && (
                 <button
                   className="fs-btn-secondary"
-                  onClick={() => { setImage(null); setResult(null); setError(null) }}
+                  onClick={() => { setImage(null); setResult(null); setError(null); setConfirmationError(null) }}
                 >
                   {t.clear}
                 </button>
@@ -458,6 +505,28 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 <div className="fs-notes">{result.notes}</div>
               )}
               <div className="fs-estimate-notice">{t.estimateNotice}</div>
+
+              <div className="fs-confirmation" aria-live="polite">
+                {result.consumptionStatus === 'Unconfirmed' ? (
+                  <>
+                    <div className="fs-confirmation-title">{t.confirmationTitle}</div>
+                    <div className="fs-confirmation-detail">{t.confirmationDetail}</div>
+                    <div className="fs-confirmation-actions">
+                      <button type="button" onClick={() => void confirmConsumption('Consumed')} disabled={confirming}>
+                        {confirming ? t.confirmationSaving : t.confirmConsumed}
+                      </button>
+                      <button type="button" onClick={() => void confirmConsumption('Reference only')} disabled={confirming}>
+                        {t.confirmReference}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className={`fs-confirmation-state fs-confirmation-state--${result.consumptionStatus === 'Consumed' ? 'consumed' : 'reference'}`}>
+                    {result.consumptionStatus === 'Consumed' ? t.confirmedConsumed : t.confirmedReference}
+                  </div>
+                )}
+                {confirmationError && <div className="fs-confirmation-error">{confirmationError}</div>}
+              </div>
 
               <div className="fs-ratio-row">
                 {[

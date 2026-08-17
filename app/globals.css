@@ -1689,6 +1689,31 @@ body.aqb-fullscreen-active {
   font-size: 12px;
   line-height: 1.55;
 }
+.fs-confirmation {
+  margin-top: 16px;
+  padding: 15px;
+  border: 1px solid rgba(201, 168, 76, .28);
+  background: rgba(201, 168, 76, .04);
+}
+.fs-confirmation-title { color: #E2C87A; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.fs-confirmation-detail { margin-top: 6px; color: #8f8a83; font-size: 12px; line-height: 1.5; }
+.fs-confirmation-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+.fs-confirmation-actions button {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid rgba(201, 168, 76, .45);
+  color: #E2C87A;
+  background: transparent;
+  font: 600 11px/1.4 'Montserrat', sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.fs-confirmation-actions button:first-child { color: #0A0A0A; background: #C9A84C; }
+.fs-confirmation-actions button:disabled { opacity: .55; cursor: default; }
+.fs-confirmation-state { color: #b9b4ad; font-size: 13px; line-height: 1.55; }
+.fs-confirmation-state--consumed { color: #E2C87A; }
+.fs-confirmation-error { margin-top: 8px; color: #E07070; font-size: 12px; }
 
 /* Placeholder */
 .fs-result-placeholder {
@@ -2071,6 +2096,20 @@ body.aqb-fullscreen-active {
   border-radius: 2px;
   flex-shrink: 0;
 }
+.flw-row-status {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid rgba(154, 149, 144, .3);
+  border-radius: 2px;
+  color: #8f8a83;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.flw-row-status--consumed { border-color: rgba(201, 168, 76, .45); color: #C9A84C; }
+.flw-row-status--reference-only { color: #6A6560; }
 .flw-row-macros {
   display: flex;
   gap: 10px;

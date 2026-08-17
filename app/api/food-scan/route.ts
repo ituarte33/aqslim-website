@@ -1,6 +1,13 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { countScansBetween, createMealLog, getMealLogsSince, type MealType } from '@/lib/airtable'
+import {
+  countScansBetween,
+  createMealLog,
+  getMealLogsSince,
+  updateMealLogConsumptionStatus,
+  type ConsumptionStatus,
+  type MealType,
+} from '@/lib/airtable'
 import {
   effectiveFoodScanPlan,
   evaluateFoodScanUsage,
@@ -139,6 +146,7 @@ All numeric values are non-negative integers representing grams (carbs/fats/prot
     return Response.json({
       ...result,
       mealLogId:       mealLog.id,
+      consumptionStatus: mealLog.fields['Consumption Status'] ?? 'Unconfirmed',
       used:             dailyUsed + 1,
       limit:            policy.dailyLimit,
       remaining:        Math.max(0, policy.dailyLimit - dailyUsed - 1),
@@ -155,6 +163,43 @@ All numeric values are non-negative integers representing grams (carbs/fats/prot
     return Response.json({ error: 'log_unavailable', correlationId }, { status: 503 })
   }
 
+}
+
+export async function PATCH(req: Request) {
+  const { userId } = await auth()
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { mealLogId, consumptionStatus } = await req.json() as {
+    mealLogId?: string
+    consumptionStatus?: ConsumptionStatus
+  }
+  if (
+    typeof mealLogId !== 'string' ||
+    !/^rec[A-Za-z0-9]{14}$/.test(mealLogId) ||
+    !['Consumed', 'Reference only'].includes(consumptionStatus ?? '')
+  ) {
+    return Response.json({ error: 'invalid_confirmation' }, { status: 400 })
+  }
+
+  try {
+    const mealLog = await updateMealLogConsumptionStatus(
+      mealLogId,
+      userId,
+      consumptionStatus as Exclude<ConsumptionStatus, 'Unconfirmed'>,
+    )
+    if (!mealLog) return Response.json({ error: 'not_found' }, { status: 404 })
+    return Response.json({
+      mealLogId: mealLog.id,
+      consumptionStatus: mealLog.fields['Consumption Status'],
+    })
+  } catch (error) {
+    const correlationId = crypto.randomUUID()
+    console.error('[food-scan] confirmation_failed', {
+      correlationId,
+      errorType: error instanceof Error ? error.name : 'unknown',
+    })
+    return Response.json({ error: 'confirmation_unavailable', correlationId }, { status: 503 })
+  }
 }
 
 // GET — return today's usage + monthly logs for period filtering

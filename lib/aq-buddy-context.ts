@@ -12,6 +12,7 @@ export type FoodScanContextData = {
   mealType: string | null
   phase: string | null
   weekInPhase: number | null
+  consumptionStatus: 'Unconfirmed' | 'Consumed' | 'Reference only'
   carbsLoggedToday: number | null
   carbsLoggedTodayExcludingCurrentMeal: number | null
 }
@@ -60,6 +61,7 @@ This context was retrieved server-side from the authenticated user's own saved m
 - Meal type selected: ${data.mealType ? safeText(data.mealType, 40) : 'not available'}
 - Current AQSLIM phase: ${phase}
 - Week in current phase: ${phaseWeek}
+- Consumption status of this saved scan: ${data.consumptionStatus}
 - Approximate carbohydrates logged today, including this saved meal: ${metric(data.carbsLoggedToday, ' g')}
 - Approximate carbohydrates logged today from other meals, excluding this saved meal: ${metric(data.carbsLoggedTodayExcludingCurrentMeal, ' g')}
 
@@ -68,6 +70,8 @@ When the user says "this plate", "this meal", "este plato", or similar, they mea
 DAILY CARBOHYDRATE BUDGET — MANDATORY FOR PHASE-SPECIFIC PLATE GUIDANCE
 
 - Official daily phase guidelines are: Jing less than 20 g; Qi approximately 25–45 g; Xue approximately 50–80 g; Yang Sheng approximately 80–120 g.
+- A scan is not proof of consumption. Only records whose consumption status is "Consumed" count as food eaten. "Unconfirmed" means the user has not yet said whether they ate it; "Reference only" means it was analyzed for information and was not eaten.
+- Never describe this saved scan as eaten unless its consumption status is "Consumed". If it is "Unconfirmed", describe it as a plate under consideration and ask at most one brief clarification only when the answer depends on whether it was eaten.
 - When suggesting an adjusted version of this plate, clearly distinguish the saved meal estimate from the hypothetical adjusted version. Never say or imply that the hypothetical version has replaced or corrected the saved record.
 - Estimate the adjusted version as a carbohydrate range, not an exact value. For a prudent daily-budget calculation, use the upper end of that range.
 - Calculate the projected daily amount using carbohydrates from other logged meals plus the adjusted plate's upper estimate. Do not add the original saved plate's carbohydrates again; that would double-count the meal being replaced in the scenario.
