@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { getPatientPortalData } from '@/lib/patient-portal'
+import { getFast36SessionsByPatient } from '@/lib/airtable'
 import { selectPilotDisplayFirstName } from '@/lib/pilot-policy'
 import { PilotView } from './pilot-view'
 
@@ -15,6 +16,9 @@ export default async function PilotPage() {
     getPatientPortalData(),
   ])
   if (!pilot) redirect('/my-aqslim')
+  const fast36Sessions = patient
+    ? await getFast36SessionsByPatient(patient.clienteId).catch(() => [])
+    : []
   return (
     <PilotView
       pilot={{
@@ -22,6 +26,7 @@ export default async function PilotPage() {
         firstName: selectPilotDisplayFirstName(pilot.firstName, patient?.firstName),
       }}
       linkedProfileName={patient?.fullName ?? null}
+      fast36Enabled={fast36Sessions.length > 0}
     />
   )
 }

@@ -817,3 +817,79 @@ export async function getMealLogsBetween(
   )
   return data.records ?? []
 }
+
+// ---------- FAST 36 ----------
+export const FAST_36_SESSIONS_TABLE = 'tblhw5APUKEYURsx8'
+
+export const FAST_36_SESSIONS_FIELDS = {
+  RECORD:        'fldYUjpniZAQAyXJk',
+  PATIENT:       'fld7gDcUwee6JTsvA',
+  WEEK:          'fld6EFbHEshVNSPSj',
+  START:         'fldmHrOIxIIJcwIcw',
+  PLANNED_END:   'fld9I63MqLGoSVHqh',
+  STATUS:        'fldDT57PgqNLthwcL',
+  ACTUAL_END:    'fldTqzwFY8ktaYUnx',
+  FEELING:       'fld7TlgFrVeN2I7TA',
+  WEIGHT:        'fldNASxw5I8sKnfMq',
+  WAIST:         'fldv3THwUxo98mzYV',
+  SESSION_DATA:  'fldhvyGWRzPM0XXc9',
+} as const
+
+export type Fast36StoredStatus =
+  | 'Pendiente'
+  | 'Activo'
+  | 'Completado'
+  | 'Terminado temprano'
+  | 'Interrumpido por seguridad'
+
+export interface Fast36SessionRecord {
+  id: string
+  createdTime?: string
+  fields: {
+    'Registro'?: string
+    'Cliente'?: string[]
+    'Semana'?: number
+    'Inicio'?: string
+    'Fin programado'?: string
+    'Estado'?: Fast36StoredStatus
+    'Fin real'?: string
+    'Sensación'?: string
+    'Peso'?: number
+    'Cintura'?: number
+    'Datos de sesión'?: string
+  }
+}
+
+export async function getFast36SessionsByPatient(
+  patientId: string,
+): Promise<Fast36SessionRecord[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) return []
+  const records: Fast36SessionRecord[] = []
+  let offset: string | undefined
+
+  do {
+    const params = new URLSearchParams({ pageSize: '100' })
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.RECORD)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.PATIENT)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.WEEK)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.START)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.PLANNED_END)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.STATUS)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.ACTUAL_END)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.FEELING)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.WEIGHT)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.WAIST)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.SESSION_DATA)
+    if (offset) params.set('offset', offset)
+
+    const data = await airtableFetch(`/${FAST_36_SESSIONS_TABLE}?${params}`)
+    records.push(...(data.records ?? []).filter((record: Fast36SessionRecord) =>
+      record.fields['Cliente']?.includes(patientId),
+    ))
+    offset = data.offset
+  } while (offset)
+
+  return records.sort((a, b) =>
+    (a.fields['Semana'] ?? 0) - (b.fields['Semana'] ?? 0),
+  )
+}

@@ -11,6 +11,8 @@ export type Capability =
   | 'profile:write:self'
   | 'questionnaire:write:self'
   | 'portal:read:self'
+  | 'fasting:read:self'
+  | 'fasting:write:self'
 
 const ADMIN_CAPABILITIES: ReadonlySet<Capability> = new Set([
   'patients:read:any',
@@ -23,6 +25,8 @@ const ADMIN_CAPABILITIES: ReadonlySet<Capability> = new Set([
   'profile:write:self',
   'questionnaire:write:self',
   'portal:read:self',
+  'fasting:read:self',
+  'fasting:write:self',
 ])
 
 const PATIENT_CAPABILITIES: ReadonlySet<Capability> = new Set([
@@ -31,6 +35,8 @@ const PATIENT_CAPABILITIES: ReadonlySet<Capability> = new Set([
   'profile:write:self',
   'questionnaire:write:self',
   'portal:read:self',
+  'fasting:read:self',
+  'fasting:write:self',
 ])
 
 export class AuthorizationError extends Error {

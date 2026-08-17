@@ -7,6 +7,7 @@ export type PilotFeature =
   | 'aq_buddy'
   | 'food_scan'
   | 'restaurant_advisor'
+  | 'fast_36'
   | 'fridge_recipes'
   | 'weekly_summary'
 
@@ -37,6 +38,7 @@ function isPilotFeature(value: unknown): value is PilotFeature {
     || value === 'aq_buddy'
     || value === 'food_scan'
     || value === 'restaurant_advisor'
+    || value === 'fast_36'
     || value === 'fridge_recipes'
     || value === 'weekly_summary'
 }

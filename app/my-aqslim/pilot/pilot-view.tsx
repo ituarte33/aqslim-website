@@ -50,6 +50,14 @@ const FEATURES: FeatureDefinition[] = [
     released: true,
   },
   {
+    id: 'fast_36',
+    icon: '◷',
+    title: { es: 'Mi ayuno de 36 horas', en: 'My 36-hour fast' },
+    description: { es: 'Horario, avance y registro semanal Fast 36.', en: 'Fast 36 schedule, progress, and weekly log.' },
+    href: '/my-aqslim/pilot/fast-36',
+    released: true,
+  },
+  {
     id: 'fridge_recipes',
     icon: '🥬',
     title: { es: 'Recetas de mi refrigerador', en: 'Recipes from my refrigerator' },
@@ -68,9 +76,11 @@ const FEATURES: FeatureDefinition[] = [
 export function PilotView({
   pilot,
   linkedProfileName,
+  fast36Enabled = false,
 }: {
   pilot: AuthenticatedPilot
   linkedProfileName?: string | null
+  fast36Enabled?: boolean
 }) {
   const [language, setLanguage] = usePortalLanguage(pilot.language)
   const es = language === 'es'
@@ -105,7 +115,10 @@ export function PilotView({
 
         <section className={styles.featureGrid} aria-label={es ? 'Funciones del piloto' : 'Pilot features'}>
           {FEATURES.map(feature => {
-            const enabled = feature.released && pilot.enabledFeatures.has(feature.id)
+            const enabled = feature.released && (
+              pilot.enabledFeatures.has(feature.id)
+              || (feature.id === 'fast_36' && fast36Enabled)
+            )
             const card = (
               <>
                 <div className={styles.featureTop}>

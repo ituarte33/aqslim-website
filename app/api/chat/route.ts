@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { AuthorizationError, requireCapability } from '@/lib/auth'
-import { getMealLogForUser, getMealLogsBetween } from '@/lib/airtable'
+import { getFast36SessionsByPatient, getMealLogForUser, getMealLogsBetween } from '@/lib/airtable'
 import { getPatientPortalData } from '@/lib/patient-portal'
+import { buildFast36BuddyContext, normalizeFast36Status, type Fast36Session } from '@/lib/fast36-policy'
 import { foodScanPeriodBoundaries } from '@/lib/food-scan-policy'
 import { buildFoodScanContextPrompt, parseBuddyContextReference } from '@/lib/aq-buddy-context'
 import { SYSTEM_PROMPT } from './system-prompt'
@@ -208,7 +209,28 @@ export async function POST(req: Request) {
   }
 
   const { messages, context }: { messages: ChatMessage[]; context?: unknown } = await req.json()
-  const verifiedContext = await resolveVerifiedContext(context, actor.clerkUserId)
+  const [verifiedContext, portal] = await Promise.all([
+    resolveVerifiedContext(context, actor.clerkUserId),
+    getPatientPortalData().catch(() => null),
+  ])
+  const fastingRecords = portal
+    ? await getFast36SessionsByPatient(portal.clienteId).catch(() => [])
+    : []
+  const fastingSessions: Fast36Session[] = fastingRecords.flatMap(record => {
+    const week = record.fields['Semana']
+    const startAt = record.fields['Inicio']
+    const plannedEndAt = record.fields['Fin programado']
+    if (typeof week !== 'number' || !startAt || !plannedEndAt) return []
+    return [{
+      id: record.id,
+      week,
+      startAt,
+      plannedEndAt,
+      actualEndAt: record.fields['Fin real'] ?? null,
+      status: normalizeFast36Status(record.fields['Estado']),
+    }]
+  })
+  const fastingContext = buildFast36BuddyContext(fastingSessions)
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')
   )
@@ -227,6 +249,7 @@ export async function POST(req: Request) {
   const systemPrompt = [
     SYSTEM_PROMPT,
     verifiedContext,
+    fastingContext,
     requiredSafetyBlocks.length > 0 ? MEDICAL_SAFETY_RESPONSE_BOUNDARY : '',
   ].filter(Boolean).join('\n\n')
 
