@@ -2,10 +2,23 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   PILOT_COHORT_ID,
+  pilotAccessFromFast36Enrollment,
   pilotAccessFromMetadata,
   pilotHasFeature,
   selectPilotDisplayFirstName,
 } from '../lib/pilot-policy.ts'
+
+test('FAST 36 enrollment grants Soft Start access', () => {
+  const access = pilotAccessFromFast36Enrollment(true)
+  assert.equal(access?.cohort, PILOT_COHORT_ID)
+  assert.equal(access?.role, 'participant')
+  assert.equal(access?.enabledFeatures.has('food_scan'), true)
+  assert.equal(access?.enabledFeatures.has('fast_36'), true)
+})
+
+test('missing FAST 36 enrollment does not grant Soft Start access', () => {
+  assert.equal(pilotAccessFromFast36Enrollment(false), null)
+})
 
 test('pilot access is denied unless the private cohort flag is exact and enabled', () => {
   assert.equal(pilotAccessFromMetadata({}), null)

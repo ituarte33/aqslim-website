@@ -2,7 +2,13 @@ import 'server-only'
 
 import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
-import { pilotAccessFromMetadata, type PilotAccess } from '@/lib/pilot-policy'
+import { getFast36SessionsByPatient } from '@/lib/airtable'
+import { getOwnPatient } from '@/lib/auth'
+import {
+  pilotAccessFromFast36Enrollment,
+  pilotAccessFromMetadata,
+  type PilotAccess,
+} from '@/lib/pilot-policy'
 
 export type AuthenticatedPilot = PilotAccess & {
   clerkUserId: string
@@ -12,7 +18,16 @@ export type AuthenticatedPilot = PilotAccess & {
 export const getPilotAccess = cache(async (): Promise<AuthenticatedPilot | null> => {
   const user = await currentUser()
   if (!user) return null
-  const access = pilotAccessFromMetadata(user.privateMetadata)
+  let access = pilotAccessFromMetadata(user.privateMetadata)
+  if (!access) {
+    try {
+      const patient = await getOwnPatient()
+      const sessions = await getFast36SessionsByPatient(patient.id)
+      access = pilotAccessFromFast36Enrollment(sessions.length > 0)
+    } catch {
+      access = null
+    }
+  }
   if (!access) return null
   return {
     ...access,

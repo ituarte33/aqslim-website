@@ -67,6 +67,19 @@ export function pilotAccessFromMetadata(metadata: unknown): PilotAccess | null {
   }
 }
 
+export function pilotAccessFromFast36Enrollment(hasFast36Sessions: boolean): PilotAccess | null {
+  if (!hasFast36Sessions) return null
+  return {
+    cohort: PILOT_COHORT_ID,
+    role: 'participant',
+    language: 'es',
+    enabledFeatures: new Set<PilotFeature>([
+      ...ACTIVE_PILOT_FEATURES,
+      'fast_36',
+    ]),
+  }
+}
+
 export function pilotHasFeature(access: PilotAccess, feature: PilotFeature): boolean {
   return access.enabledFeatures.has(feature)
 }

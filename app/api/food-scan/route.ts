@@ -14,7 +14,7 @@ import {
   foodScanPeriodBoundaries,
   foodScanPolicyFor,
 } from '@/lib/food-scan-policy'
-import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
+import { getPilotAccess } from '@/lib/pilot-access'
 import { parseFoodAnalysis } from '@/lib/food-analysis'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -33,9 +33,10 @@ export async function POST(req: Request) {
 
   const user = await currentUser()
   const privateMetadata = user?.privateMetadata
+  const pilot = await getPilotAccess()
   const policy = foodScanPolicyFor(effectiveFoodScanPlan(
     privateMetadata?.plan,
-    pilotAccessFromMetadata(privateMetadata) !== null,
+    pilot !== null,
   ))
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
   const today = todayPT()
@@ -209,9 +210,10 @@ export async function GET() {
 
   const user = await currentUser()
   const privateMetadata = user?.privateMetadata
+  const pilot = await getPilotAccess()
   const policy = foodScanPolicyFor(effectiveFoodScanPlan(
     privateMetadata?.plan,
-    pilotAccessFromMetadata(privateMetadata) !== null,
+    pilot !== null,
   ))
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
