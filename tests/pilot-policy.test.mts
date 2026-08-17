@@ -4,6 +4,7 @@ import {
   PILOT_COHORT_ID,
   pilotAccessFromMetadata,
   pilotHasFeature,
+  selectPilotDisplayFirstName,
 } from '../lib/pilot-policy.ts'
 
 test('pilot access is denied unless the private cohort flag is exact and enabled', () => {
@@ -29,4 +30,10 @@ test('active pilot features are always available to an enrolled participant', ()
   assert.equal(pilotHasFeature(access, 'food_scan'), true)
   assert.equal(pilotHasFeature(access, 'restaurant_advisor'), true)
   assert.equal(access.enabledFeatures.has('unknown_feature' as never), false)
+})
+
+test('the linked patient name takes precedence over the Clerk profile name', () => {
+  assert.equal(selectPilotDisplayFirstName('Maria', 'Mónica'), 'Mónica')
+  assert.equal(selectPilotDisplayFirstName('Rom', null), 'Rom')
+  assert.equal(selectPilotDisplayFirstName('  ', '  '), 'Participante')
 })

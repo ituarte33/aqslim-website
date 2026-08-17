@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getPilotAccess } from '@/lib/pilot-access'
+import { getPatientPortalData } from '@/lib/patient-portal'
+import { selectPilotDisplayFirstName } from '@/lib/pilot-policy'
 import { PilotView } from './pilot-view'
 
 export const metadata = {
@@ -8,7 +10,18 @@ export const metadata = {
 }
 
 export default async function PilotPage() {
-  const pilot = await getPilotAccess()
+  const [pilot, patient] = await Promise.all([
+    getPilotAccess(),
+    getPatientPortalData(),
+  ])
   if (!pilot) redirect('/my-aqslim')
-  return <PilotView pilot={pilot} />
+  return (
+    <PilotView
+      pilot={{
+        ...pilot,
+        firstName: selectPilotDisplayFirstName(pilot.firstName, patient?.firstName),
+      }}
+      linkedProfileName={patient?.fullName ?? null}
+    />
+  )
 }

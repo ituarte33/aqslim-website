@@ -68,3 +68,10 @@ export function pilotAccessFromMetadata(metadata: unknown): PilotAccess | null {
 export function pilotHasFeature(access: PilotAccess, feature: PilotFeature): boolean {
   return access.enabledFeatures.has(feature)
 }
+
+export function selectPilotDisplayFirstName(
+  clerkFirstName: string,
+  patientFirstName?: string | null,
+): string {
+  return patientFirstName?.trim() || clerkFirstName.trim() || 'Participante'
+}

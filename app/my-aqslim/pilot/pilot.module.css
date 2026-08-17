@@ -47,6 +47,22 @@
   font: 400 clamp(40px, 7vw, 64px)/1.05 'Playfair Display', serif;
 }
 .intro { max-width: 720px; margin: 0; color: #aaa69e; font-size: 17px; line-height: 1.75; }
+.profileIdentity {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  margin: 18px 0 0;
+  border: 1px solid rgba(212, 167, 44, .28);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #aaa69e;
+  background: rgba(212, 167, 44, .05);
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profileIdentity strong { color: #f5f2eb; font-weight: 500; }
 
 .featureGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 40px; }
 .featureCard {

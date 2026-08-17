@@ -65,7 +65,13 @@ const FEATURES: FeatureDefinition[] = [
   },
 ]
 
-export function PilotView({ pilot }: { pilot: AuthenticatedPilot }) {
+export function PilotView({
+  pilot,
+  linkedProfileName,
+}: {
+  pilot: AuthenticatedPilot
+  linkedProfileName?: string | null
+}) {
   const [language, setLanguage] = usePortalLanguage(pilot.language)
   const es = language === 'es'
 
@@ -91,6 +97,11 @@ export function PilotView({ pilot }: { pilot: AuthenticatedPilot }) {
             ? 'Este es nuestro espacio de prueba anticipada. Las funciones activas están listas para usarse; las demás aparecerán aquí conforme pasen a revisión.'
             : 'This is our early-access testing space. Active features are ready to use; the rest will appear here as they move into review.'}
         </p>
+        {linkedProfileName ? (
+          <p className={styles.profileIdentity}>
+            {es ? 'Perfil vinculado' : 'Linked profile'}: <strong>{linkedProfileName}</strong>
+          </p>
+        ) : null}
 
         <section className={styles.featureGrid} aria-label={es ? 'Funciones del piloto' : 'Pilot features'}>
           {FEATURES.map(feature => {
