@@ -8,6 +8,7 @@ import {
   foodScanPolicyFor,
 } from '@/lib/food-scan-policy'
 import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
+import { parseFoodAnalysis } from '@/lib/food-analysis'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -74,20 +75,22 @@ export async function POST(req: Request) {
     return Response.json({ error: 'invalid_image' }, { status: 400 })
   }
 
-  const message = await client.messages.create({
-    model: FOOD_SCAN_MODEL,
-    max_tokens: 512,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mimeType, data: imageBase64 },
-          },
-          {
-            type: 'text',
-            text: `You are the image-analysis component used by AQ Buddy. Estimate the visible serving only. Do not imply laboratory or label-level precision. Analyze this food image and return ONLY valid JSON with no markdown or extra text:
+  let message: Anthropic.Message
+  try {
+    message = await client.messages.create({
+      model: FOOD_SCAN_MODEL,
+      max_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mimeType, data: imageBase64 },
+            },
+            {
+              type: 'text',
+              text: `You are the image-analysis component used by AQ Buddy. Estimate the visible serving only. Do not imply laboratory or label-level precision. Analyze this food image and return ONLY valid JSON with no markdown or extra text:
 {
   "food": "concise food name",
   "calories": number,
@@ -97,41 +100,50 @@ export async function POST(req: Request) {
   "notes": "brief note on serving size assumptions or estimation confidence"
 }
 All numeric values are non-negative integers representing grams (carbs/fats/proteins) or kcal (calories) for the visible portion. The notes must briefly state the key serving-size or ingredient assumptions and that the result is an estimate.`,
-          },
-        ],
-      },
-    ],
-  })
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error) {
+    const correlationId = crypto.randomUUID()
+    console.error('[food-scan] provider_failed', {
+      correlationId,
+      errorType: error instanceof Error ? error.name : 'unknown',
+    })
+    return Response.json({ error: 'provider_unavailable', correlationId }, { status: 502 })
+  }
 
   const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-  let result: { food: string; calories: number; carbs: number; fats: number; proteins: number; notes: string }
-  try {
-    result = JSON.parse(raw)
-  } catch {
-    return Response.json({ error: 'parse_failed', raw }, { status: 500 })
-  }
-  const numericValues = [result.calories, result.carbs, result.fats, result.proteins]
-  if (
-    typeof result.food !== 'string'
-    || typeof result.notes !== 'string'
-    || numericValues.some(value => !Number.isFinite(value) || value < 0)
-  ) {
-    return Response.json({ error: 'invalid_analysis' }, { status: 500 })
+  const result = parseFoodAnalysis(raw)
+  if (!result) {
+    const correlationId = crypto.randomUUID()
+    console.error('[food-scan] invalid_provider_response', { correlationId })
+    return Response.json({ error: 'analysis_format_invalid', correlationId }, { status: 502 })
   }
 
-  await createMealLog({
-    userId,
-    userEmail:       email,
-    date:            today,
-    foodDescription: result.food,
-    calories:        result.calories,
-    carbs:           result.carbs,
-    fats:            result.fats,
-    proteins:        result.proteins,
-    plan:            policy.plan,
-    notes:           result.notes,
-    mealType,
-  })
+  try {
+    await createMealLog({
+      userId,
+      userEmail:       email,
+      date:            today,
+      foodDescription: result.food,
+      calories:        result.calories,
+      carbs:           result.carbs,
+      fats:            result.fats,
+      proteins:        result.proteins,
+      plan:            policy.plan,
+      notes:           result.notes,
+      mealType,
+    })
+  } catch (error) {
+    const correlationId = crypto.randomUUID()
+    console.error('[food-scan] meal_log_failed', {
+      correlationId,
+      errorType: error instanceof Error ? error.name : 'unknown',
+    })
+    return Response.json({ error: 'log_unavailable', correlationId }, { status: 503 })
+  }
 
   return Response.json({
     ...result,

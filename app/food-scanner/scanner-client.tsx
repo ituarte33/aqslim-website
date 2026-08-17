@@ -89,6 +89,9 @@ const COPY = {
     disclosureDetail: 'Esta referencia no sustituye una etiqueta nutricional ni la orientación de un profesional de salud.',
     disclosureAccept: 'Entiendo · Continuar',
     failError:    'El análisis falló. Inténtalo de nuevo.',
+    providerError: 'AQ Buddy no pudo analizar la imagen en este momento. No se descontó ningún escaneo.',
+    formatError:   'La imagen se recibió, pero el resultado no pudo interpretarse. No se descontó ningún escaneo.',
+    logError:      'El análisis terminó, pero no pudo guardarse. No se descontó ningún escaneo.',
     networkError: 'Error de red. Inténtalo de nuevo.',
     imageError:   'Por favor sube un archivo de imagen.',
     sizeError:    'La imagen debe ser menor a 5 MB.',
@@ -126,6 +129,9 @@ const COPY = {
     disclosureDetail: 'This reference does not replace a nutrition label or guidance from a healthcare professional.',
     disclosureAccept: 'I understand · Continue',
     failError:    'Analysis failed. Please try again.',
+    providerError: 'AQ Buddy could not analyze the image right now. No scan was deducted.',
+    formatError:   'The image was received, but the result could not be interpreted. No scan was deducted.',
+    logError:      'The analysis finished but could not be saved. No scan was deducted.',
     networkError: 'Network error. Please try again.',
     imageError:   'Please upload an image file.',
     sizeError:    'Image must be under 5 MB.',
@@ -238,6 +244,12 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           setLimit(data.limit ?? limit)
           setMonthlyUsed(data.monthlyUsed ?? monthlyUsed)
           setMonthlyLimit(data.monthlyLimit ?? monthlyLimit)
+        } else if (data.error === 'provider_unavailable') {
+          setError(t.providerError)
+        } else if (data.error === 'analysis_format_invalid') {
+          setError(t.formatError)
+        } else if (data.error === 'log_unavailable') {
+          setError(t.logError)
         } else {
           setError(t.failError)
         }
