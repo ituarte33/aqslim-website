@@ -16,5 +16,7 @@ test('food scanner passes only the saved meal-log reference into AQ Buddy', asyn
   assert.match(scanner, /detail: context/)
   assert.match(widget, /context: foodScannerContext/)
   assert.match(chatRoute, /getMealLogForUser\(reference\.mealLogId, clerkUserId\)/)
+  assert.match(chatRoute, /getMealLogsBetween\(/)
+  assert.match(chatRoute, /carbsLoggedTodayExcludingCurrentMeal/)
   assert.match(airtable, /record\.fields\['User ID'\] === userId/)
 })

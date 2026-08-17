@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { AuthorizationError, requireCapability } from '@/lib/auth'
-import { getMealLogForUser } from '@/lib/airtable'
+import { getMealLogForUser, getMealLogsBetween } from '@/lib/airtable'
 import { getPatientPortalData } from '@/lib/patient-portal'
+import { foodScanPeriodBoundaries } from '@/lib/food-scan-policy'
 import { buildFoodScanContextPrompt, parseBuddyContextReference } from '@/lib/aq-buddy-context'
 import { SYSTEM_PROMPT } from './system-prompt'
 
@@ -146,11 +147,39 @@ async function resolveVerifiedContext(value: unknown, clerkUserId: string): Prom
   const reference = parseBuddyContextReference(value)
   if (!reference) return ''
 
-  const [mealLog, portal] = await Promise.all([
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+  }).format(new Date())
+  const boundaries = foodScanPeriodBoundaries(today)
+  const [mealLog, portal, todaysMealLogs] = await Promise.all([
     getMealLogForUser(reference.mealLogId, clerkUserId).catch(() => null),
     getPatientPortalData().catch(() => null),
+    getMealLogsBetween(
+      clerkUserId,
+      boundaries.dayStartUtc,
+      boundaries.dayEndUtc,
+    ).catch(() => null),
   ])
   if (!mealLog) return ''
+
+  const validCarbs = todaysMealLogs
+    ?.map((log) => log.fields['Carbs (g)'])
+    .filter((carbs): carbs is number => typeof carbs === 'number' && Number.isFinite(carbs) && carbs >= 0)
+  const carbsLoggedToday = validCarbs
+    ? validCarbs.reduce((total, carbs) => total + carbs, 0)
+    : null
+  const currentMealWasLoggedToday = todaysMealLogs?.some((log) => log.id === mealLog.id) ?? false
+  const currentMealCarbs = mealLog.fields['Carbs (g)']
+  const carbsLoggedTodayExcludingCurrentMeal = carbsLoggedToday !== null
+    ? Math.max(
+        0,
+        carbsLoggedToday - (
+          currentMealWasLoggedToday && typeof currentMealCarbs === 'number'
+            ? currentMealCarbs
+            : 0
+        ),
+      )
+    : null
 
   return buildFoodScanContextPrompt({
     food: mealLog.fields['Food Description'] ?? '',
@@ -161,6 +190,8 @@ async function resolveVerifiedContext(value: unknown, clerkUserId: string): Prom
     mealType: mealLog.fields['Meal Type'] ?? null,
     phase: portal?.phase ?? null,
     weekInPhase: portal?.weekInPhase ?? null,
+    carbsLoggedToday,
+    carbsLoggedTodayExcludingCurrentMeal,
   })
 }
 

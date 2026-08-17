@@ -12,6 +12,8 @@ export type FoodScanContextData = {
   mealType: string | null
   phase: string | null
   weekInPhase: number | null
+  carbsLoggedToday: number | null
+  carbsLoggedTodayExcludingCurrentMeal: number | null
 }
 
 const AIRTABLE_RECORD_ID = /^rec[A-Za-z0-9]{14}$/
@@ -58,6 +60,20 @@ This context was retrieved server-side from the authenticated user's own saved m
 - Meal type selected: ${data.mealType ? safeText(data.mealType, 40) : 'not available'}
 - Current AQSLIM phase: ${phase}
 - Week in current phase: ${phaseWeek}
+- Approximate carbohydrates logged today, including this saved meal: ${metric(data.carbsLoggedToday, ' g')}
+- Approximate carbohydrates logged today from other meals, excluding this saved meal: ${metric(data.carbsLoggedTodayExcludingCurrentMeal, ' g')}
 
-When the user says "this plate", "this meal", "este plato", or similar, they mean this saved food scan. Use these approximate values and the identified foods directly; do not ask the user to upload or describe the same plate again. Give practical modifications appropriate to the known AQSLIM phase. If the phase is not available, say that clearly and provide conditional options without guessing. Remind the user that image-based values are estimates.`
+When the user says "this plate", "this meal", "este plato", or similar, they mean this saved food scan. Use these approximate values and the identified foods directly; do not ask the user to upload or describe the same plate again. Give practical modifications appropriate to the known AQSLIM phase. If the phase is not available, say that clearly and provide conditional options without guessing. Remind the user that image-based values are estimates.
+
+DAILY CARBOHYDRATE BUDGET — MANDATORY FOR PHASE-SPECIFIC PLATE GUIDANCE
+
+- Official daily phase guidelines are: Jing less than 20 g; Qi approximately 25–45 g; Xue approximately 50–80 g; Yang Sheng approximately 80–120 g.
+- When suggesting an adjusted version of this plate, clearly distinguish the saved meal estimate from the hypothetical adjusted version. Never say or imply that the hypothetical version has replaced or corrected the saved record.
+- Estimate the adjusted version as a carbohydrate range, not an exact value. For a prudent daily-budget calculation, use the upper end of that range.
+- Calculate the projected daily amount using carbohydrates from other logged meals plus the adjusted plate's upper estimate. Do not add the original saved plate's carbohydrates again; that would double-count the meal being replaced in the scenario.
+- State the approximate amount remaining under the current phase's upper guideline. For Jing, calculate against 20 g but describe the goal accurately as less than 20 g and preserve a margin for image and portion uncertainty.
+- If the proposed plate would use at least half of the phase's upper daily guideline, say prominently that it consumes a large part of the day's carbohydrate budget and explain what that leaves for the rest of the day.
+- If the remaining amount is small, recommend that the rest of the day focus mainly on suitable protein, permitted fats, and very-low-carbohydrate vegetables; do not encourage eating up to the mathematical boundary.
+- If other carbohydrates are already logged today, subtract them before describing what remains. If today's values are unavailable, do not invent a remaining budget.
+- Treat every logged value as an estimate, not proof of what was actually eaten. Before treating a hypothetical adjustment as consumed or changing any daily total, ask the user to confirm what they actually ate.`
 }

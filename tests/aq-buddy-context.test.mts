@@ -25,11 +25,18 @@ test('builds a grounded prompt with the saved meal and patient phase', () => {
     mealType: 'Lunch',
     phase: 'Jing',
     weekInPhase: 2,
+    carbsLoggedToday: 84,
+    carbsLoggedTodayExcludingCurrentMeal: 6,
   })
 
   assert.match(prompt, /Carnitas platter with rice and tortilla/)
   assert.match(prompt, /Approximate carbohydrates: 78 g/)
   assert.match(prompt, /Current AQSLIM phase: Jing/)
+  assert.match(prompt, /including this saved meal: 84 g/)
+  assert.match(prompt, /excluding this saved meal: 6 g/)
+  assert.match(prompt, /For Jing, calculate against 20 g/)
+  assert.match(prompt, /Do not add the original saved plate's carbohydrates again/)
+  assert.match(prompt, /ask the user to confirm what they actually ate/)
   assert.match(prompt, /do not ask the user to upload or describe the same plate again/)
 })
 
@@ -43,8 +50,11 @@ test('marks an unavailable phase explicitly instead of inventing one', () => {
     mealType: null,
     phase: null,
     weekInPhase: null,
+    carbsLoggedToday: null,
+    carbsLoggedTodayExcludingCurrentMeal: null,
   })
 
   assert.match(prompt, /Current AQSLIM phase: not available/)
   assert.match(prompt, /provide conditional options without guessing/)
+  assert.match(prompt, /including this saved meal: not available/)
 })

@@ -774,3 +774,18 @@ export async function getMealLogsSince(userId: string, since: string, limit = 20
   )
   return data.records ?? []
 }
+
+export async function getMealLogsBetween(
+  userId: string,
+  startUtc: string,
+  endUtc: string,
+  limit = 200,
+): Promise<MealLog[]> {
+  const formula = encodeURIComponent(
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} >= "${startUtc}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} < "${endUtc}")`,
+  )
+  const data = await airtableFetch(
+    `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${MEAL_LOGS_FIELDS.TIMESTAMP}&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=${Math.min(Math.max(limit, 1), 200)}`,
+  )
+  return data.records ?? []
+}
