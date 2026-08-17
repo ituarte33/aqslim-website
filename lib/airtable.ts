@@ -1,5 +1,6 @@
 import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
+import { filterConsultationsForPatient } from './patient-portal-policy'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
@@ -98,7 +99,7 @@ export interface Consulta {
   id: string
   fields: {
     'ID Consulta'?: string
-    'ID Cliente'?: string
+    'ID Cliente'?: string[]
     'Fecha Consulta'?: string
     'Tipo de Consulta'?: string
     'Peso (kg)'?: number
@@ -557,9 +558,16 @@ export async function hasConsulta(nombreCliente: string): Promise<boolean> {
 }
 
 export async function getConsultasByCliente(nombreCliente: string): Promise<Consulta[]> {
-  const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
+  const safeName = escapeAirtableString(nombreCliente.trim())
+  const formula = encodeURIComponent(`{ID Cliente} = "${safeName}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
-  return data.records
+  return data.records ?? []
+}
+
+export async function getConsultasByPatientId(clienteId: string, nombreCliente: string): Promise<Consulta[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(clienteId)) return []
+  const data = await getConsultasByCliente(nombreCliente)
+  return filterConsultationsForPatient(data, clienteId)
 }
 
 // ---------- Plan AQSLIM ----------
