@@ -23,7 +23,19 @@ interface ScanResult {
 }
 
 const DISCLOSURE_KEY = 'aqslim-food-scan-disclosure-v1'
+const BUDDY_CONTEXT_KEY = 'aqslim-buddy-context-v1'
 const MAX_IMAGE_EDGE = 1600
+
+function publishFoodScanContext(mealLogId: unknown) {
+  if (typeof mealLogId !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(mealLogId)) return
+  const context = { type: 'food_scan', mealLogId }
+  try {
+    sessionStorage.setItem(BUDDY_CONTEXT_KEY, JSON.stringify(context))
+  } catch {
+    // The same-page event still provides context when storage is unavailable.
+  }
+  window.dispatchEvent(new CustomEvent('aq-buddy-context', { detail: context }))
+}
 
 async function dataUrlFromBlob(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -187,6 +199,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         setLogToday(d.today ?? '')
         setLogWeekStart(d.weekStart ?? '')
         setLogMonthStart(d.monthStart ?? '')
+        publishFoodScanContext(d.latestMealLogId)
       })
       .catch(() => {})
   }, [])
@@ -260,8 +273,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       setUsed(data.used)
       setMonthlyUsed(data.monthlyUsed)
       setMonthlyLimit(data.monthlyLimit)
+      publishFoodScanContext(data.mealLogId)
       setLogs(prev => [{
-        id:          Date.now().toString(),
+        id:          data.mealLogId,
         createdTime: new Date().toISOString(),
         fields: {
           'Food Description': data.food,

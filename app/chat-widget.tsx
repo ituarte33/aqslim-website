@@ -6,6 +6,9 @@ import { ChatMessage } from './chat-message'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
 type Message = { role: 'user' | 'assistant'; content: string }
+type BuddyContextReference = { type: 'food_scan'; mealLogId: string }
+
+const BUDDY_CONTEXT_KEY = 'aqslim-buddy-context-v1'
 
 const STATE_IMAGES: Record<BuddyState, string> = {
   idle:     '/Aqslim_Buddy_Pics/aqslim_buddy_open_arms.png',
@@ -28,6 +31,8 @@ const LABELS = {
     send: 'Enviar',
     welcome: '¡Hola! Soy AQ Buddy, tu asistente de bienestar AQSLIM. ¿En qué te puedo ayudar hoy?',
     starter: 'Hola, ¿qué puedes hacer por mí?',
+    contextWelcome: 'Ya tengo el análisis de tu último plato. Puedes preguntarme cómo adaptarlo a tu fase de AQSLIM.',
+    contextStarter: '¿Cómo adapto este plato a mi fase?',
     thinking: 'Pensando...',
     error: 'Ocurrió un error. Intenta de nuevo.',
   },
@@ -38,6 +43,8 @@ const LABELS = {
     send: 'Send',
     welcome: "Hi! I'm AQ Buddy, your AQSLIM wellness assistant. How can I help you today?",
     starter: 'Hi, what can you help me with?',
+    contextWelcome: 'I have your latest plate analysis. You can ask me how to adapt it to your AQSLIM phase.',
+    contextStarter: 'How can I adapt this plate to my phase?',
     thinking: 'Thinking...',
     error: 'An error occurred. Please try again.',
   },
@@ -74,6 +81,8 @@ export function ChatWidget() {
   const [input, setInput]         = useState('')
   const [streaming, setStreaming] = useState(false)
   const [fontSize, setFontSize]   = useState(16)
+  const [buddyContext, setBuddyContext] = useState<BuddyContextReference | null>(null)
+  const foodScannerContext = pathname.startsWith('/food-scanner') ? buddyContext : null
 
   const MIN_FONT = 13
   const MAX_FONT = 25
@@ -131,6 +140,31 @@ export function ChatWidget() {
     return () => window.removeEventListener('aq-buddy-open', openChat)
   }, [])
 
+  // Receive only an opaque saved-record reference from the scanner. The chat
+  // API resolves and authorizes the actual meal data on the server.
+  useEffect(() => {
+    function acceptContext(value: unknown) {
+      if (!value || typeof value !== 'object') return
+      const candidate = value as Record<string, unknown>
+      if (candidate.type !== 'food_scan') return
+      if (typeof candidate.mealLogId !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(candidate.mealLogId)) return
+      setBuddyContext({ type: 'food_scan', mealLogId: candidate.mealLogId })
+    }
+
+    try {
+      const stored = sessionStorage.getItem(BUDDY_CONTEXT_KEY)
+      if (stored) acceptContext(JSON.parse(stored))
+    } catch {
+      sessionStorage.removeItem(BUDDY_CONTEXT_KEY)
+    }
+
+    function onContext(event: Event) {
+      acceptContext((event as CustomEvent).detail)
+    }
+    window.addEventListener('aq-buddy-context', onContext)
+    return () => window.removeEventListener('aq-buddy-context', onContext)
+  }, [])
+
   useEffect(() => {
     if (fullScreen) setOpen(true)
   }, [fullScreen])
@@ -174,7 +208,7 @@ export function ChatWidget() {
   // Welcome message on first open
   useEffect(() => {
     if (open && messages.length === 0) {
-      const welcome = LABELS[lang].welcome
+      const welcome = foodScannerContext ? LABELS[lang].contextWelcome : LABELS[lang].welcome
       setMessages([{ role: 'assistant', content: welcome }])
       setStateWithTimeout('love', '¡Hola! 👋', 3500)
     }
@@ -226,7 +260,10 @@ export function ChatWidget() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({
+          messages: history.map(m => ({ role: m.role, content: m.content })),
+          context: foodScannerContext,
+        }),
       })
 
       if (!res.ok || !res.body) {
@@ -395,11 +432,11 @@ export function ChatWidget() {
                 type="button"
                 className="aqb-starter"
                 onClick={() => {
-                  setInput(t.starter)
+                  setInput(foodScannerContext ? t.contextStarter : t.starter)
                   inputRef.current?.focus()
                 }}
               >
-                {t.starter}
+                {foodScannerContext ? t.contextStarter : t.starter}
               </button>
             ) : null}
           </div>

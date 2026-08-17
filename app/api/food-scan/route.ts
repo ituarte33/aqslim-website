@@ -123,7 +123,7 @@ All numeric values are non-negative integers representing grams (carbs/fats/prot
   }
 
   try {
-    await createMealLog({
+    const mealLog = await createMealLog({
       userId,
       userEmail:       email,
       date:            today,
@@ -136,6 +136,16 @@ All numeric values are non-negative integers representing grams (carbs/fats/prot
       notes:           result.notes,
       mealType,
     })
+    return Response.json({
+      ...result,
+      mealLogId:       mealLog.id,
+      used:             dailyUsed + 1,
+      limit:            policy.dailyLimit,
+      remaining:        Math.max(0, policy.dailyLimit - dailyUsed - 1),
+      monthlyUsed:      monthlyUsed + 1,
+      monthlyLimit:     policy.monthlyLimit,
+      monthlyRemaining: Math.max(0, policy.monthlyLimit - monthlyUsed - 1),
+    })
   } catch (error) {
     const correlationId = crypto.randomUUID()
     console.error('[food-scan] meal_log_failed', {
@@ -145,15 +155,6 @@ All numeric values are non-negative integers representing grams (carbs/fats/prot
     return Response.json({ error: 'log_unavailable', correlationId }, { status: 503 })
   }
 
-  return Response.json({
-    ...result,
-    used:             dailyUsed + 1,
-    limit:            policy.dailyLimit,
-    remaining:        Math.max(0, policy.dailyLimit - dailyUsed - 1),
-    monthlyUsed:      monthlyUsed + 1,
-    monthlyLimit:     policy.monthlyLimit,
-    monthlyRemaining: Math.max(0, policy.monthlyLimit - monthlyUsed - 1),
-  })
 }
 
 // GET — return today's usage + monthly logs for period filtering
@@ -192,6 +193,7 @@ export async function GET() {
     today,
     weekStart,
     monthStart,
+    latestMealLogId: logs[0]?.id ?? null,
     logs,
   })
 }

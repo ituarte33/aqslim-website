@@ -647,6 +647,7 @@ export interface MealLog {
   id: string
   createdTime: string
   fields: {
+    'User ID'?: string
     'User Email'?: string
     'Date'?: string
     'Food Description'?: string
@@ -659,6 +660,12 @@ export interface MealLog {
     'Notes'?: string
     'Meal Type'?: MealType
   }
+}
+
+export async function getMealLogForUser(recordId: string, userId: string): Promise<MealLog | null> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(recordId) || !userId) return null
+  const record = await airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`) as MealLog
+  return record.fields['User ID'] === userId ? record : null
 }
 
 export async function createMealLog(data: {

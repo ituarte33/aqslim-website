@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { AuthorizationError, requireCapability } from '@/lib/auth'
+import { getMealLogForUser } from '@/lib/airtable'
+import { getPatientPortalData } from '@/lib/patient-portal'
+import { buildFoodScanContextPrompt, parseBuddyContextReference } from '@/lib/aq-buddy-context'
 import { SYSTEM_PROMPT } from './system-prompt'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -139,15 +142,39 @@ function breastfeedingSafetyBlockFor(text: string) {
     : BREASTFEEDING_SAFETY_EN
 }
 
+async function resolveVerifiedContext(value: unknown, clerkUserId: string): Promise<string> {
+  const reference = parseBuddyContextReference(value)
+  if (!reference) return ''
+
+  const [mealLog, portal] = await Promise.all([
+    getMealLogForUser(reference.mealLogId, clerkUserId).catch(() => null),
+    getPatientPortalData().catch(() => null),
+  ])
+  if (!mealLog) return ''
+
+  return buildFoodScanContextPrompt({
+    food: mealLog.fields['Food Description'] ?? '',
+    calories: mealLog.fields['Calories'] ?? null,
+    carbs: mealLog.fields['Carbs (g)'] ?? null,
+    fats: mealLog.fields['Fats (g)'] ?? null,
+    proteins: mealLog.fields['Proteins (g)'] ?? null,
+    mealType: mealLog.fields['Meal Type'] ?? null,
+    phase: portal?.phase ?? null,
+    weekInPhase: portal?.weekInPhase ?? null,
+  })
+}
+
 export async function POST(req: Request) {
+  let actor: Awaited<ReturnType<typeof requireCapability>>
   try {
-    await requireCapability('buddy:chat')
+    actor = await requireCapability('buddy:chat')
   } catch (error) {
     const status = error instanceof AuthorizationError && error.code === 'FORBIDDEN' ? 403 : 401
     return Response.json({ error: 'Unauthorized' }, { status })
   }
 
-  const { messages }: { messages: ChatMessage[] } = await req.json()
+  const { messages, context }: { messages: ChatMessage[]; context?: unknown } = await req.json()
+  const verifiedContext = await resolveVerifiedContext(context, actor.clerkUserId)
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')
   )
@@ -163,10 +190,11 @@ export async function POST(req: Request) {
       : null,
   ].filter((block): block is string => Boolean(block))
 
-  const systemPrompt =
-    requiredSafetyBlocks.length > 0
-      ? `${SYSTEM_PROMPT}\n\n${MEDICAL_SAFETY_RESPONSE_BOUNDARY}`
-      : SYSTEM_PROMPT
+  const systemPrompt = [
+    SYSTEM_PROMPT,
+    verifiedContext,
+    requiredSafetyBlocks.length > 0 ? MEDICAL_SAFETY_RESPONSE_BOUNDARY : '',
+  ].filter(Boolean).join('\n\n')
 
   const stream = client.messages.stream({
     model: 'claude-haiku-4-5-20251001',
