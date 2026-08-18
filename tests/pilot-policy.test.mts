@@ -43,6 +43,7 @@ test('active pilot features are always available to an enrolled participant', ()
   assert.equal(pilotHasFeature(access, 'aq_buddy'), true)
   assert.equal(pilotHasFeature(access, 'food_scan'), true)
   assert.equal(pilotHasFeature(access, 'restaurant_advisor'), true)
+  assert.equal(pilotHasFeature(access, 'fridge_recipes'), true)
   assert.equal(access.enabledFeatures.has('unknown_feature' as never), false)
 })
 

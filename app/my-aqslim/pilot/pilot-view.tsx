@@ -61,8 +61,9 @@ const FEATURES: FeatureDefinition[] = [
     id: 'fridge_recipes',
     icon: '🥬',
     title: { es: 'Recetas de mi refrigerador', en: 'Recipes from my refrigerator' },
-    description: { es: 'Ideas compatibles con tu fase usando lo que ya tienes.', en: 'Phase-compatible ideas using what you already have.' },
-    released: false,
+    description: { es: 'Tres ideas prácticas usando lo que ya tienes.', en: 'Three practical ideas using what you already have.' },
+    href: '/my-aqslim/pilot/fridge',
+    released: true,
   },
   {
     id: 'weekly_summary',
