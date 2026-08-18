@@ -20,6 +20,12 @@ test('accepts structured pilot feedback and trims bounded text', () => {
   assert.equal(parsed.category, 'Ingredientes incorrectos')
 })
 
+test('accepts a general My AQSLIM surface report', () => {
+  const parsed = parsePilotFeedbackInput({ ...validProblem, tool: 'My AQSLIM', category: 'Difícil de usar' })
+  assert.ok(parsed)
+  assert.equal(parsed.tool, 'My AQSLIM')
+})
+
 test('requires a category for a reported problem', () => {
   assert.equal(parsePilotFeedbackInput({ ...validProblem, category: '' }), null)
   assert.ok(parsePilotFeedbackInput({ ...validProblem, rating: 'Funcionó', category: '' }))
@@ -41,15 +47,22 @@ test('creates a concise report name without patient information', () => {
   )
 })
 
-test('integrates the shared feedback control into all four pilot surfaces', async () => {
-  const [chat, scanner, restaurant, fridge] = await Promise.all([
+test('integrates permanent feedback access into the pilot home and all four tools', async () => {
+  const [pilot, chat, scanner, restaurant, fridge] = await Promise.all([
+    readFile(new URL('../app/my-aqslim/pilot/pilot-view.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/chat-widget.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/my-aqslim/pilot/restaurant/restaurant-advisor.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/my-aqslim/pilot/fridge/fridge-recipes.tsx', import.meta.url), 'utf8'),
   ])
+  assert.match(pilot, /tool="My AQSLIM"/)
+  assert.match(pilot, /standalone/)
   assert.match(chat, /tool="AQ Buddy"/)
+  assert.match(chat, /standalone/)
   assert.match(scanner, /tool="Escáner de alimentos"/)
+  assert.match(scanner, /standalone/)
   assert.match(restaurant, /tool="Asesor de restaurantes"/)
+  assert.match(restaurant, /standalone/)
   assert.match(fridge, /tool="Recetas del refrigerador"/)
+  assert.match(fridge, /standalone/)
 })

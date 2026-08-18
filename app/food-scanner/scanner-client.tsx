@@ -392,6 +392,13 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       )}
 
       <main className="fs-main">
+        <PilotFeedback
+          tool="Escáner de alimentos"
+          language={lang}
+          context={{ surface: 'food_scanner', hasImage: Boolean(image), hasResult: Boolean(result), hasError: Boolean(error) }}
+          standalone
+        />
+
         {/* Usage bar */}
         <div className="fs-usage-bar">
           <span className="fs-usage-label">{t.usage(userName)}</span>

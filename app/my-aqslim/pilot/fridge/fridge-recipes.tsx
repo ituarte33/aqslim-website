@@ -239,6 +239,12 @@ export function FridgeRecipes({
         <p className={styles.intro}>{es
           ? 'Muéstrale a AQ Buddy una, dos o tres vistas. Después podrás corregir la lista antes de crear las recetas.'
           : 'Show AQ Buddy one, two, or three views. You can correct the ingredient list before creating recipes.'}</p>
+        <PilotFeedback
+          tool="Recetas del refrigerador"
+          language={language}
+          context={{ surface: 'fridge_recipes', photoCount: photos.length, hasDetection: Boolean(detection), hasResult: Boolean(result), hasError: Boolean(error) }}
+          standalone
+        />
 
         <section className={styles.formPanel}>
           <div className={styles.stepHeading}><span>01</span><div><strong>{es ? 'Muéstrame lo que tienes' : 'Show me what you have'}</strong><small>{es ? 'Refrigerador, puerta o ingredientes sobre la mesa.' : 'Refrigerator, door, or ingredients on a counter.'}</small></div></div>

@@ -109,6 +109,12 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
         <Link href="/my-aqslim/pilot" className={styles.back}>{es ? '← Volver al piloto' : '← Back to pilot'}</Link>
         <h1>{es ? '¿Qué puedo comer aquí?' : 'What can I eat here?'}</h1>
         <p className={styles.intro}>{es ? 'Fotografía o sube el menú del restaurante y AQ Buddy te mostrará opciones compatibles con tu fase.' : 'Photograph or upload the restaurant menu and AQ Buddy will show options compatible with your phase.'}</p>
+        <PilotFeedback
+          tool="Asesor de restaurantes"
+          language={language}
+          context={{ surface: 'restaurant_advisor', restaurant, phase, hasMenuImage: Boolean(imageBase64), hasResult: Boolean(result), hasError: Boolean(error) }}
+          standalone
+        />
 
         <section className={styles.formPanel}>
           <button type="button" className={styles.upload} onClick={() => fileRef.current?.click()}>

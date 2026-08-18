@@ -54,14 +54,17 @@ export function PilotFeedback({
   responseId,
   context,
   issueOnly = false,
+  standalone = false,
 }: {
   tool: FeedbackTool
   language: 'es' | 'en'
-  responseId: string
+  responseId?: string
   context: unknown
   issueOnly?: boolean
+  standalone?: boolean
 }) {
   const es = language === 'es'
+  const [resolvedResponseId] = useState(() => responseId || crypto.randomUUID())
   const fileRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [sending, setSending] = useState(false)
@@ -88,7 +91,7 @@ export function PilotFeedback({
       form.set('category', rating === 'Problema' ? category : '')
       form.set('comment', rating === 'Problema' ? comment : '')
       form.set('context', technicalContext(context))
-      form.set('responseId', responseId)
+      form.set('responseId', resolvedResponseId)
       form.set('language', es ? 'ES' : 'EN')
       if (rating === 'Problema' && screenshot) form.set('screenshot', screenshot)
 
@@ -140,14 +143,21 @@ export function PilotFeedback({
   }
 
   return (
-    <section className={styles.feedback} aria-label={es ? 'Retroalimentación del piloto' : 'Pilot feedback'}>
-      <div className={styles.question}>
-        <span>{issueOnly ? (es ? '¿Quieres reportar este error?' : 'Would you like to report this error?') : (es ? '¿Te sirvió esta respuesta?' : 'Was this response helpful?')}</span>
-        <div>
-          {!issueOnly ? <button type="button" disabled={sending} onClick={() => void send('Funcionó')}>👍 {es ? 'Sí' : 'Yes'}</button> : null}
-          <button type="button" disabled={sending} onClick={() => { setOpen(true); setError(null) }}>👎 {es ? 'Reportar' : 'Report'}</button>
+    <section className={`${styles.feedback}${standalone ? ` ${styles.standalone}` : ''}`} aria-label={es ? 'Retroalimentación del piloto' : 'Pilot feedback'}>
+      {standalone ? (
+        <button type="button" className={styles.standaloneButton} disabled={sending} onClick={() => { setOpen(true); setError(null) }}>
+          <span aria-hidden="true">⚑</span>
+          <span><strong>{es ? 'Reportar un problema' : 'Report a problem'}</strong><small>{es ? 'Puedes adjuntar una captura' : 'You can attach a screenshot'}</small></span>
+        </button>
+      ) : (
+        <div className={styles.question}>
+          <span>{issueOnly ? (es ? '¿Quieres reportar este error?' : 'Would you like to report this error?') : (es ? '¿Te sirvió esta respuesta?' : 'Was this response helpful?')}</span>
+          <div>
+            {!issueOnly ? <button type="button" disabled={sending} onClick={() => void send('Funcionó')}>👍 {es ? 'Sí' : 'Yes'}</button> : null}
+            <button type="button" disabled={sending} onClick={() => { setOpen(true); setError(null) }}>👎 {es ? 'Reportar' : 'Report'}</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {open ? (
         <div className={styles.form}>

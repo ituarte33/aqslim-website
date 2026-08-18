@@ -427,6 +427,15 @@ export function ChatWidget() {
             </div>
           </div>
 
+          <div className="aqb-persistent-feedback">
+            <PilotFeedback
+              tool="AQ Buddy"
+              language={lang}
+              context={{ surface: 'aq_buddy_chat', messageCount: messages.length }}
+              standalone
+            />
+          </div>
+
           <div ref={messagesRef} className="aqb-messages">
             {messages.map((m, i) => (
               <div

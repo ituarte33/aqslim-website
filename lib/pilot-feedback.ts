@@ -1,4 +1,5 @@
 export const FEEDBACK_TOOLS = [
+  'My AQSLIM',
   'AQ Buddy',
   'Escáner de alimentos',
   'Asesor de restaurantes',

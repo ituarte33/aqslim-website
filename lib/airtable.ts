@@ -268,7 +268,9 @@ export async function createPilotFeedback({
 
   return airtableFetch(`/${PILOT_FEEDBACK_TABLE}`, {
     method: 'POST',
-    body: JSON.stringify({ fields, typecast: false }),
+    // Typecast lets Airtable register a newly governed surface such as My AQSLIM
+    // without dropping the report if the single-select option was not pre-created.
+    body: JSON.stringify({ fields, typecast: true }),
   })
 }
 

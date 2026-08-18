@@ -5,6 +5,7 @@ import { UserButton } from '@clerk/nextjs'
 import type { AuthenticatedPilot } from '@/lib/pilot-access'
 import type { PilotFeature } from '@/lib/pilot-policy'
 import { usePortalLanguage } from '../use-portal-language'
+import { PilotFeedback } from '@/app/pilot-feedback'
 import styles from './pilot.module.css'
 
 type FeatureDefinition = {
@@ -113,6 +114,13 @@ export function PilotView({
             {es ? 'Perfil vinculado' : 'Linked profile'}: <strong>{linkedProfileName}</strong>
           </p>
         ) : null}
+
+        <PilotFeedback
+          tool="My AQSLIM"
+          language={language}
+          context={{ surface: 'pilot_home' }}
+          standalone
+        />
 
         <section className={styles.featureGrid} aria-label={es ? 'Funciones del piloto' : 'Pilot features'}>
           {FEATURES.map(feature => {

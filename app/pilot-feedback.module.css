@@ -28,6 +28,18 @@
 .error { margin: 0; padding: 10px 14px; color: #ef8b76; font-size: 12px; line-height: 1.5; }
 .thanks { display: grid; gap: 4px; margin-top: 20px; padding: 14px 16px; border-left: 2px solid #c9a84c; color: #d8d1c5; background: rgba(201,168,76,.07); font: 12px/1.5 Montserrat,sans-serif; }
 .thanks small { color: #aaa49c; }
+.standalone { width: min(100%, 520px); margin: 18px 0; }
+.standaloneButton {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+  border: 1px solid rgba(212,167,44,.48); border-radius: 10px; color: #f2cf6a;
+  background: rgba(212,167,44,.065); text-align: left; cursor: pointer;
+}
+.standaloneButton > span:first-child { font-size: 22px; line-height: 1; }
+.standaloneButton > span:last-child { display: grid; gap: 3px; }
+.standaloneButton strong { font: 600 12px Montserrat,sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.standaloneButton small { color: #aaa49c; font: 11px/1.35 Montserrat,sans-serif; }
+.standaloneButton:hover { border-color: #f2cf6a; background: rgba(212,167,44,.11); }
+.standaloneButton:focus-visible { outline: 2px solid #f2cf6a; outline-offset: 3px; }
 @media (max-width: 560px) {
   .question { align-items: flex-start; flex-direction: column; }
   .question > div { width: 100%; }
