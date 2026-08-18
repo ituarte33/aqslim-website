@@ -13,6 +13,8 @@ export type Capability =
   | 'portal:read:self'
   | 'fasting:read:self'
   | 'fasting:write:self'
+  | 'feedback:read:any'
+  | 'feedback:write:any'
 
 const ADMIN_CAPABILITIES: ReadonlySet<Capability> = new Set([
   'patients:read:any',
@@ -27,6 +29,8 @@ const ADMIN_CAPABILITIES: ReadonlySet<Capability> = new Set([
   'portal:read:self',
   'fasting:read:self',
   'fasting:write:self',
+  'feedback:read:any',
+  'feedback:write:any',
 ])
 
 const PATIENT_CAPABILITIES: ReadonlySet<Capability> = new Set([

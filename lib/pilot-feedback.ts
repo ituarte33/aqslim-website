@@ -15,9 +15,12 @@ export const FEEDBACK_CATEGORIES = [
   'Otro',
 ] as const
 
+export const PILOT_FEEDBACK_STATUSES = ['Nuevo', 'Revisando', 'Resuelto'] as const
+
 export type FeedbackTool = typeof FEEDBACK_TOOLS[number]
 export type FeedbackCategory = typeof FEEDBACK_CATEGORIES[number]
 export type FeedbackRating = 'Funcionó' | 'Problema'
+export type PilotFeedbackStatus = typeof PILOT_FEEDBACK_STATUSES[number]
 
 export type PilotFeedbackInput = {
   tool: FeedbackTool
@@ -65,4 +68,9 @@ export function parsePilotFeedbackInput(value: unknown): PilotFeedbackInput | nu
 export function feedbackReportName(input: PilotFeedbackInput, now = new Date()): string {
   const stamp = now.toISOString().replace('T', ' ').slice(0, 16)
   return `${input.rating} · ${input.tool} · ${stamp}`.slice(0, 100)
+}
+
+export function isPilotFeedbackStatus(value: unknown): value is PilotFeedbackStatus {
+  return typeof value === 'string'
+    && PILOT_FEEDBACK_STATUSES.includes(value as PilotFeedbackStatus)
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
-import { feedbackReportName, parsePilotFeedbackInput } from '../lib/pilot-feedback.ts'
+import { feedbackReportName, isPilotFeedbackStatus, parsePilotFeedbackInput } from '../lib/pilot-feedback.ts'
 
 const validProblem = {
   tool: 'Recetas del refrigerador',
@@ -45,6 +45,28 @@ test('creates a concise report name without patient information', () => {
     feedbackReportName(parsed, new Date('2026-08-18T17:30:00.000Z')),
     'Problema · Recetas del refrigerador · 2026-08-18 17:30',
   )
+})
+
+test('only accepts governed pilot feedback workflow states', () => {
+  assert.equal(isPilotFeedbackStatus('Nuevo'), true)
+  assert.equal(isPilotFeedbackStatus('Revisando'), true)
+  assert.equal(isPilotFeedbackStatus('Resuelto'), true)
+  assert.equal(isPilotFeedbackStatus('En revisión'), false)
+})
+
+test('provides an admin report inbox with filters and status tracking', async () => {
+  const [page, client, actions, shell] = await Promise.all([
+    readFile(new URL('../app/dashboard/pilot-feedback/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/dashboard/pilot-feedback/pilot-feedback-client.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/dashboard/pilot-feedback/actions.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url), 'utf8'),
+  ])
+  assert.match(page, /feedback:read:any/)
+  assert.match(client, /Reportes del piloto/)
+  assert.match(client, /FEEDBACK_CATEGORIES/)
+  assert.match(client, /updatePilotFeedbackStatusAction/)
+  assert.match(actions, /feedback:write:any/)
+  assert.match(shell, /dashboard\/pilot-feedback/)
 })
 
 test('integrates permanent feedback access into the pilot home and all four tools', async () => {

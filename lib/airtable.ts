@@ -1,7 +1,7 @@
 import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
 import { filterConsultationsForPatient } from './patient-portal-policy'
-import type { PilotFeedbackInput } from './pilot-feedback'
+import type { PilotFeedbackInput, PilotFeedbackStatus } from './pilot-feedback'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
@@ -149,6 +149,29 @@ export interface Consulta {
     'Nombre Cliente'?: string | string[]
     [key: string]: unknown
   }
+}
+
+export interface PilotFeedbackRecord {
+  id: string
+  createdTime: string
+  report: string
+  patientId: string | null
+  patientName: string
+  date: string
+  tool: string
+  rating: string
+  category: string
+  comment: string
+  screenshots: Array<{
+    id?: string
+    url: string
+    filename: string
+    thumbnails?: { small?: { url: string }; large?: { url: string } }
+  }>
+  technicalContext: string
+  responseId: string
+  language: string
+  status: PilotFeedbackStatus
 }
 
 // ---------- Clientes ----------
@@ -305,6 +328,85 @@ export async function uploadPilotFeedbackScreenshot({
     })
     throw new Error(`Airtable attachment upload failed (${correlationId})`)
   }
+}
+
+function stringField(fields: Record<string, unknown>, fieldId: string): string {
+  const value = fields[fieldId]
+  return typeof value === 'string' ? value : ''
+}
+
+export async function getPilotFeedback(): Promise<PilotFeedbackRecord[]> {
+  const records: Array<{
+    id: string
+    createdTime: string
+    fields: Record<string, unknown>
+  }> = []
+  let offset: string | undefined
+
+  do {
+    const params = new URLSearchParams({
+      pageSize: '100',
+      returnFieldsByFieldId: 'true',
+      'sort[0][field]': PILOT_FEEDBACK_FIELDS.FECHA,
+      'sort[0][direction]': 'desc',
+    })
+    if (offset) params.set('offset', offset)
+    const data = await airtableFetch(`/${PILOT_FEEDBACK_TABLE}?${params}`)
+    records.push(...(data.records ?? []))
+    offset = data.offset
+  } while (offset)
+
+  const patientIds = Array.from(new Set(records.flatMap(record => {
+    const value = record.fields[PILOT_FEEDBACK_FIELDS.CLIENTE]
+    return Array.isArray(value) && typeof value[0] === 'string' ? [value[0]] : []
+  })))
+  const patientEntries = await Promise.all(patientIds.map(async patientId => {
+    const patient = await getClienteById(patientId).catch(() => null)
+    return [patientId, patient?.fields['Nombre Completo'] ?? 'Paciente sin nombre'] as const
+  }))
+  const patientNames = new Map(patientEntries)
+
+  return records.map(record => {
+    const fields = record.fields
+    const patientValue = fields[PILOT_FEEDBACK_FIELDS.CLIENTE]
+    const patientId = Array.isArray(patientValue) && typeof patientValue[0] === 'string'
+      ? patientValue[0]
+      : null
+    const screenshots = Array.isArray(fields[PILOT_FEEDBACK_FIELDS.CAPTURA])
+      ? fields[PILOT_FEEDBACK_FIELDS.CAPTURA] as PilotFeedbackRecord['screenshots']
+      : []
+    const status = stringField(fields, PILOT_FEEDBACK_FIELDS.ESTADO)
+
+    return {
+      id: record.id,
+      createdTime: record.createdTime,
+      report: stringField(fields, PILOT_FEEDBACK_FIELDS.REPORTE),
+      patientId,
+      patientName: patientId ? patientNames.get(patientId) ?? 'Paciente sin nombre' : 'Sin paciente',
+      date: stringField(fields, PILOT_FEEDBACK_FIELDS.FECHA) || record.createdTime,
+      tool: stringField(fields, PILOT_FEEDBACK_FIELDS.HERRAMIENTA),
+      rating: stringField(fields, PILOT_FEEDBACK_FIELDS.VALORACION),
+      category: stringField(fields, PILOT_FEEDBACK_FIELDS.CATEGORIA),
+      comment: stringField(fields, PILOT_FEEDBACK_FIELDS.COMENTARIO),
+      screenshots,
+      technicalContext: stringField(fields, PILOT_FEEDBACK_FIELDS.CONTEXTO_TECNICO),
+      responseId: stringField(fields, PILOT_FEEDBACK_FIELDS.ID_RESPUESTA),
+      language: stringField(fields, PILOT_FEEDBACK_FIELDS.IDIOMA),
+      status: status === 'Revisando' || status === 'Resuelto' ? status : 'Nuevo',
+    }
+  })
+}
+
+export async function updatePilotFeedbackStatus(
+  recordId: string,
+  status: PilotFeedbackStatus,
+): Promise<void> {
+  await airtableFetch(`/${PILOT_FEEDBACK_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: { [PILOT_FEEDBACK_FIELDS.ESTADO]: status },
+    }),
+  })
 }
 
 export async function getClientesConCita(): Promise<Cliente[]> {
