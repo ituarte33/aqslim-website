@@ -3,9 +3,21 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChatMessage } from './chat-message'
+import { PilotFeedback } from './pilot-feedback'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
-type Message = { role: 'user' | 'assistant'; content: string }
+type Message = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  feedbackEligible?: boolean
+  question?: string
+  errorCode?: string
+  correlationId?: string
+}
+type BuddyContextReference = { type: 'food_scan'; mealLogId: string }
+
+const BUDDY_CONTEXT_KEY = 'aqslim-buddy-context-v1'
 
 const STATE_IMAGES: Record<BuddyState, string> = {
   idle:     '/Aqslim_Buddy_Pics/aqslim_buddy_open_arms.png',
@@ -28,6 +40,8 @@ const LABELS = {
     send: 'Enviar',
     welcome: '¡Hola! Soy AQ Buddy, tu asistente de bienestar AQSLIM. ¿En qué te puedo ayudar hoy?',
     starter: 'Hola, ¿qué puedes hacer por mí?',
+    contextWelcome: 'Ya tengo el análisis de tu último plato. Puedes preguntarme cómo adaptarlo a tu fase de AQSLIM.',
+    contextStarter: '¿Cómo adapto este plato a mi fase?',
     thinking: 'Pensando...',
     error: 'Ocurrió un error. Intenta de nuevo.',
   },
@@ -38,6 +52,8 @@ const LABELS = {
     send: 'Send',
     welcome: "Hi! I'm AQ Buddy, your AQSLIM wellness assistant. How can I help you today?",
     starter: 'Hi, what can you help me with?',
+    contextWelcome: 'I have your latest plate analysis. You can ask me how to adapt it to your AQSLIM phase.',
+    contextStarter: 'How can I adapt this plate to my phase?',
     thinking: 'Thinking...',
     error: 'An error occurred. Please try again.',
   },
@@ -62,6 +78,7 @@ export function ChatWidget() {
   const router                    = useRouter()
   const inPatientPortal           = pathname.startsWith('/my-aqslim')
   const inDashboard               = pathname.startsWith('/dashboard')
+  const compactLauncher           = inDashboard || pathname.startsWith('/food-scanner')
   const fullScreen                = inPatientPortal && pathname.endsWith('/buddy')
   const demo                      = pathname.startsWith('/my-aqslim/demo/')
   const [open, setOpen]           = useState(fullScreen)
@@ -73,6 +90,8 @@ export function ChatWidget() {
   const [input, setInput]         = useState('')
   const [streaming, setStreaming] = useState(false)
   const [fontSize, setFontSize]   = useState(16)
+  const [buddyContext, setBuddyContext] = useState<BuddyContextReference | null>(null)
+  const foodScannerContext = pathname.startsWith('/food-scanner') ? buddyContext : null
 
   const MIN_FONT = 13
   const MAX_FONT = 25
@@ -130,6 +149,31 @@ export function ChatWidget() {
     return () => window.removeEventListener('aq-buddy-open', openChat)
   }, [])
 
+  // Receive only an opaque saved-record reference from the scanner. The chat
+  // API resolves and authorizes the actual meal data on the server.
+  useEffect(() => {
+    function acceptContext(value: unknown) {
+      if (!value || typeof value !== 'object') return
+      const candidate = value as Record<string, unknown>
+      if (candidate.type !== 'food_scan') return
+      if (typeof candidate.mealLogId !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(candidate.mealLogId)) return
+      setBuddyContext({ type: 'food_scan', mealLogId: candidate.mealLogId })
+    }
+
+    try {
+      const stored = sessionStorage.getItem(BUDDY_CONTEXT_KEY)
+      if (stored) acceptContext(JSON.parse(stored))
+    } catch {
+      sessionStorage.removeItem(BUDDY_CONTEXT_KEY)
+    }
+
+    function onContext(event: Event) {
+      acceptContext((event as CustomEvent).detail)
+    }
+    window.addEventListener('aq-buddy-context', onContext)
+    return () => window.removeEventListener('aq-buddy-context', onContext)
+  }, [])
+
   useEffect(() => {
     if (fullScreen) setOpen(true)
   }, [fullScreen])
@@ -173,8 +217,8 @@ export function ChatWidget() {
   // Welcome message on first open
   useEffect(() => {
     if (open && messages.length === 0) {
-      const welcome = LABELS[lang].welcome
-      setMessages([{ role: 'assistant', content: welcome }])
+      const welcome = foodScannerContext ? LABELS[lang].contextWelcome : LABELS[lang].welcome
+      setMessages([{ id: 'welcome', role: 'assistant', content: welcome }])
       setStateWithTimeout('love', '¡Hola! 👋', 3500)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -210,7 +254,7 @@ export function ChatWidget() {
     if (!text || streaming) return
     setInput('')
 
-    const userMsg: Message = { role: 'user', content: text }
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
     const history = [...messages, userMsg]
     pendingUserScrollRef.current = true
     setMessages(history)
@@ -219,17 +263,27 @@ export function ChatWidget() {
     setBubble(t.thinking)
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
 
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+    const assistantId = crypto.randomUUID()
+    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', feedbackEligible: true, question: text }])
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({
+          messages: history.map(m => ({ role: m.role, content: m.content })),
+          context: foodScannerContext,
+        }),
       })
 
       if (!res.ok || !res.body) {
-        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: t.error }; return n })
+        const failure = await res.json().catch(() => null) as { error?: string; correlationId?: string } | null
+        setMessages(prev => { const n = [...prev]; n[n.length - 1] = {
+          ...n[n.length - 1],
+          content: t.error,
+          errorCode: failure?.error || `http_${res.status}`,
+          correlationId: failure?.correlationId,
+        }; return n })
         setStateWithTimeout('warning', t.error)
         return
       }
@@ -242,14 +296,14 @@ export function ChatWidget() {
         const { done, value } = await reader.read()
         if (done) break
         full += decoder.decode(value, { stream: true })
-        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: full }; return n })
+        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { ...n[n.length - 1], content: full }; return n })
       }
 
       const finalState = detectState(full)
       const preview = full.slice(0, 70).trim() + (full.length > 70 ? '…' : '')
       setStateWithTimeout(finalState, preview, 5000)
     } catch {
-      setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: t.error }; return n })
+      setMessages(prev => { const n = [...prev]; n[n.length - 1] = { ...n[n.length - 1], content: t.error, errorCode: 'network_error' }; return n })
       setStateWithTimeout('warning', t.error)
     } finally {
       setStreaming(false)
@@ -266,45 +320,68 @@ export function ChatWidget() {
   }
 
   return (
-    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
+    <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${compactLauncher ? ' aqb-wrap--compact' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
-      {/* Admin pages use a compact launcher so patient and finance controls stay clear. */}
-      {inDashboard && !open ? (
-        <button
-          className="aqb-dashboard-launcher"
-          onClick={() => setOpen(true)}
-          aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
-          title="AQ Buddy"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M5.4 17.2 4 21l4.2-1.7c1.1.5 2.4.7 3.8.7 4.9 0 8.8-3.6 8.8-8s-3.9-8-8.8-8-8.8 3.6-8.8 8c0 2 .8 3.8 2.2 5.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-            <circle cx="8.5" cy="12" r="1" fill="currentColor" />
-            <circle cx="12" cy="12" r="1" fill="currentColor" />
-            <circle cx="15.5" cy="12" r="1" fill="currentColor" />
-          </svg>
-        </button>
+      {/* Dashboard and scanner surfaces keep AQ Buddy visible without covering the work area. */}
+      {compactLauncher ? (
+        !open && !fullScreen ? (
+          <button
+            className="aqb-compact-launcher"
+            onClick={() => setOpen(true)}
+            aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
+            title="AQ Buddy"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={STATE_IMAGES[buddyState]}
+              alt=""
+              className="aqb-compact-img"
+              aria-hidden="true"
+            />
+            <span className="aqb-compact-label">
+              {lang === 'es' ? '¿Hablamos?' : 'Let’s chat'}
+            </span>
+          </button>
+        ) : null
       ) : (
-        <button
-          className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
-          onClick={() => fullScreen ? undefined : setOpen(v => !v)}
-          aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={STATE_IMAGES[buddyState]}
-            alt="AQ Buddy"
-            className="aqb-img"
-          />
-          {!open && (
-            <div className="aqb-cta-label">
-              💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
-            </div>
-          )}
-        </button>
+        <>
+          {!open && !fullScreen ? (
+            <button
+              className="aqb-mobile-launcher"
+              onClick={() => setOpen(true)}
+              aria-label={lang === 'es' ? 'Abrir AQ Buddy' : 'Open AQ Buddy'}
+              title="AQ Buddy"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5.4 17.2 4 21l4.2-1.7c1.1.5 2.4.7 3.8.7 4.9 0 8.8-3.6 8.8-8s-3.9-8-8.8-8-8.8 3.6-8.8 8c0 2 .8 3.8 2.2 5.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                <circle cx="8.5" cy="12" r="1" fill="currentColor" />
+                <circle cx="12" cy="12" r="1" fill="currentColor" />
+                <circle cx="15.5" cy="12" r="1" fill="currentColor" />
+              </svg>
+            </button>
+          ) : null}
+          <button
+            className={`aqb-mascot${talking ? ' aqb-mascot--talking' : ''}`}
+            onClick={() => fullScreen ? undefined : setOpen(v => !v)}
+            aria-label={open ? 'Close AQ Buddy' : 'Open AQ Buddy'}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={STATE_IMAGES[buddyState]}
+              alt="AQ Buddy"
+              className="aqb-img"
+            />
+            {!open && (
+              <div className="aqb-cta-label">
+                💬 {lang === 'es' ? '¡Habla conmigo!' : 'Chat with me!'}
+              </div>
+            )}
+          </button>
+        </>
       )}
 
       {/* Speech bubble — only when chat is closed */}
-      {bubble && !open && (
+      {bubble && !open && !compactLauncher && (
         <div className="aqb-bubble">
           <div className="aqb-bubble-text">{bubble}</div>
           <div className="aqb-bubble-tail" />
@@ -350,12 +427,21 @@ export function ChatWidget() {
             </div>
           </div>
 
+          <div className="aqb-persistent-feedback">
+            <PilotFeedback
+              tool="AQ Buddy"
+              language={lang}
+              context={{ surface: 'aq_buddy_chat', messageCount: messages.length }}
+              standalone
+            />
+          </div>
+
           <div ref={messagesRef} className="aqb-messages">
             {messages.map((m, i) => (
               <div
-                key={i}
+                key={m.id}
                 ref={m.role === 'user' ? latestUserRef : undefined}
-                className={`aqb-msg-row ${m.role}`}
+                className={`aqb-msg-row ${m.role}${m.feedbackEligible ? ' aqb-msg-row--feedback' : ''}`}
               >
                 <div className={`aqb-msg ${m.role}`} style={{ fontSize }}>
                   {m.content
@@ -364,6 +450,16 @@ export function ChatWidget() {
                       ? <><span className="aqb-dot" /><span className="aqb-dot" /><span className="aqb-dot" /></>
                       : null}
                 </div>
+                {m.feedbackEligible && m.content && !(streaming && i === messages.length - 1) ? (
+                  <div className="aqb-message-feedback">
+                    <PilotFeedback
+                      tool="AQ Buddy"
+                      language={lang}
+                      responseId={m.id}
+                      context={{ question: m.question, response: m.content, errorCode: m.errorCode, correlationId: m.correlationId, foodScannerContext }}
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
             {messages.length === 1 && !streaming ? (
@@ -371,11 +467,11 @@ export function ChatWidget() {
                 type="button"
                 className="aqb-starter"
                 onClick={() => {
-                  setInput(t.starter)
+                  setInput(foodScannerContext ? t.contextStarter : t.starter)
                   inputRef.current?.focus()
                 }}
               >
-                {t.starter}
+                {foodScannerContext ? t.contextStarter : t.starter}
               </button>
             ) : null}
           </div>

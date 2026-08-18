@@ -1,5 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { AuthorizationError, requireCapability } from '@/lib/auth'
+import { getFast36SessionsByPatient, getMealLogForUser, getMealLogsBetween } from '@/lib/airtable'
+import { getPatientPortalData } from '@/lib/patient-portal'
+import { buildFast36BuddyContext, normalizeFast36Status, type Fast36Session } from '@/lib/fast36-policy'
+import { foodScanPeriodBoundaries } from '@/lib/food-scan-policy'
+import { buildFoodScanContextPrompt, parseBuddyContextReference } from '@/lib/aq-buddy-context'
 import { SYSTEM_PROMPT } from './system-prompt'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -139,15 +144,93 @@ function breastfeedingSafetyBlockFor(text: string) {
     : BREASTFEEDING_SAFETY_EN
 }
 
+async function resolveVerifiedContext(value: unknown, clerkUserId: string): Promise<string> {
+  const reference = parseBuddyContextReference(value)
+  if (!reference) return ''
+
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+  }).format(new Date())
+  const boundaries = foodScanPeriodBoundaries(today)
+  const [mealLog, portal, todaysMealLogs] = await Promise.all([
+    getMealLogForUser(reference.mealLogId, clerkUserId).catch(() => null),
+    getPatientPortalData().catch(() => null),
+    getMealLogsBetween(
+      clerkUserId,
+      boundaries.dayStartUtc,
+      boundaries.dayEndUtc,
+    ).catch(() => null),
+  ])
+  if (!mealLog) return ''
+
+  const consumedMealLogs = todaysMealLogs
+    ?.filter((log) => log.fields['Consumption Status'] === 'Consumed')
+  const validCarbs = consumedMealLogs
+    ?.map((log) => log.fields['Carbs (g)'])
+    .filter((carbs): carbs is number => typeof carbs === 'number' && Number.isFinite(carbs) && carbs >= 0)
+  const carbsLoggedToday = validCarbs
+    ? validCarbs.reduce((total, carbs) => total + carbs, 0)
+    : null
+  const currentMealWasLoggedToday = consumedMealLogs?.some((log) => log.id === mealLog.id) ?? false
+  const currentMealCarbs = mealLog.fields['Carbs (g)']
+  const carbsLoggedTodayExcludingCurrentMeal = carbsLoggedToday !== null
+    ? Math.max(
+        0,
+        carbsLoggedToday - (
+          currentMealWasLoggedToday && typeof currentMealCarbs === 'number'
+            ? currentMealCarbs
+            : 0
+        ),
+      )
+    : null
+
+  return buildFoodScanContextPrompt({
+    food: mealLog.fields['Food Description'] ?? '',
+    calories: mealLog.fields['Calories'] ?? null,
+    carbs: mealLog.fields['Carbs (g)'] ?? null,
+    fats: mealLog.fields['Fats (g)'] ?? null,
+    proteins: mealLog.fields['Proteins (g)'] ?? null,
+    mealType: mealLog.fields['Meal Type'] ?? null,
+    phase: portal?.phase ?? null,
+    weekInPhase: portal?.weekInPhase ?? null,
+    consumptionStatus: mealLog.fields['Consumption Status'] ?? 'Unconfirmed',
+    carbsLoggedToday,
+    carbsLoggedTodayExcludingCurrentMeal,
+  })
+}
+
 export async function POST(req: Request) {
+  let actor: Awaited<ReturnType<typeof requireCapability>>
   try {
-    await requireCapability('buddy:chat')
+    actor = await requireCapability('buddy:chat')
   } catch (error) {
     const status = error instanceof AuthorizationError && error.code === 'FORBIDDEN' ? 403 : 401
     return Response.json({ error: 'Unauthorized' }, { status })
   }
 
-  const { messages }: { messages: ChatMessage[] } = await req.json()
+  const { messages, context }: { messages: ChatMessage[]; context?: unknown } = await req.json()
+  const [verifiedContext, portal] = await Promise.all([
+    resolveVerifiedContext(context, actor.clerkUserId),
+    getPatientPortalData().catch(() => null),
+  ])
+  const fastingRecords = portal
+    ? await getFast36SessionsByPatient(portal.clienteId).catch(() => [])
+    : []
+  const fastingSessions: Fast36Session[] = fastingRecords.flatMap(record => {
+    const week = record.fields['Semana']
+    const startAt = record.fields['Inicio']
+    const plannedEndAt = record.fields['Fin programado']
+    if (typeof week !== 'number' || !startAt || !plannedEndAt) return []
+    return [{
+      id: record.id,
+      week,
+      startAt,
+      plannedEndAt,
+      actualEndAt: record.fields['Fin real'] ?? null,
+      status: normalizeFast36Status(record.fields['Estado']),
+    }]
+  })
+  const fastingContext = buildFast36BuddyContext(fastingSessions)
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')
   )
@@ -163,10 +246,12 @@ export async function POST(req: Request) {
       : null,
   ].filter((block): block is string => Boolean(block))
 
-  const systemPrompt =
-    requiredSafetyBlocks.length > 0
-      ? `${SYSTEM_PROMPT}\n\n${MEDICAL_SAFETY_RESPONSE_BOUNDARY}`
-      : SYSTEM_PROMPT
+  const systemPrompt = [
+    SYSTEM_PROMPT,
+    verifiedContext,
+    fastingContext,
+    requiredSafetyBlocks.length > 0 ? MEDICAL_SAFETY_RESPONSE_BOUNDARY : '',
+  ].filter(Boolean).join('\n\n')
 
   const stream = client.messages.stream({
     model: 'claude-haiku-4-5-20251001',

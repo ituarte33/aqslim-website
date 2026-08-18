@@ -9,7 +9,12 @@ export default function SignInPage() {
       justifyContent: 'center',
       background: '#0A0A0A',
     }}>
-      <SignIn />
+      <SignIn
+        path="/sign-in"
+        routing="path"
+        signUpUrl="/sign-up"
+        forceRedirectUrl="/food-scanner"
+      />
     </div>
   )
 }

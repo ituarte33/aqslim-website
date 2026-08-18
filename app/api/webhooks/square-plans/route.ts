@@ -3,10 +3,28 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { clerkClient } from '@clerk/nextjs/server'
 
 // ── Variation name → plan tier ─────────────────────────────────────────────
-// Set these to the exact Square catalog variation names for the AI Meal Tracker subscription.
-const VARIATION_PLAN_MAP: Record<string, string> = {
-  [process.env.SQUARE_SUBSCRIPTION_VARIATION_MID ?? 'Regular']: 'mid',
-  [process.env.SQUARE_SUBSCRIPTION_VARIATION_TOP ?? 'Plus']:    'top',
+// Environment overrides let Square keep its own catalog naming. Legacy
+// Regular/Mid/Top names remain accepted while subscriptions are migrated.
+function planForVariationName(variationName: string): string | null {
+  const normalized = variationName.trim().toLowerCase()
+  const configured: Array<[string | undefined, string]> = [
+    [process.env.SQUARE_SUBSCRIPTION_VARIATION_START, 'start'],
+    [process.env.SQUARE_SUBSCRIPTION_VARIATION_PLUS, 'plus'],
+    [process.env.SQUARE_SUBSCRIPTION_VARIATION_ELITE, 'elite'],
+    [process.env.SQUARE_SUBSCRIPTION_VARIATION_MID, 'start'],
+    [process.env.SQUARE_SUBSCRIPTION_VARIATION_TOP, 'elite'],
+  ]
+  for (const [name, plan] of configured) {
+    if (name?.trim().toLowerCase() === normalized) return plan
+  }
+  return ({
+    regular: 'start',
+    mid: 'start',
+    start: 'start',
+    plus: 'plus',
+    top: 'elite',
+    elite: 'elite',
+  } as Record<string, string>)[normalized] ?? null
 }
 
 const INACTIVE_STATUSES = new Set(['CANCELED', 'DEACTIVATED', 'PAUSED'])
@@ -76,11 +94,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    plan = VARIATION_PLAN_MAP[variationName] ?? null
-    if (!plan) {
+    const mappedPlan = planForVariationName(variationName)
+    if (!mappedPlan) {
       console.warn('[square-plans] No plan mapped for variation:', variationName)
       return NextResponse.json({ ok: true })
     }
+    plan = mappedPlan
   }
 
   // Get the customer's email and update Clerk

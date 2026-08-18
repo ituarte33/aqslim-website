@@ -14,6 +14,7 @@ export interface LogEntry {
     'Date'?: string
     'Timestamp'?: string
     'Meal Type'?: string
+    'Consumption Status'?: 'Unconfirmed' | 'Consumed' | 'Reference only'
   }
 }
 
@@ -22,24 +23,26 @@ type Period = 'today' | 'week' | 'month'
 const COPY = {
   es: {
     loading:   'Cargando registro…',
-    noMeals:   'Aún no hay comidas registradas.',
-    scan:      'Escanea una comida',
+    noMeals:   'Aún no hay escaneos registrados.',
+    scan:      'Escanea un plato',
     toStart:   'para comenzar.',
-    title:     'Registro de Comidas',
+    title:     'Historial de Escaneos',
     tabs:      { today: 'Hoy', week: 'Esta Semana', month: 'Este Mes' },
-    meals:     (n: number) => `${n} comida${n !== 1 ? 's' : ''}`,
-    noPeriod:  (p: Period) => p === 'today' ? 'Sin comidas hoy.' : p === 'week' ? 'Sin comidas esta semana.' : 'Sin comidas este mes.',
+    meals:     (n: number) => `${n} comida${n !== 1 ? 's' : ''} confirmada${n !== 1 ? 's' : ''}`,
+    noPeriod:  (p: Period) => p === 'today' ? 'Sin escaneos hoy.' : p === 'week' ? 'Sin escaneos esta semana.' : 'Sin escaneos este mes.',
+    status: { Unconfirmed: 'Sin confirmar', Consumed: 'Consumido', 'Reference only': 'Solo referencia' } as Record<string, string>,
     kcal: 'kcal', carbs: 'carbos', fats: 'grasas', protein: 'proteína',
   },
   en: {
     loading:   'Loading meal log…',
-    noMeals:   'No meals logged yet.',
-    scan:      'Scan a meal',
+    noMeals:   'No scans saved yet.',
+    scan:      'Scan a plate',
     toStart:   'to start tracking.',
-    title:     'Meal Log',
+    title:     'Scan History',
     tabs:      { today: 'Today', week: 'This Week', month: 'This Month' },
-    meals:     (n: number) => `${n} meal${n !== 1 ? 's' : ''}`,
-    noPeriod:  (p: Period) => p === 'today' ? 'No meals logged today.' : p === 'week' ? 'No meals logged this week.' : 'No meals logged this month.',
+    meals:     (n: number) => `${n} confirmed meal${n !== 1 ? 's' : ''}`,
+    noPeriod:  (p: Period) => p === 'today' ? 'No scans today.' : p === 'week' ? 'No scans this week.' : 'No scans this month.',
+    status: { Unconfirmed: 'Unconfirmed', Consumed: 'Consumed', 'Reference only': 'Reference only' } as Record<string, string>,
     kcal: 'kcal', carbs: 'carbs', fats: 'fats', protein: 'protein',
   },
 }
@@ -99,8 +102,9 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
 
   const cutoff   = period === 'today' ? today : period === 'week' ? weekStart : monthStart
   const filtered = logs.filter(l => (l.fields['Date'] ?? '') >= cutoff)
+  const consumed = filtered.filter(l => l.fields['Consumption Status'] === 'Consumed')
 
-  const totals = filtered.reduce(
+  const totals = consumed.reduce(
     (acc, l) => ({
       calories: acc.calories + (l.fields['Calories']    ?? 0),
       carbs:    acc.carbs    + (l.fields['Carbs (g)']   ?? 0),
@@ -142,7 +146,7 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
             <span className="flw-summary-val" style={{ color: '#E2C87A' }}>{totals.proteins}g</span>
             <span className="flw-summary-lbl">{t.protein}</span>
           </div>
-          <div className="flw-summary-count">{t.meals(filtered.length)}</div>
+          <div className="flw-summary-count">{t.meals(consumed.length)}</div>
         </div>
       )}
 
@@ -155,6 +159,9 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
               <div className="flw-row-food">
                 {log.fields['Meal Type'] && <span className="flw-row-type">{log.fields['Meal Type']}</span>}
                 {log.fields['Food Description'] ?? '—'}
+                <span className={`flw-row-status flw-row-status--${(log.fields['Consumption Status'] ?? 'Unconfirmed').toLowerCase().replace(/\s+/g, '-')}`}>
+                  {t.status[log.fields['Consumption Status'] ?? 'Unconfirmed']}
+                </span>
               </div>
               <div className="flw-row-macros">
                 <span className="flw-row-cal">{log.fields['Calories'] ?? 0} {t.kcal}</span>

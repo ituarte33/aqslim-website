@@ -52,6 +52,9 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
       <section className={styles.welcome}>
         <p>{es ? `Hola, ${data.firstName}` : `Hello, ${data.firstName}`}</p>
         <span>{capitalize(today)}</span>
+        <small className={styles.profileIdentity}>
+          {es ? 'Perfil vinculado' : 'Linked profile'}: <strong>{data.fullName}</strong>
+        </small>
       </section>
 
       <section className={`${styles.panel} ${styles.phasePanel}`}>

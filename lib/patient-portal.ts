@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import {
-  getConsultasByCliente,
+  getConsultasByPatientId,
   getPlanById,
   type Consulta,
 } from '@/lib/airtable'
@@ -77,7 +77,7 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
   const planId = cliente.fields['Plan AQSLIM']?.[0]
   const [consultas, plan] = await Promise.all([
     clienteName
-      ? getConsultasByCliente(clienteName).catch(() => [] as Consulta[])
+      ? getConsultasByPatientId(cliente.id, clienteName).catch(() => [] as Consulta[])
       : Promise.resolve([] as Consulta[]),
     planId ? getPlanById(planId).catch(() => null) : Promise.resolve(null),
   ])

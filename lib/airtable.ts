@@ -1,9 +1,27 @@
 import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
+import { filterConsultationsForPatient } from './patient-portal-policy'
+import type { PilotFeedbackInput, PilotFeedbackStatus } from './pilot-feedback'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
 export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
+export const PILOT_FEEDBACK_TABLE = 'tbl0yg7fqfaXS5Dva'
+
+export const PILOT_FEEDBACK_FIELDS = {
+  REPORTE: 'fldq9JvW9mV8SlIvJ',
+  CLIENTE: 'fld7bZ052lpz0ZhFZ',
+  FECHA: 'fldIfr99Fj0NIKIPf',
+  HERRAMIENTA: 'fldT9UWTl25zc2Wta',
+  VALORACION: 'fldkEMonzJH4Lndx5',
+  CATEGORIA: 'fldmb5vvDaSb2xQGO',
+  COMENTARIO: 'flds9clsoqFQUCi61',
+  CAPTURA: 'fldekv8wLap1IcMmV',
+  CONTEXTO_TECNICO: 'fldtadkX9UlSkMAOY',
+  ID_RESPUESTA: 'fldYczkoiNpTTyiT1',
+  IDIOMA: 'fldrtAaqsFwEr2YJz',
+  ESTADO: 'fldiuoXAUwFYEOWI7',
+} as const
 
 // Field IDs for the Clientes table. Use these as keys in write operations
 // so that Airtable field renames never break the API.
@@ -98,7 +116,7 @@ export interface Consulta {
   id: string
   fields: {
     'ID Consulta'?: string
-    'ID Cliente'?: string
+    'ID Cliente'?: string[]
     'Fecha Consulta'?: string
     'Tipo de Consulta'?: string
     'Peso (kg)'?: number
@@ -131,6 +149,29 @@ export interface Consulta {
     'Nombre Cliente'?: string | string[]
     [key: string]: unknown
   }
+}
+
+export interface PilotFeedbackRecord {
+  id: string
+  createdTime: string
+  report: string
+  patientId: string | null
+  patientName: string
+  date: string
+  tool: string
+  rating: string
+  category: string
+  comment: string
+  screenshots: Array<{
+    id?: string
+    url: string
+    filename: string
+    thumbnails?: { small?: { url: string }; large?: { url: string } }
+  }>
+  technicalContext: string
+  responseId: string
+  language: string
+  status: PilotFeedbackStatus
 }
 
 // ---------- Clientes ----------
@@ -222,6 +263,149 @@ export async function updateCliente(id: string, fields: Record<string, unknown>)
   return airtableFetch(`/${CLIENTES_TABLE}/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ fields }),
+  })
+}
+
+export async function createPilotFeedback({
+  patientId,
+  reportName,
+  input,
+}: {
+  patientId: string
+  reportName: string
+  input: PilotFeedbackInput
+}): Promise<{ id: string }> {
+  const fields: Record<string, unknown> = {
+    [PILOT_FEEDBACK_FIELDS.REPORTE]: reportName,
+    [PILOT_FEEDBACK_FIELDS.CLIENTE]: [patientId],
+    [PILOT_FEEDBACK_FIELDS.FECHA]: new Date().toISOString(),
+    [PILOT_FEEDBACK_FIELDS.HERRAMIENTA]: input.tool,
+    [PILOT_FEEDBACK_FIELDS.VALORACION]: input.rating,
+    [PILOT_FEEDBACK_FIELDS.CONTEXTO_TECNICO]: input.context,
+    [PILOT_FEEDBACK_FIELDS.ID_RESPUESTA]: input.responseId,
+    [PILOT_FEEDBACK_FIELDS.IDIOMA]: input.language,
+    [PILOT_FEEDBACK_FIELDS.ESTADO]: 'Nuevo',
+  }
+  if (input.category) fields[PILOT_FEEDBACK_FIELDS.CATEGORIA] = input.category
+  if (input.comment) fields[PILOT_FEEDBACK_FIELDS.COMENTARIO] = input.comment
+
+  return airtableFetch(`/${PILOT_FEEDBACK_TABLE}`, {
+    method: 'POST',
+    // Typecast lets Airtable register a newly governed surface such as My AQSLIM
+    // without dropping the report if the single-select option was not pre-created.
+    body: JSON.stringify({ fields, typecast: true }),
+  })
+}
+
+export async function uploadPilotFeedbackScreenshot({
+  recordId,
+  base64,
+  filename,
+  contentType,
+}: {
+  recordId: string
+  base64: string
+  filename: string
+  contentType: 'image/jpeg' | 'image/png'
+}): Promise<void> {
+  const response = await fetch(
+    `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${recordId}/${PILOT_FEEDBACK_FIELDS.CAPTURA}/uploadAttachment`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.AIRTABLE_PAT}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ file: base64, filename, contentType }),
+      cache: 'no-store',
+    },
+  )
+  if (!response.ok) {
+    const correlationId = crypto.randomUUID()
+    console.error('[pilot-feedback] attachment_upload_failed', {
+      correlationId,
+      status: response.status,
+    })
+    throw new Error(`Airtable attachment upload failed (${correlationId})`)
+  }
+}
+
+function stringField(fields: Record<string, unknown>, fieldId: string): string {
+  const value = fields[fieldId]
+  return typeof value === 'string' ? value : ''
+}
+
+export async function getPilotFeedback(): Promise<PilotFeedbackRecord[]> {
+  const records: Array<{
+    id: string
+    createdTime: string
+    fields: Record<string, unknown>
+  }> = []
+  let offset: string | undefined
+
+  do {
+    const params = new URLSearchParams({
+      pageSize: '100',
+      returnFieldsByFieldId: 'true',
+      'sort[0][field]': PILOT_FEEDBACK_FIELDS.FECHA,
+      'sort[0][direction]': 'desc',
+    })
+    if (offset) params.set('offset', offset)
+    const data = await airtableFetch(`/${PILOT_FEEDBACK_TABLE}?${params}`)
+    records.push(...(data.records ?? []))
+    offset = data.offset
+  } while (offset)
+
+  const patientIds = Array.from(new Set(records.flatMap(record => {
+    const value = record.fields[PILOT_FEEDBACK_FIELDS.CLIENTE]
+    return Array.isArray(value) && typeof value[0] === 'string' ? [value[0]] : []
+  })))
+  const patientEntries = await Promise.all(patientIds.map(async patientId => {
+    const patient = await getClienteById(patientId).catch(() => null)
+    return [patientId, patient?.fields['Nombre Completo'] ?? 'Paciente sin nombre'] as const
+  }))
+  const patientNames = new Map(patientEntries)
+
+  return records.map(record => {
+    const fields = record.fields
+    const patientValue = fields[PILOT_FEEDBACK_FIELDS.CLIENTE]
+    const patientId = Array.isArray(patientValue) && typeof patientValue[0] === 'string'
+      ? patientValue[0]
+      : null
+    const screenshots = Array.isArray(fields[PILOT_FEEDBACK_FIELDS.CAPTURA])
+      ? fields[PILOT_FEEDBACK_FIELDS.CAPTURA] as PilotFeedbackRecord['screenshots']
+      : []
+    const status = stringField(fields, PILOT_FEEDBACK_FIELDS.ESTADO)
+
+    return {
+      id: record.id,
+      createdTime: record.createdTime,
+      report: stringField(fields, PILOT_FEEDBACK_FIELDS.REPORTE),
+      patientId,
+      patientName: patientId ? patientNames.get(patientId) ?? 'Paciente sin nombre' : 'Sin paciente',
+      date: stringField(fields, PILOT_FEEDBACK_FIELDS.FECHA) || record.createdTime,
+      tool: stringField(fields, PILOT_FEEDBACK_FIELDS.HERRAMIENTA),
+      rating: stringField(fields, PILOT_FEEDBACK_FIELDS.VALORACION),
+      category: stringField(fields, PILOT_FEEDBACK_FIELDS.CATEGORIA),
+      comment: stringField(fields, PILOT_FEEDBACK_FIELDS.COMENTARIO),
+      screenshots,
+      technicalContext: stringField(fields, PILOT_FEEDBACK_FIELDS.CONTEXTO_TECNICO),
+      responseId: stringField(fields, PILOT_FEEDBACK_FIELDS.ID_RESPUESTA),
+      language: stringField(fields, PILOT_FEEDBACK_FIELDS.IDIOMA),
+      status: status === 'Revisando' || status === 'Resuelto' ? status : 'Nuevo',
+    }
+  })
+}
+
+export async function updatePilotFeedbackStatus(
+  recordId: string,
+  status: PilotFeedbackStatus,
+): Promise<void> {
+  await airtableFetch(`/${PILOT_FEEDBACK_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: { [PILOT_FEEDBACK_FIELDS.ESTADO]: status },
+    }),
   })
 }
 
@@ -557,9 +741,16 @@ export async function hasConsulta(nombreCliente: string): Promise<boolean> {
 }
 
 export async function getConsultasByCliente(nombreCliente: string): Promise<Consulta[]> {
-  const formula = encodeURIComponent(`{ID Cliente} = "${nombreCliente}"`)
+  const safeName = escapeAirtableString(nombreCliente.trim())
+  const formula = encodeURIComponent(`{ID Cliente} = "${safeName}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
-  return data.records
+  return data.records ?? []
+}
+
+export async function getConsultasByPatientId(clienteId: string, nombreCliente: string): Promise<Consulta[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(clienteId)) return []
+  const data = await getConsultasByCliente(nombreCliente)
+  return filterConsultationsForPatient(data, clienteId)
 }
 
 // ---------- Plan AQSLIM ----------
@@ -639,14 +830,17 @@ export const MEAL_LOGS_FIELDS = {
   PLAN:             'fldDToUQRdKhv89aF',
   NOTES:            'fldaKtk9h5u2riid3',
   MEAL_TYPE:        'fld7Pc0AxN4ujVWvZ',
+  CONSUMPTION_STATUS:'fldASx146GvUjwhI6',
 } as const
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'
+export type ConsumptionStatus = 'Unconfirmed' | 'Consumed' | 'Reference only'
 
 export interface MealLog {
   id: string
   createdTime: string
   fields: {
+    'User ID'?: string
     'User Email'?: string
     'Date'?: string
     'Food Description'?: string
@@ -658,7 +852,14 @@ export interface MealLog {
     'Plan'?: string
     'Notes'?: string
     'Meal Type'?: MealType
+    'Consumption Status'?: ConsumptionStatus
   }
+}
+
+export async function getMealLogForUser(recordId: string, userId: string): Promise<MealLog | null> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(recordId) || !userId) return null
+  const record = await airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`) as MealLog
+  return record.fields['User ID'] === userId ? record : null
 }
 
 export async function createMealLog(data: {
@@ -688,9 +889,26 @@ export async function createMealLog(data: {
         [MEAL_LOGS_FIELDS.PROTEINS_G]:       data.proteins,
         [MEAL_LOGS_FIELDS.TIMESTAMP]:        new Date().toISOString(),
         [MEAL_LOGS_FIELDS.PLAN]:             data.plan,
+        [MEAL_LOGS_FIELDS.CONSUMPTION_STATUS]:'Unconfirmed',
         ...(data.notes    ? { [MEAL_LOGS_FIELDS.NOTES]:     data.notes }    : {}),
         ...(data.mealType ? { [MEAL_LOGS_FIELDS.MEAL_TYPE]: data.mealType } : {}),
       },
+    }),
+  })
+}
+
+export async function updateMealLogConsumptionStatus(
+  recordId: string,
+  userId: string,
+  status: Exclude<ConsumptionStatus, 'Unconfirmed'>,
+): Promise<MealLog | null> {
+  const record = await getMealLogForUser(recordId, userId)
+  if (!record) return null
+
+  return airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: { [MEAL_LOGS_FIELDS.CONSUMPTION_STATUS]: status },
     }),
   })
 }
@@ -726,6 +944,29 @@ export async function countTodayScans(userId: string, date: string): Promise<num
   return Array.isArray(data?.records) ? data.records.length : 0
 }
 
+export async function countScansBetween(
+  userId: string,
+  startUtc: string,
+  endUtc: string,
+): Promise<number> {
+  const formula = encodeURIComponent(
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} >= "${startUtc}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} < "${endUtc}")`,
+  )
+  let count = 0
+  let offset: string | undefined
+
+  do {
+    const offsetParam = offset ? `&offset=${encodeURIComponent(offset)}` : ''
+    const data = await airtableFetch(
+      `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&fields%5B%5D=${MEAL_LOGS_FIELDS.USER_ID}&pageSize=100${offsetParam}`,
+    )
+    count += Array.isArray(data?.records) ? data.records.length : 0
+    offset = typeof data?.offset === 'string' ? data.offset : undefined
+  } while (offset)
+
+  return count
+}
+
 export async function getMealLogsByUser(userId: string, limit = 20): Promise<MealLog[]> {
   const formula = encodeURIComponent(`{${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}"`)
   const data = await airtableFetch(
@@ -743,4 +984,95 @@ export async function getMealLogsSince(userId: string, since: string, limit = 20
     `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${MEAL_LOGS_FIELDS.TIMESTAMP}&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=${limit}`
   )
   return data.records ?? []
+}
+
+export async function getMealLogsBetween(
+  userId: string,
+  startUtc: string,
+  endUtc: string,
+  limit = 200,
+): Promise<MealLog[]> {
+  const formula = encodeURIComponent(
+    `AND({${MEAL_LOGS_FIELDS.USER_ID}} = "${userId}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} >= "${startUtc}", {${MEAL_LOGS_FIELDS.TIMESTAMP}} < "${endUtc}")`,
+  )
+  const data = await airtableFetch(
+    `/${MEAL_LOGS_TABLE}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=${MEAL_LOGS_FIELDS.TIMESTAMP}&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=${Math.min(Math.max(limit, 1), 200)}`,
+  )
+  return data.records ?? []
+}
+
+// ---------- FAST 36 ----------
+export const FAST_36_SESSIONS_TABLE = 'tblhw5APUKEYURsx8'
+
+export const FAST_36_SESSIONS_FIELDS = {
+  RECORD:        'fldYUjpniZAQAyXJk',
+  PATIENT:       'fld7gDcUwee6JTsvA',
+  WEEK:          'fld6EFbHEshVNSPSj',
+  START:         'fldmHrOIxIIJcwIcw',
+  PLANNED_END:   'fld9I63MqLGoSVHqh',
+  STATUS:        'fldDT57PgqNLthwcL',
+  ACTUAL_END:    'fldTqzwFY8ktaYUnx',
+  FEELING:       'fld7TlgFrVeN2I7TA',
+  WEIGHT:        'fldNASxw5I8sKnfMq',
+  WAIST:         'fldv3THwUxo98mzYV',
+  SESSION_DATA:  'fldhvyGWRzPM0XXc9',
+} as const
+
+export type Fast36StoredStatus =
+  | 'Pendiente'
+  | 'Activo'
+  | 'Completado'
+  | 'Terminado temprano'
+  | 'Interrumpido por seguridad'
+
+export interface Fast36SessionRecord {
+  id: string
+  createdTime?: string
+  fields: {
+    'Registro'?: string
+    'Cliente'?: string[]
+    'Semana'?: number
+    'Inicio'?: string
+    'Fin programado'?: string
+    'Estado'?: Fast36StoredStatus
+    'Fin real'?: string
+    'Sensación'?: string
+    'Peso'?: number
+    'Cintura'?: number
+    'Datos de sesión'?: string
+  }
+}
+
+export async function getFast36SessionsByPatient(
+  patientId: string,
+): Promise<Fast36SessionRecord[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) return []
+  const records: Fast36SessionRecord[] = []
+  let offset: string | undefined
+
+  do {
+    const params = new URLSearchParams({ pageSize: '100' })
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.RECORD)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.PATIENT)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.WEEK)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.START)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.PLANNED_END)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.STATUS)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.ACTUAL_END)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.FEELING)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.WEIGHT)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.WAIST)
+    params.append('fields[]', FAST_36_SESSIONS_FIELDS.SESSION_DATA)
+    if (offset) params.set('offset', offset)
+
+    const data = await airtableFetch(`/${FAST_36_SESSIONS_TABLE}?${params}`)
+    records.push(...(data.records ?? []).filter((record: Fast36SessionRecord) =>
+      record.fields['Cliente']?.includes(patientId),
+    ))
+    offset = data.offset
+  } while (offset)
+
+  return records.sort((a, b) =>
+    (a.fields['Semana'] ?? 0) - (b.fields['Semana'] ?? 0),
+  )
 }
