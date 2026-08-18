@@ -75,6 +75,7 @@ export function pilotAccessFromFast36Enrollment(hasFast36Sessions: boolean): Pil
     language: 'es',
     enabledFeatures: new Set<PilotFeature>([
       ...ACTIVE_PILOT_FEATURES,
+      'patient_portal',
       'fast_36',
     ]),
   }

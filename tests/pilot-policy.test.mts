@@ -12,6 +12,7 @@ test('FAST 36 enrollment grants Soft Start access', () => {
   const access = pilotAccessFromFast36Enrollment(true)
   assert.equal(access?.cohort, PILOT_COHORT_ID)
   assert.equal(access?.role, 'participant')
+  assert.equal(access?.enabledFeatures.has('patient_portal'), true)
   assert.equal(access?.enabledFeatures.has('food_scan'), true)
   assert.equal(access?.enabledFeatures.has('fast_36'), true)
 })
