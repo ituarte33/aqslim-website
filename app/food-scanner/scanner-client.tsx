@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { FoodLogWidget, type LogEntry } from '../food-log-widget'
 import type { FoodScanPlan } from '@/lib/food-scan-policy'
+import { PilotFeedback } from '@/app/pilot-feedback'
 
 type Plan = FoodScanPlan
 
@@ -180,6 +181,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [confirming, setConfirming] = useState(false)
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const [error, setError]        = useState<string | null>(null)
+  const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; context: unknown } | null>(null)
   const [used, setUsed]          = useState(0)
   const [limit, setLimit]        = useState(1)
   const [monthlyUsed, setMonthlyUsed] = useState(0)
@@ -237,6 +239,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     }
     setError(null)
     setResult(null)
+    setFeedbackTarget(null)
     setConfirmationError(null)
     try {
       const optimized = await optimizeImage(file)
@@ -271,6 +274,10 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       const data = await res.json()
 
       if (!res.ok) {
+        setFeedbackTarget({
+          id: crypto.randomUUID(),
+          context: { errorCode: data.error || 'analysis_failed', correlationId: data.correlationId ?? null, status: res.status, mealType },
+        })
         if (data.error === 'limit_reached') {
           const period = data.period === 'month' ? 'month' : 'day'
           const periodLimit = period === 'month' ? data.monthlyLimit : data.limit
@@ -292,6 +299,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       }
 
       setResult(data)
+      setFeedbackTarget({ id: data.mealLogId, context: { mealType, result: data } })
       setUsed(data.used)
       setMonthlyUsed(data.monthlyUsed)
       setMonthlyLimit(data.monthlyLimit)
@@ -313,6 +321,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       }, ...prev])
     } catch {
       setError(t.networkError)
+      setFeedbackTarget({ id: crypto.randomUUID(), context: { errorCode: 'network_error', mealType } })
     } finally {
       setScanning(false)
     }
@@ -461,7 +470,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               {image && (
                 <button
                   className="fs-btn-secondary"
-                  onClick={() => { setImage(null); setResult(null); setError(null); setConfirmationError(null) }}
+                  onClick={() => { setImage(null); setResult(null); setError(null); setConfirmationError(null); setFeedbackTarget(null) }}
                 >
                   {t.clear}
                 </button>
@@ -476,6 +485,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             </div>
 
             {error && <div className="fs-error">{error}</div>}
+            {error && feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Escáner de alimentos" language={lang} responseId={feedbackTarget.id} context={feedbackTarget.context} issueOnly /> : null}
           </div>
 
           {/* Results panel */}
@@ -540,6 +550,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                   </div>
                 ))}
               </div>
+              {feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Escáner de alimentos" language={lang} responseId={feedbackTarget.id} context={feedbackTarget.context} /> : null}
             </div>
           ) : (
             <div className="fs-card fs-result-placeholder">

@@ -1,10 +1,27 @@
 import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
 import { filterConsultationsForPatient } from './patient-portal-policy'
+import type { PilotFeedbackInput } from './pilot-feedback'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
 export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
+export const PILOT_FEEDBACK_TABLE = 'tbl0yg7fqfaXS5Dva'
+
+export const PILOT_FEEDBACK_FIELDS = {
+  REPORTE: 'fldq9JvW9mV8SlIvJ',
+  CLIENTE: 'fld7bZ052lpz0ZhFZ',
+  FECHA: 'fldIfr99Fj0NIKIPf',
+  HERRAMIENTA: 'fldT9UWTl25zc2Wta',
+  VALORACION: 'fldkEMonzJH4Lndx5',
+  CATEGORIA: 'fldmb5vvDaSb2xQGO',
+  COMENTARIO: 'flds9clsoqFQUCi61',
+  CAPTURA: 'fldekv8wLap1IcMmV',
+  CONTEXTO_TECNICO: 'fldtadkX9UlSkMAOY',
+  ID_RESPUESTA: 'fldYczkoiNpTTyiT1',
+  IDIOMA: 'fldrtAaqsFwEr2YJz',
+  ESTADO: 'fldiuoXAUwFYEOWI7',
+} as const
 
 // Field IDs for the Clientes table. Use these as keys in write operations
 // so that Airtable field renames never break the API.
@@ -224,6 +241,68 @@ export async function updateCliente(id: string, fields: Record<string, unknown>)
     method: 'PATCH',
     body: JSON.stringify({ fields }),
   })
+}
+
+export async function createPilotFeedback({
+  patientId,
+  reportName,
+  input,
+}: {
+  patientId: string
+  reportName: string
+  input: PilotFeedbackInput
+}): Promise<{ id: string }> {
+  const fields: Record<string, unknown> = {
+    [PILOT_FEEDBACK_FIELDS.REPORTE]: reportName,
+    [PILOT_FEEDBACK_FIELDS.CLIENTE]: [patientId],
+    [PILOT_FEEDBACK_FIELDS.FECHA]: new Date().toISOString(),
+    [PILOT_FEEDBACK_FIELDS.HERRAMIENTA]: input.tool,
+    [PILOT_FEEDBACK_FIELDS.VALORACION]: input.rating,
+    [PILOT_FEEDBACK_FIELDS.CONTEXTO_TECNICO]: input.context,
+    [PILOT_FEEDBACK_FIELDS.ID_RESPUESTA]: input.responseId,
+    [PILOT_FEEDBACK_FIELDS.IDIOMA]: input.language,
+    [PILOT_FEEDBACK_FIELDS.ESTADO]: 'Nuevo',
+  }
+  if (input.category) fields[PILOT_FEEDBACK_FIELDS.CATEGORIA] = input.category
+  if (input.comment) fields[PILOT_FEEDBACK_FIELDS.COMENTARIO] = input.comment
+
+  return airtableFetch(`/${PILOT_FEEDBACK_TABLE}`, {
+    method: 'POST',
+    body: JSON.stringify({ fields, typecast: false }),
+  })
+}
+
+export async function uploadPilotFeedbackScreenshot({
+  recordId,
+  base64,
+  filename,
+  contentType,
+}: {
+  recordId: string
+  base64: string
+  filename: string
+  contentType: 'image/jpeg' | 'image/png'
+}): Promise<void> {
+  const response = await fetch(
+    `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${recordId}/${PILOT_FEEDBACK_FIELDS.CAPTURA}/uploadAttachment`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.AIRTABLE_PAT}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ file: base64, filename, contentType }),
+      cache: 'no-store',
+    },
+  )
+  if (!response.ok) {
+    const correlationId = crypto.randomUUID()
+    console.error('[pilot-feedback] attachment_upload_failed', {
+      correlationId,
+      status: response.status,
+    })
+    throw new Error(`Airtable attachment upload failed (${correlationId})`)
+  }
 }
 
 export async function getClientesConCita(): Promise<Cliente[]> {

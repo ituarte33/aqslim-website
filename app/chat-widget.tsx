@@ -3,9 +3,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChatMessage } from './chat-message'
+import { PilotFeedback } from './pilot-feedback'
 
 type BuddyState = 'idle' | 'thinking' | 'happy' | 'love' | 'warning'
-type Message = { role: 'user' | 'assistant'; content: string }
+type Message = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  feedbackEligible?: boolean
+  question?: string
+  errorCode?: string
+  correlationId?: string
+}
 type BuddyContextReference = { type: 'food_scan'; mealLogId: string }
 
 const BUDDY_CONTEXT_KEY = 'aqslim-buddy-context-v1'
@@ -209,7 +218,7 @@ export function ChatWidget() {
   useEffect(() => {
     if (open && messages.length === 0) {
       const welcome = foodScannerContext ? LABELS[lang].contextWelcome : LABELS[lang].welcome
-      setMessages([{ role: 'assistant', content: welcome }])
+      setMessages([{ id: 'welcome', role: 'assistant', content: welcome }])
       setStateWithTimeout('love', '¡Hola! 👋', 3500)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -245,7 +254,7 @@ export function ChatWidget() {
     if (!text || streaming) return
     setInput('')
 
-    const userMsg: Message = { role: 'user', content: text }
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
     const history = [...messages, userMsg]
     pendingUserScrollRef.current = true
     setMessages(history)
@@ -254,7 +263,8 @@ export function ChatWidget() {
     setBubble(t.thinking)
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
 
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+    const assistantId = crypto.randomUUID()
+    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', feedbackEligible: true, question: text }])
 
     try {
       const res = await fetch('/api/chat', {
@@ -267,7 +277,13 @@ export function ChatWidget() {
       })
 
       if (!res.ok || !res.body) {
-        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: t.error }; return n })
+        const failure = await res.json().catch(() => null) as { error?: string; correlationId?: string } | null
+        setMessages(prev => { const n = [...prev]; n[n.length - 1] = {
+          ...n[n.length - 1],
+          content: t.error,
+          errorCode: failure?.error || `http_${res.status}`,
+          correlationId: failure?.correlationId,
+        }; return n })
         setStateWithTimeout('warning', t.error)
         return
       }
@@ -280,14 +296,14 @@ export function ChatWidget() {
         const { done, value } = await reader.read()
         if (done) break
         full += decoder.decode(value, { stream: true })
-        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: full }; return n })
+        setMessages(prev => { const n = [...prev]; n[n.length - 1] = { ...n[n.length - 1], content: full }; return n })
       }
 
       const finalState = detectState(full)
       const preview = full.slice(0, 70).trim() + (full.length > 70 ? '…' : '')
       setStateWithTimeout(finalState, preview, 5000)
     } catch {
-      setMessages(prev => { const n = [...prev]; n[n.length - 1] = { role: 'assistant', content: t.error }; return n })
+      setMessages(prev => { const n = [...prev]; n[n.length - 1] = { ...n[n.length - 1], content: t.error, errorCode: 'network_error' }; return n })
       setStateWithTimeout('warning', t.error)
     } finally {
       setStreaming(false)
@@ -414,9 +430,9 @@ export function ChatWidget() {
           <div ref={messagesRef} className="aqb-messages">
             {messages.map((m, i) => (
               <div
-                key={i}
+                key={m.id}
                 ref={m.role === 'user' ? latestUserRef : undefined}
-                className={`aqb-msg-row ${m.role}`}
+                className={`aqb-msg-row ${m.role}${m.feedbackEligible ? ' aqb-msg-row--feedback' : ''}`}
               >
                 <div className={`aqb-msg ${m.role}`} style={{ fontSize }}>
                   {m.content
@@ -425,6 +441,16 @@ export function ChatWidget() {
                       ? <><span className="aqb-dot" /><span className="aqb-dot" /><span className="aqb-dot" /></>
                       : null}
                 </div>
+                {m.feedbackEligible && m.content && !(streaming && i === messages.length - 1) ? (
+                  <div className="aqb-message-feedback">
+                    <PilotFeedback
+                      tool="AQ Buddy"
+                      language={lang}
+                      responseId={m.id}
+                      context={{ question: m.question, response: m.content, errorCode: m.errorCode, correlationId: m.correlationId, foodScannerContext }}
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
             {messages.length === 1 && !streaming ? (

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { FridgeDetectionResult, FridgeRecipeGenerationResult } from '@/lib/fridge-recipes'
 import { ingredientTextToList } from '@/lib/fridge-recipes'
+import { PilotFeedback } from '@/app/pilot-feedback'
 import styles from './fridge.module.css'
 
 type PhotoInput = {
@@ -91,6 +92,7 @@ export function FridgeRecipes({
   const [error, setError] = useState<string | null>(null)
   const [detection, setDetection] = useState<DetectionResponse | null>(null)
   const [result, setResult] = useState<RecipeResponse | null>(null)
+  const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; context: unknown } | null>(null)
 
   useEffect(() => () => {
     previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
@@ -100,6 +102,7 @@ export function FridgeRecipes({
     setDetection(null)
     setIngredientsText('')
     setResult(null)
+    setFeedbackTarget(null)
     setError(null)
   }, [])
 
@@ -158,12 +161,22 @@ export function FridgeRecipes({
         }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'detection_failed')
+      if (!response.ok) {
+        const errorCode = data.error || 'detection_failed'
+        setError(errorMessage(errorCode, es))
+        setFeedbackTarget({
+          id: crypto.randomUUID(),
+          context: { step: 'detection', errorCode, correlationId: data.correlationId ?? null },
+        })
+        return
+      }
       const nextDetection = data as DetectionResponse
       setDetection(nextDetection)
       setIngredientsText(nextDetection.suggestedIngredients.join(', '))
-    } catch (cause) {
-      setError(errorMessage(cause instanceof Error ? cause.message : null, es))
+    } catch {
+      const errorCode = 'network_error'
+      setError(errorMessage(errorCode, es))
+      setFeedbackTarget({ id: crypto.randomUUID(), context: { step: 'detection', errorCode } })
     } finally {
       setDetecting(false)
     }
@@ -186,10 +199,27 @@ export function FridgeRecipes({
         body: JSON.stringify({ action: 'generate', ingredients, exclusions, servings, language }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'generation_failed')
+      if (!response.ok) {
+        const errorCode = data.error || 'generation_failed'
+        setError(errorMessage(errorCode, es))
+        setFeedbackTarget({
+          id: crypto.randomUUID(),
+          context: { step: 'generation', confirmedIngredients: ingredients, exclusions, errorCode, correlationId: data.correlationId ?? null },
+        })
+        return
+      }
       setResult(data as RecipeResponse)
-    } catch (cause) {
-      setError(errorMessage(cause instanceof Error ? cause.message : null, es))
+      setFeedbackTarget({
+        id: crypto.randomUUID(),
+        context: { step: 'generation', confirmedIngredients: ingredients, exclusions, result: data },
+      })
+    } catch {
+      const errorCode = 'network_error'
+      setError(errorMessage(errorCode, es))
+      setFeedbackTarget({
+        id: crypto.randomUUID(),
+        context: { step: 'generation', confirmedIngredients: ingredients, exclusions, errorCode },
+      })
     } finally {
       setGenerating(false)
     }
@@ -273,6 +303,7 @@ export function FridgeRecipes({
           ) : null}
 
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          {error && feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Recetas del refrigerador" language={language} responseId={feedbackTarget.id} context={feedbackTarget.context} issueOnly /> : null}
           <p className={styles.disclosure}>{es ? 'Las identificaciones y cantidades son aproximadas. Verifica ingredientes, alergias, fechas y cocción segura.' : 'Identifications and quantities are approximate. Verify ingredients, allergies, dates, and safe cooking.'}</p>
         </section>
 
@@ -296,6 +327,7 @@ export function FridgeRecipes({
               ))}
             </div>
             <div className={styles.notes}><p>{result.confidenceNote}</p><p>{result.safetyNote}</p></div>
+            {feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Recetas del refrigerador" language={language} responseId={feedbackTarget.id} context={feedbackTarget.context} /> : null}
           </section>
         ) : null}
       </section>

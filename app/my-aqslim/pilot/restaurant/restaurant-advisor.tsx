@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import Link from 'next/link'
+import { PilotFeedback } from '@/app/pilot-feedback'
 import styles from './restaurant.module.css'
 
 type Recommendation = {
@@ -41,6 +42,7 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AdvisorResult | null>(null)
+  const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; context: unknown } | null>(null)
 
   const loadFile = useCallback(async (file?: File) => {
     if (!file) return
@@ -51,6 +53,7 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
     try {
       setError(null)
       setResult(null)
+      setFeedbackTarget(null)
       setPreview(URL.createObjectURL(file))
       setImageBase64(await optimizeImage(file))
     } catch {
@@ -69,10 +72,21 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
         body: JSON.stringify({ imageBase64, mimeType: 'image/jpeg', restaurant, phase, language }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'analysis_failed')
+      if (!response.ok) {
+        const errorCode = data.error || 'analysis_failed'
+        setError(es ? 'No pudimos analizar el menú. Inténtalo con una foto más clara.' : 'We could not analyze the menu. Try a clearer photo.')
+        setFeedbackTarget({
+          id: crypto.randomUUID(),
+          context: { restaurant, phase, errorCode, correlationId: data.correlationId ?? null },
+        })
+        return
+      }
       setResult(data)
+      setFeedbackTarget({ id: crypto.randomUUID(), context: { restaurant, phase, result: data } })
     } catch {
+      const errorCode = 'network_error'
       setError(es ? 'No pudimos analizar el menú. Inténtalo con una foto más clara.' : 'We could not analyze the menu. Try a clearer photo.')
+      setFeedbackTarget({ id: crypto.randomUUID(), context: { restaurant, phase, errorCode } })
     } finally {
       setLoading(false)
     }
@@ -113,6 +127,7 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
             {loading ? (es ? 'Analizando menú…' : 'Analyzing menu…') : (es ? 'Analizar menú con AQ Buddy' : 'Analyze menu with AQ Buddy')}
           </button>
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          {error && feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Asesor de restaurantes" language={language} responseId={feedbackTarget.id} context={feedbackTarget.context} issueOnly /> : null}
           <p className={styles.disclosure}>{es ? 'La orientación es aproximada y no sustituye tu plan individual ni la orientación clínica.' : 'Guidance is approximate and does not replace your individual plan or clinical guidance.'}</p>
         </section>
 
@@ -126,6 +141,7 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
               </article>
             ))}
             <p className={styles.confidence}>{result.confidenceNote}</p>
+            {feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Asesor de restaurantes" language={language} responseId={feedbackTarget.id} context={feedbackTarget.context} /> : null}
           </section>
         ) : null}
       </section>
