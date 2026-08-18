@@ -1,3 +1,9 @@
+export type FridgeDetectionResult = {
+  observedIngredients: string[]
+  uncertainItems: string[]
+  confidenceNote: string
+}
+
 export type FridgeRecipeIngredient = {
   item: string
   amount: string
@@ -14,9 +20,7 @@ export type FridgeRecipe = {
   phaseFit: string
 }
 
-export type FridgeRecipeResult = {
-  observedIngredients: string[]
-  uncertainItems: string[]
+export type FridgeRecipeGenerationResult = {
   recipes: FridgeRecipe[]
   confidenceNote: string
   safetyNote: string
@@ -45,7 +49,7 @@ function isRecipe(value: unknown): value is FridgeRecipe {
     isShortText(recipe.name, 120)
     && isShortText(recipe.summary, 400)
     && Array.isArray(recipe.ingredients)
-    && recipe.ingredients.length >= 2
+    && recipe.ingredients.length >= 1
     && recipe.ingredients.length <= 14
     && recipe.ingredients.every(isIngredient)
     && isShortTextList(recipe.optionalExtras, 8)
@@ -61,19 +65,62 @@ function isRecipe(value: unknown): value is FridgeRecipe {
   )
 }
 
-export function isFridgeRecipeResult(value: unknown): value is FridgeRecipeResult {
+export function isFridgeDetectionResult(value: unknown): value is FridgeDetectionResult {
   if (!value || typeof value !== 'object') return false
   const result = value as Record<string, unknown>
   return (
     isShortTextList(result.observedIngredients, 30)
-    && result.observedIngredients.length > 0
     && isShortTextList(result.uncertainItems, 20)
-    && Array.isArray(result.recipes)
+    && isShortText(result.confidenceNote, 600)
+  )
+}
+
+export function isFridgeRecipeGenerationResult(value: unknown): value is FridgeRecipeGenerationResult {
+  if (!value || typeof value !== 'object') return false
+  const result = value as Record<string, unknown>
+  return (
+    Array.isArray(result.recipes)
     && result.recipes.length === 3
     && result.recipes.every(isRecipe)
     && isShortText(result.confidenceNote, 600)
     && isShortText(result.safetyNote, 600)
   )
+}
+
+export function parseModelJson(raw: string): unknown {
+  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    if (start < 0 || end <= start) return null
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1))
+    } catch {
+      return null
+    }
+  }
+}
+
+export function normalizeIngredientList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string') continue
+    const normalized = item.trim().replace(/\s+/g, ' ').slice(0, 100)
+    const key = normalized.toLocaleLowerCase('es-MX')
+    if (!normalized || seen.has(key)) continue
+    seen.add(key)
+    result.push(normalized)
+    if (result.length === 30) break
+  }
+  return result
+}
+
+export function ingredientTextToList(value: string): string[] {
+  return normalizeIngredientList(value.split(/[,;\n]+/))
 }
 
 const PHASE_RULES: Record<string, string> = {
