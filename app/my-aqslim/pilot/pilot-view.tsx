@@ -71,7 +71,8 @@ const FEATURES: FeatureDefinition[] = [
     icon: '📈',
     title: { es: 'Resumen semanal', en: 'Weekly summary' },
     description: { es: 'Patrones, constancia y temas para revisar con AQSLIM.', en: 'Patterns, consistency, and topics to review with AQSLIM.' },
-    released: false,
+    href: '/my-aqslim/pilot/weekly-summary',
+    released: true,
   },
 ]
 

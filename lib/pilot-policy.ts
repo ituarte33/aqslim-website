@@ -16,11 +16,10 @@ export const ACTIVE_PILOT_FEATURES: readonly PilotFeature[] = [
   'food_scan',
   'restaurant_advisor',
   'fridge_recipes',
-]
-
-export const PLANNED_PILOT_FEATURES: readonly PilotFeature[] = [
   'weekly_summary',
 ]
+
+export const PLANNED_PILOT_FEATURES: readonly PilotFeature[] = []
 
 export type PilotAccess = {
   cohort: typeof PILOT_COHORT_ID

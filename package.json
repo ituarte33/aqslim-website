@@ -5,7 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/authorization-policy.test.mts tests/authenticated-patient-flow.test.mts tests/patient-portal-phase.test.mts tests/patient-portal-identity.test.mts tests/finance-metrics.test.mts tests/upcoming-appointments.test.mts tests/food-scan-policy.test.mts tests/pilot-policy.test.mts tests/chat-widget-mobile.test.mts tests/restaurant-advisor.test.mts tests/fridge-recipes.test.mts tests/pilot-feedback.test.mts tests/fast36-policy.test.mts"
+    "test:authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/authorization-policy.test.mts tests/authenticated-patient-flow.test.mts tests/patient-portal-phase.test.mts tests/patient-portal-identity.test.mts tests/finance-metrics.test.mts tests/upcoming-appointments.test.mts tests/food-scan-policy.test.mts tests/pilot-policy.test.mts tests/chat-widget-mobile.test.mts tests/restaurant-advisor.test.mts tests/fridge-recipes.test.mts tests/pilot-feedback.test.mts tests/fast36-policy.test.mts tests/weekly-summary.test.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
