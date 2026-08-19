@@ -23,7 +23,7 @@ type PlanViewProps = {
 }
 
 export function PlanView({ data, demo = false }: PlanViewProps) {
-  const [language] = usePortalLanguage(data.language)
+  const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const phase = data.phase || (es ? 'Por confirmar' : 'To be confirmed')
   const week = data.weekInPhase
@@ -31,7 +31,7 @@ export function PlanView({ data, demo = false }: PlanViewProps) {
   const materialsPath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
 
   return (
-    <PortalShell firstName={data.firstName} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
       <section className={styles.pageIntro}>
         <div>
           <h1>{es ? 'Mi Plan' : 'My Plan'}</h1>

@@ -44,7 +44,7 @@ type ProgressViewProps = {
 }
 
 export function ProgressView({ data, demo = false }: ProgressViewProps) {
-  const [language] = usePortalLanguage(data.language)
+  const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const first = data.measurements[0] ?? null
   const latest = data.measurements.at(-1) ?? null
@@ -58,7 +58,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
     : 0
 
   return (
-    <PortalShell firstName={data.firstName} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
       <section className={styles.progressHeader}>
         <div>
           <h1>{es ? 'Mi Progreso' : 'My Progress'}</h1>

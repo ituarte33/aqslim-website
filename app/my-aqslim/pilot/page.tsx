@@ -24,7 +24,9 @@ export default async function PilotPage() {
       pilot={{
         ...pilot,
         firstName: selectPilotDisplayFirstName(pilot.firstName, patient?.firstName),
+        language: patient?.language ?? pilot.language,
       }}
+      profileId={patient?.clienteId ?? pilot.clerkUserId}
       linkedProfileName={patient?.fullName ?? null}
       fast36Enabled={fast36Sessions.length > 0}
     />
