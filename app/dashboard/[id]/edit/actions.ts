@@ -1,5 +1,7 @@
 'use server'
 
+import { clerkClient } from '@clerk/nextjs/server'
+import { revalidatePath } from 'next/cache'
 import { Resend } from 'resend'
 import {
   createPlanForPatient,
@@ -10,6 +12,7 @@ import {
   PLAN_AQSLIM_FIELDS,
 } from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
+import { withAqslimPatientBinding } from '@/lib/patient-binding'
 
 const CUESTIONARIO_URL   = 'https://aqslim.com/cuestionario'
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -153,6 +156,30 @@ export async function sendReinitiationEmail(clienteId: string): Promise<void> {
     subject: lang === 'es' ? 'Bienvenido de regreso a AQSLIM' : 'Welcome back to AQSLIM',
     html: reinitiationEmailHtml(nombre, lang),
   })
+}
+
+export async function bindCurrentAccountToPatient(clienteId: string): Promise<{
+  patientId: string
+  patientName: string
+}> {
+  const actor = await requireCapability('patients:write:any')
+  const patient = await getClienteById(clienteId)
+  const client = await clerkClient()
+  const user = await client.users.getUser(actor.clerkUserId)
+
+  await client.users.updateUserMetadata(actor.clerkUserId, {
+    privateMetadata: withAqslimPatientBinding(
+      user.privateMetadata as Record<string, unknown>,
+      patient.id,
+    ),
+  })
+
+  revalidatePath('/my-aqslim', 'layout')
+
+  return {
+    patientId: patient.id,
+    patientName: patient.fields['Nombre Completo']?.trim() || 'Paciente AQSLIM',
+  }
 }
 
 function mmddyyyyToISO(date: string): string | undefined {
