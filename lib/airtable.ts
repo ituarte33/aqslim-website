@@ -1076,3 +1076,21 @@ export async function getFast36SessionsByPatient(
     (a.fields['Semana'] ?? 0) - (b.fields['Semana'] ?? 0),
   )
 }
+
+export async function updateFast36SessionOutcome(
+  recordId: string,
+  status: Extract<Fast36StoredStatus, 'Completado' | 'Terminado temprano' | 'Interrumpido por seguridad'>,
+  actualEndAt?: string,
+): Promise<Fast36SessionRecord> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(recordId)) throw new Error('Invalid FAST 36 record')
+
+  const fields: Record<string, string> = {
+    [FAST_36_SESSIONS_FIELDS.STATUS]: status,
+  }
+  if (actualEndAt) fields[FAST_36_SESSIONS_FIELDS.ACTUAL_END] = actualEndAt
+
+  return airtableFetch(`/${FAST_36_SESSIONS_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fields }),
+  })
+}

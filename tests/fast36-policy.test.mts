@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import {
+  canConfirmFast36Outcome,
   effectiveFast36Status,
   fast36TimeZoneFromSessionData,
   fast36ProgressPercent,
@@ -8,6 +10,7 @@ import {
   DEFAULT_FAST36_TIME_ZONE,
   normalizeFast36Status,
   selectCurrentFast36Session,
+  storedFast36StatusForOutcome,
   type Fast36Session,
 } from '../lib/fast36-policy.ts'
 
@@ -68,4 +71,31 @@ test('FAST 36 context never infers completion from elapsed time alone', () => {
   assert.match(context, /Documented status: active/)
   assert.match(context, /Scheduled window elapsed: yes/)
   assert.match(context, /Do not claim that the patient completed the fast/)
+})
+
+test('only an elapsed schedule can be confirmed as completed', () => {
+  assert.equal(canConfirmFast36Outcome(session, 'completed', Date.parse('2026-08-18T16:59:59Z')), false)
+  assert.equal(canConfirmFast36Outcome(session, 'completed', Date.parse('2026-08-18T17:00:00Z')), true)
+  assert.equal(canConfirmFast36Outcome({ ...session, status: 'completed' }, 'completed', Date.parse('2026-08-18T18:00:00Z')), false)
+})
+
+test('maps explicit patient outcomes to Airtable status labels', () => {
+  assert.equal(storedFast36StatusForOutcome('completed'), 'Completado')
+  assert.equal(storedFast36StatusForOutcome('ended_early'), 'Terminado temprano')
+  assert.equal(storedFast36StatusForOutcome('stopped_for_safety'), 'Interrumpido por seguridad')
+})
+
+test('renders three explicit confirmation controls only for an awaiting session', async () => {
+  const [view, action] = await Promise.all([
+    readFile(new URL('../app/my-aqslim/pilot/fast-36/fast36-view.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/my-aqslim/pilot/fast-36/actions.ts', import.meta.url), 'utf8'),
+  ])
+
+  assert.match(view, /status === 'awaiting_confirmation'/)
+  assert.match(view, /Sí, completé las 36 horas/)
+  assert.match(view, /Terminé antes/)
+  assert.match(view, /Interrumpí por seguridad/)
+  assert.match(view, /confirmFast36SessionAction/)
+  assert.match(action, /requireOwnPatient\('fasting:write:self'\)/)
+  assert.match(action, /records\.find\(candidate => candidate\.id === sessionId\)/)
 })
