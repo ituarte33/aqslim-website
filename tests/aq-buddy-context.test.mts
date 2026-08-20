@@ -23,6 +23,8 @@ test('builds a grounded prompt with the saved meal and patient phase', () => {
     fats: 62,
     proteins: 82,
     mealType: 'Lunch',
+    planName: 'Kenkho Path — Jing',
+    calorieTarget: 1800,
     phase: 'Jing',
     weekInPhase: 2,
     consumptionStatus: 'Unconfirmed',
@@ -33,6 +35,8 @@ test('builds a grounded prompt with the saved meal and patient phase', () => {
   assert.match(prompt, /Carnitas platter with rice and tortilla/)
   assert.match(prompt, /Approximate carbohydrates: 78 g/)
   assert.match(prompt, /Current AQSLIM phase: Jing/)
+  assert.match(prompt, /Current AQSLIM plan: Kenkho Path — Jing/)
+  assert.match(prompt, /Authorized daily calorie target: 1800 kcal/)
   assert.match(prompt, /including this saved meal: 84 g/)
   assert.match(prompt, /excluding this saved meal: 6 g/)
   assert.match(prompt, /Consumption status of this saved scan: Unconfirmed/)
@@ -51,6 +55,8 @@ test('marks an unavailable phase explicitly instead of inventing one', () => {
     fats: 22,
     proteins: 52,
     mealType: null,
+    planName: 'FAST 36 \+ Plan Hipocalórico',
+    calorieTarget: null,
     phase: null,
     weekInPhase: null,
     consumptionStatus: 'Reference only',
@@ -59,6 +65,7 @@ test('marks an unavailable phase explicitly instead of inventing one', () => {
   })
 
   assert.match(prompt, /Current AQSLIM phase: not available/)
+  assert.match(prompt, /Authorized daily calorie target: not available/)
   assert.match(prompt, /provide conditional options without guessing/)
   assert.match(prompt, /including this saved meal: not available/)
 })
