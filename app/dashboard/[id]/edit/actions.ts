@@ -6,6 +6,7 @@ import {
   getClienteById,
   updateCliente,
   updatePlan,
+  uploadPlanMaterial,
   CLIENTES_FIELDS,
   PLAN_AQSLIM_FIELDS,
 } from '@/lib/airtable'
@@ -190,6 +191,22 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   const planWeek       = ((formData.get('planWeek')      as string) ?? '').trim()
   const calorieTarget  = ((formData.get('calorieTarget') as string) ?? '').trim()
   const planInstructions = ((formData.get('planInstructions') as string) ?? '').trim()
+  const kenkhoTier = ((formData.get('kenkhoTier') as string) ?? '').trim()
+  const planMaterials = formData
+    .getAll('planMaterials')
+    .filter((value): value is File => value instanceof File && value.size > 0)
+
+  if (kenkhoTier && !['Start', 'Plus', 'Elite'].includes(kenkhoTier)) {
+    throw new Error('El nivel de Kenkho Path no es válido.')
+  }
+  if (planMaterials.length > 5) throw new Error('Puedes agregar hasta 5 materiales a la vez.')
+  if (planMaterials.reduce((total, material) => total + material.size, 0) > 10 * 1024 * 1024) {
+    throw new Error('La carga total de materiales debe pesar 10 MB o menos.')
+  }
+  for (const material of planMaterials) {
+    if (material.type !== 'application/pdf') throw new Error('Los materiales deben ser archivos PDF.')
+    if (material.size > 10 * 1024 * 1024) throw new Error('Cada material debe pesar 10 MB o menos.')
+  }
 
   const nombre = [firstName, lastName].filter(Boolean).join(' ')
 
@@ -221,6 +238,7 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   const existingPatientName = existingPatient.fields['Nombre Completo']?.trim()
   if (existingPatientName) planFields[PLAN_AQSLIM_FIELDS.PATIENT_NAME] = existingPatientName
   if (planName) planFields[PLAN_AQSLIM_FIELDS.PLAN_LABEL] = planName
+  planFields[PLAN_AQSLIM_FIELDS.KENKHO_TIER] = kenkhoTier || null
   if (/^\d{4}-\d{2}-\d{2}$/.test(planStartDate)) {
     planFields[PLAN_AQSLIM_FIELDS.TREATMENT_START] = planStartDate
     planFields[PLAN_AQSLIM_FIELDS.PHASE_START] = planStartDate
@@ -250,8 +268,26 @@ export async function updatePaciente(formData: FormData): Promise<void> {
       : createPlanForPatient(clienteId, planFields)
     : Promise.resolve(null)
 
-  await Promise.all([
+  const [, savedPlan] = await Promise.all([
     updateCliente(clienteId, fields),
     planWrite,
   ])
+
+  if (planMaterials.length && !savedPlan) {
+    throw new Error('Asigna primero un plan antes de agregar materiales.')
+  }
+  if (savedPlan && planMaterials.length) {
+    await Promise.all(planMaterials.map(async material => {
+      const bytes = Buffer.from(await material.arrayBuffer())
+      const filename = material.name
+        .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ._ -]/g, '-')
+        .slice(0, 180)
+      await uploadPlanMaterial({
+        planId: savedPlan.id,
+        base64: bytes.toString('base64'),
+        filename,
+        contentType: 'application/pdf',
+      })
+    }))
+  }
 }

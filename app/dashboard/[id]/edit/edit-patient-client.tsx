@@ -390,6 +390,24 @@ export function EditPatientClient({ patient, plan }: Props) {
             </datalist>
           </div>
 
+          <div>
+            <label htmlFor="kenkhoTier" style={labelStyle}>Nivel Kenkho Path</label>
+            <select
+              id="kenkhoTier"
+              name="kenkhoTier"
+              defaultValue={plan?.fields['Nivel Kenkho Path'] ?? ''}
+              style={inputStyle}
+            >
+              <option value="">Atención en clínica — fuera de Kenkho Path</option>
+              <option value="Start">Kenkho Path — Start</option>
+              <option value="Plus">Kenkho Path — Plus</option>
+              <option value="Elite">Kenkho Path — Elite</option>
+            </select>
+            <small style={{ display: 'block', marginTop: 8, color: '#6A6560', fontSize: pt.xs, lineHeight: 1.5 }}>
+              Déjalo en atención en clínica para cualquier participante que no pertenezca a Kenkho Path.
+            </small>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
             <div>
               <label htmlFor="planStartDate" style={labelStyle}>Inicio del plan</label>
@@ -414,6 +432,30 @@ export function EditPatientClient({ patient, plan }: Props) {
               placeholder="Indicaciones autorizadas que también verá el paciente."
               style={textareaStyle}
             />
+          </div>
+
+          <div>
+            <label htmlFor="planMaterials" style={labelStyle}>Materiales asignados</label>
+            <input
+              id="planMaterials"
+              name="planMaterials"
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple
+              style={inputStyle}
+            />
+            <small style={{ display: 'block', marginTop: 8, color: '#6A6560', fontSize: pt.xs, lineHeight: 1.5 }}>
+              PDF únicamente, hasta 10 MB por carga. El paciente los verá en MY AQSLIM.
+            </small>
+            {Boolean(plan?.fields['Materiales asignados']?.length) && (
+              <div style={{ marginTop: 12, display: 'grid', gap: 6 }}>
+                {plan?.fields['Materiales asignados']?.map(material => (
+                  <span key={material.id} style={{ color: '#9A9590', fontSize: pt.xs }}>
+                    ✓ {material.filename}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

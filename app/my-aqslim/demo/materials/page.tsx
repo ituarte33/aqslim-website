@@ -6,5 +6,9 @@ import { MaterialsView } from '../../materials/materials-view'
 export default async function DemoMaterialsPage() {
   if (await getRole() !== 'admin') redirect('/my-aqslim')
 
-  return <MaterialsView data={demoPatientPortalData} demo />
+  return <MaterialsView
+    data={demoPatientPortalData}
+    materialsData={{ kenkhoTier: 'Start', materials: [] }}
+    demo
+  />
 }

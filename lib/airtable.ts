@@ -23,6 +23,8 @@ export const PLAN_AQSLIM_FIELDS = {
   CURRENT_WEIGHT_KG: 'fldhzEgeA0Ozo9amr',
   GOAL_WEIGHT_KG: 'fldQ1ZGeKxckEuM0a',
   SPECIAL_INSTRUCTIONS: 'fldITr5A5DNLVOdKE',
+  KENKHO_TIER: 'fldttwtndHWgzgBlP',
+  ASSIGNED_MATERIALS: 'fldB3tIMTakkMGX85',
 } as const
 
 export const FAST_36_MEASUREMENTS_FIELDS = {
@@ -785,6 +787,14 @@ export async function getConsultasByPatientId(clienteId: string, nombreCliente: 
 
 // ---------- Plan AQSLIM ----------
 
+export interface AirtableAttachment {
+  id: string
+  url: string
+  filename: string
+  size?: number
+  type?: string
+}
+
 export interface PlanAqslim {
   id: string
   fields: {
@@ -807,6 +817,8 @@ export interface PlanAqslim {
     'Siguiente Fase'?: string[]
     'Instrucciones Especiales'?: string
     'Notas del Plan'?: string
+    'Nivel Kenkho Path'?: string
+    'Materiales asignados'?: AirtableAttachment[]
     [key: string]: unknown
   }
 }
@@ -840,6 +852,40 @@ export async function updatePlan(
     method: 'PATCH',
     body: JSON.stringify({ fields }),
   })
+}
+
+export async function uploadPlanMaterial({
+  planId,
+  base64,
+  filename,
+  contentType,
+}: {
+  planId: string
+  base64: string
+  filename: string
+  contentType: 'application/pdf'
+}): Promise<void> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(planId)) throw new Error('Invalid plan record')
+  const response = await fetch(
+    `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${planId}/${PLAN_AQSLIM_FIELDS.ASSIGNED_MATERIALS}/uploadAttachment`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.AIRTABLE_PAT}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ file: base64, filename, contentType }),
+      cache: 'no-store',
+    },
+  )
+  if (!response.ok) {
+    const correlationId = crypto.randomUUID()
+    console.error('[plan-materials] attachment_upload_failed', {
+      correlationId,
+      status: response.status,
+    })
+    throw new Error(`Airtable attachment upload failed (${correlationId})`)
+  }
 }
 
 export interface Fast36MeasurementRecord {

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PatientPortalData } from '@/lib/patient-portal'
+import type { PatientMaterialsData } from '@/lib/materials-policy'
 import { ChevronIcon, InfoIcon, MaterialsIcon } from '../portal-icons'
 import { PortalShell } from '../portal-shell'
 import { usePortalLanguage } from '../use-portal-language'
@@ -11,37 +12,25 @@ import styles from '../portal.module.css'
 
 type MaterialsViewProps = {
   data: PatientPortalData
+  materialsData: PatientMaterialsData
   demo?: boolean
 }
 
-export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
+export function MaterialsView({ data, materialsData, demo = false }: MaterialsViewProps) {
   const router = useRouter()
   const [openingBuddy, setOpeningBuddy] = useState(false)
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
-  const phase = data.phase || (es ? 'Tu fase' : 'Your phase')
+  const plan = data.planName || data.phase || (es ? 'Tu plan' : 'Your plan')
   const week = data.weekInPhase
+  const { kenkhoTier, materials } = materialsData
   const buddyPath = demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'
   useEffect(() => {
     router.prefetch(buddyPath)
   }, [buddyPath, router])
-  const items = [
-    {
-      title: es ? `Guía ${phase}` : `${phase} Guide`,
-      type: es ? 'Guía de fase' : 'Phase guide',
-      detail: es ? 'La guía principal para tu etapa actual.' : 'The main guide for your current phase.',
-    },
-    {
-      title: es ? `Cartografía Semana ${week || '—'}` : `Week ${week || '—'} Auricular Chart`,
-      type: es ? 'Cartografía' : 'Auricular chart',
-      detail: es ? 'La cartografía correspondiente a tu semana actual.' : 'The auricular chart for your current week.',
-    },
-    {
-      title: es ? 'Manual del Participante' : 'Participant Manual',
-      type: es ? 'Manual' : 'Manual',
-      detail: es ? 'Tu referencia general para trabajar con AQSLIM.' : 'Your general reference for working with AQSLIM.',
-    },
-  ]
+  const programLabel = kenkhoTier
+    ? `Kenkho Path · ${kenkhoTier}`
+    : (es ? 'Atención en clínica' : 'In-clinic care')
 
   return (
     <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
@@ -53,23 +42,45 @@ export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
       </section>
 
       <section className={`${styles.panel} ${styles.materialsHero}`}>
-        <p className={styles.eyebrow}>{es ? 'Para ti ahora' : 'For you now'}</p>
-        <h2>{phase}</h2>
+        <p className={styles.eyebrow}>{programLabel}</p>
+        <h2>{plan}</h2>
         <p>{week ? `${es ? 'Semana' : 'Week'} ${week}` : (es ? 'Semana por confirmar' : 'Week to be confirmed')}</p>
       </section>
 
       <section className={styles.libraryList} aria-label={es ? 'Biblioteca de materiales' : 'Materials library'}>
-        {items.map(item => (
-          <article key={item.title} className={`${styles.panel} ${styles.materialCard}`}>
+        {materials.map(item => (
+          <article key={item.id} className={`${styles.panel} ${styles.materialCard}`}>
             <div className={styles.materialIcon}><MaterialsIcon /></div>
             <div>
-              <span>{item.type}</span>
-              <h2>{item.title}</h2>
-              <p>{item.detail}</p>
+              <span>{es ? item.typeEs : item.typeEn}</span>
+              <h2>{es ? item.titleEs : item.titleEn}</h2>
+              <p>{es ? item.detailEs : item.detailEn}</p>
               <small>{es ? 'Asignado a tu plan' : 'Assigned to your plan'}</small>
+              <a
+                className={styles.materialAction}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {es ? 'Abrir material' : 'Open material'} <ChevronIcon />
+              </a>
             </div>
           </article>
         ))}
+        {materials.length === 0 ? (
+          <article className={`${styles.panel} ${styles.materialEmpty}`}>
+            <div className={styles.materialIcon}><MaterialsIcon /></div>
+            <div>
+              <span>{es ? 'Biblioteca personal' : 'Personal library'}</span>
+              <h2>{es ? 'Tus archivos aparecerán aquí' : 'Your files will appear here'}</h2>
+              <p>
+                {es
+                  ? 'AQSLIM todavía no ha agregado un archivo descargable a tu plan.'
+                  : 'AQSLIM has not added a downloadable file to your plan yet.'}
+              </p>
+            </div>
+          </article>
+        ) : null}
       </section>
 
       <div className={styles.materialHelp}>
@@ -89,7 +100,15 @@ export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
 
       <div className={styles.dataNotice}>
         <InfoIcon />
-        <p>{es ? 'Esta biblioteca muestra los materiales asignados a tu fase. Los archivos descargables aparecerán aquí cuando se agreguen a tu plan.' : 'This library shows the materials assigned to your phase. Downloadable files will appear here when they are added to your plan.'}</p>
+        <p>
+          {kenkhoTier
+            ? (es
+              ? 'Tu biblioteca sigue tu nivel de Kenkho Path, fase y semana. Quick Start y cartografías solo se muestran cuando corresponden.'
+              : 'Your library follows your Kenkho Path tier, phase, and week. Quick Start and auricular charts appear only when applicable.')
+            : (es
+              ? 'Como participante de atención en clínica, aquí verás únicamente los materiales que AQSLIM asigne directamente a tu plan.'
+              : 'As an in-clinic participant, you will only see materials AQSLIM assigns directly to your plan.')}
+        </p>
       </div>
     </PortalShell>
   )
