@@ -1,7 +1,14 @@
 'use server'
 
 import { Resend } from 'resend'
-import { getClienteById, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
+import {
+  createPlanForPatient,
+  getClienteById,
+  updateCliente,
+  updatePlan,
+  CLIENTES_FIELDS,
+  PLAN_AQSLIM_FIELDS,
+} from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
 
 const CUESTIONARIO_URL   = 'https://aqslim.com/cuestionario'
@@ -178,6 +185,11 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   const metaDelCliente = ((formData.get('metaDelCliente') as string) ?? '').trim()
   const condiciones    = ((formData.get('condiciones')   as string) ?? '').trim()
   const estaturaCm     = ((formData.get('estaturaCm')    as string) ?? '').trim()
+  const planName       = ((formData.get('planName')      as string) ?? '').trim()
+  const planStartDate  = ((formData.get('planStartDate') as string) ?? '').trim()
+  const planWeek       = ((formData.get('planWeek')      as string) ?? '').trim()
+  const calorieTarget  = ((formData.get('calorieTarget') as string) ?? '').trim()
+  const planInstructions = ((formData.get('planInstructions') as string) ?? '').trim()
 
   const nombre = [firstName, lastName].filter(Boolean).join(' ')
 
@@ -204,5 +216,42 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   if (canalPublicidad) fields[CLIENTES_FIELDS.CANAL_PUBLICIDAD] = canalPublicidad
   if (responsableCaptacion) fields[CLIENTES_FIELDS.RESPONSABLE_CAPTACION] = responsableCaptacion
 
-  await updateCliente(clienteId, fields)
+  const existingPatient = await getClienteById(clienteId)
+  const planFields: Record<string, unknown> = {}
+  const existingPatientName = existingPatient.fields['Nombre Completo']?.trim()
+  if (existingPatientName) planFields[PLAN_AQSLIM_FIELDS.PATIENT_NAME] = existingPatientName
+  if (planName) planFields[PLAN_AQSLIM_FIELDS.PLAN_LABEL] = planName
+  if (/^\d{4}-\d{2}-\d{2}$/.test(planStartDate)) {
+    planFields[PLAN_AQSLIM_FIELDS.TREATMENT_START] = planStartDate
+    planFields[PLAN_AQSLIM_FIELDS.PHASE_START] = planStartDate
+  }
+  if (planWeek) {
+    const week = Number.parseInt(planWeek, 10)
+    if (!Number.isInteger(week) || week < 1 || week > 99) throw new Error('La semana del plan no es válida.')
+    planFields[PLAN_AQSLIM_FIELDS.WEEK] = week
+  }
+  if (calorieTarget) {
+    const calories = Number.parseInt(calorieTarget, 10)
+    if (!Number.isInteger(calories) || calories < 500 || calories > 5000) throw new Error('El objetivo calórico no es válido.')
+    planFields[PLAN_AQSLIM_FIELDS.CALORIE_TARGET] = calories
+  }
+  if (planInstructions) planFields[PLAN_AQSLIM_FIELDS.SPECIAL_INSTRUCTIONS] = planInstructions
+  if (pesoMeta) {
+    const goal = Number.parseFloat(pesoMeta)
+    if (Number.isFinite(goal)) {
+      planFields[PLAN_AQSLIM_FIELDS.GOAL_WEIGHT_KG] = unidadDePeso === 'Lbs' ? goal / 2.2046226218 : goal
+    }
+  }
+
+  const planId = existingPatient.fields['Plan AQSLIM']?.[0]
+  const planWrite = planName
+    ? planId
+      ? updatePlan(planId, planFields)
+      : createPlanForPatient(clienteId, planFields)
+    : Promise.resolve(null)
+
+  await Promise.all([
+    updateCliente(clienteId, fields),
+    planWrite,
+  ])
 }
