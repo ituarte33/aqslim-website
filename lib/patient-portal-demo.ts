@@ -8,6 +8,8 @@ export const demoPatientPortalData: PatientPortalData = {
   fullName: 'María Ejemplo',
   language: 'es',
   unit: 'lb',
+  planName: 'Jing',
+  calorieTarget: null,
   phase: 'Jing',
   weekInPhase: 2,
   phaseStartDate: '2026-07-21T12:00:00.000Z',
