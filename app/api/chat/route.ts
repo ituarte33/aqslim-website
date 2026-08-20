@@ -191,6 +191,8 @@ async function resolveVerifiedContext(value: unknown, clerkUserId: string): Prom
     fats: mealLog.fields['Fats (g)'] ?? null,
     proteins: mealLog.fields['Proteins (g)'] ?? null,
     mealType: mealLog.fields['Meal Type'] ?? null,
+    planName: portal?.planName ?? null,
+    calorieTarget: portal?.calorieTarget ?? null,
     phase: portal?.phase ?? null,
     weekInPhase: portal?.weekInPhase ?? null,
     consumptionStatus: mealLog.fields['Consumption Status'] ?? 'Unconfirmed',

@@ -25,7 +25,9 @@ type PlanViewProps = {
 export function PlanView({ data, demo = false }: PlanViewProps) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
-  const phase = data.phase || (es ? 'Por confirmar' : 'To be confirmed')
+  const plan = data.planName || data.phase || (es ? 'Por confirmar' : 'To be confirmed')
+  const isFast36Hypocaloric = plan.toLowerCase().includes('fast 36') && plan.toLowerCase().includes('hipocal')
+  const planTitle = isFast36Hypocaloric ? 'FAST 36' : plan
   const week = data.weekInPhase
   const buddyPath = demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'
   const materialsPath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
@@ -41,13 +43,16 @@ export function PlanView({ data, demo = false }: PlanViewProps) {
 
       <section className={`${styles.panel} ${styles.planHero}`}>
         <div className={styles.phaseSeal} aria-hidden="true">
-          <span>{phase.slice(0, 1).toUpperCase()}</span>
+          <span>{planTitle.slice(0, 1).toUpperCase()}</span>
           <small>MY AQSLIM</small>
         </div>
         <div>
-          <p className={styles.eyebrow}>{es ? 'Tu fase actual' : 'Your current phase'}</p>
-          <h2>{phase}</h2>
-          <p>{week ? `${es ? 'Semana' : 'Week'} ${week}` : (es ? 'Semana por confirmar' : 'Week to be confirmed')}</p>
+          <p className={styles.eyebrow}>{es ? 'Tu plan actual' : 'Your current plan'}</p>
+          <h2>{planTitle}</h2>
+          <p>
+            {isFast36Hypocaloric ? `${es ? 'Plan Hipocalórico' : 'Hypocaloric Plan'} · ` : ''}
+            {week ? `${es ? 'Semana' : 'Week'} ${week}` : (es ? 'Semana por confirmar' : 'Week to be confirmed')}
+          </p>
         </div>
       </section>
 
@@ -56,7 +61,7 @@ export function PlanView({ data, demo = false }: PlanViewProps) {
         <div className={styles.timelineRows}>
           <div>
             <span className={styles.timelineIcon}><PlanIcon /></span>
-            <p><small>{es ? 'Inicio de la fase' : 'Phase started'}</small><strong>{formatDate(data.phaseStartDate, language)}</strong></p>
+            <p><small>{es ? 'Inicio del plan' : 'Plan started'}</small><strong>{formatDate(data.phaseStartDate, language)}</strong></p>
           </div>
           <div>
             <span className={styles.timelineIcon}><CalendarIcon /></span>
@@ -91,7 +96,7 @@ export function PlanView({ data, demo = false }: PlanViewProps) {
 
       <div className={styles.dataNotice}>
         <InfoIcon />
-        <p>{es ? 'Tu fase solo cambia cuando el equipo AQSLIM registra una actualización autorizada.' : 'Your phase changes only when the AQSLIM team records an authorized update.'}</p>
+        <p>{es ? 'Tu plan solo cambia cuando el equipo AQSLIM registra una actualización autorizada.' : 'Your plan changes only when the AQSLIM team records an authorized update.'}</p>
       </div>
     </PortalShell>
   )

@@ -3,17 +3,21 @@ import 'server-only'
 import { cache } from 'react'
 import {
   getConsultasByPatientId,
+  getFast36MeasurementsByPatient,
   getPlanById,
   type Consulta,
+  type Fast36MeasurementRecord,
 } from '@/lib/airtable'
 import { AuthorizationError, getOwnPatient, requireCapability } from '@/lib/auth'
 import { toCanonicalPhaseName } from '@/lib/phase-names'
 
 export type PortalMeasurement = {
   id: string
-  date: string
+  date: string | null
   weight: number
-  source: 'AQSLIM (Consulta)'
+  source: 'AQSLIM (Consulta)' | 'AQSLIM (FAST 36)'
+  label?: string
+  sequence?: number
 }
 
 export type PatientPortalData = {
@@ -22,6 +26,8 @@ export type PatientPortalData = {
   fullName: string
   language: 'es' | 'en'
   unit: 'lb' | 'kg'
+  planName: string | null
+  calorieTarget: number | null
   phase: string | null
   weekInPhase: number | null
   phaseStartDate: string | null
@@ -63,6 +69,48 @@ function measurementFromConsulta(
   }
 }
 
+function measurementFromFast36(
+  measurement: Fast36MeasurementRecord,
+): PortalMeasurement | null {
+  const weight = measurement.fields['Peso']
+  if (typeof weight !== 'number') return null
+
+  let storedData: Record<string, unknown> = {}
+  try {
+    const raw = measurement.fields['Datos de medición']
+    if (raw) storedData = JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    storedData = {}
+  }
+
+  const sequence = measurement.fields['Secuencia']
+  const measuredAt = typeof storedData.measuredAt === 'string' ? storedData.measuredAt : null
+  const label = typeof storedData.label === 'string'
+    ? storedData.label
+    : typeof sequence === 'number'
+      ? sequence === 0 ? 'Base' : `S${sequence}`
+      : undefined
+
+  return {
+    id: measurement.id,
+    date: measurement.fields['Fecha'] ?? measuredAt,
+    weight,
+    source: 'AQSLIM (FAST 36)',
+    label,
+    sequence,
+  }
+}
+
+function compareMeasurements(a: PortalMeasurement, b: PortalMeasurement) {
+  if (typeof a.sequence === 'number' && typeof b.sequence === 'number') {
+    return a.sequence - b.sequence
+  }
+  if (a.date && b.date) return Date.parse(a.date) - Date.parse(b.date)
+  if (!a.date && b.date) return -1
+  if (a.date && !b.date) return 1
+  return 0
+}
+
 export const getPatientPortalData = cache(async (): Promise<PatientPortalData | null> => {
   await requireCapability('portal:read:self')
   let cliente
@@ -75,24 +123,32 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
 
   const clienteName = cliente.fields['Nombre Completo']?.trim()
   const planId = cliente.fields['Plan AQSLIM']?.[0]
-  const [consultas, plan] = await Promise.all([
+  const [consultas, plan, fast36Measurements] = await Promise.all([
     clienteName
       ? getConsultasByPatientId(cliente.id, clienteName).catch(() => [] as Consulta[])
       : Promise.resolve([] as Consulta[]),
     planId ? getPlanById(planId).catch(() => null) : Promise.resolve(null),
+    getFast36MeasurementsByPatient(cliente.id).catch(() => [] as Fast36MeasurementRecord[]),
   ])
 
   const unitField = String(cliente.fields['Unidad de Peso'] ?? '').toLowerCase()
   const unit: 'lb' | 'kg' = unitField.includes('kg') ? 'kg' : 'lb'
-  const measurements = consultas
+  const consultationMeasurements = consultas
     .map(consulta => measurementFromConsulta(consulta, unit))
     .filter((measurement): measurement is PortalMeasurement => Boolean(measurement))
-    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+  const fastMeasurements = fast36Measurements
+    .map(measurementFromFast36)
+    .filter((measurement): measurement is PortalMeasurement => Boolean(measurement))
+  const measurements = [...consultationMeasurements, ...fastMeasurements].sort(compareMeasurements)
 
   const first = measurements[0] ?? null
   const latest = measurements.at(-1) ?? null
-  const initialWeight = first?.weight ?? null
-  const currentWeight = latest?.weight ?? null
+  const planInitialKg = plan?.fields['Peso Inicio (kg)']
+  const planCurrentKg = plan?.fields['Peso Actual (kg)']
+  const initialWeight = first?.weight
+    ?? (typeof planInitialKg === 'number' ? toDisplayWeight(planInitialKg, unit) : null)
+  const currentWeight = latest?.weight
+    ?? (typeof planCurrentKg === 'number' ? toDisplayWeight(planCurrentKg, unit) : null)
   const totalChange = initialWeight !== null && currentWeight !== null
     ? currentWeight - initialWeight
     : null
@@ -121,6 +177,12 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
     fullName,
     language: preferredLanguage.includes('english') || preferredLanguage.includes('ingl') ? 'en' : 'es',
     unit,
+    planName: plan?.fields['Notas del Plan']?.trim()
+      || plan?.fields['Dieta en Nutrimind']?.trim()
+      || null,
+    calorieTarget: typeof plan?.fields['Calorías Objetivo'] === 'number'
+      ? plan.fields['Calorías Objetivo']
+      : null,
     phase: toCanonicalPhaseName(
       plan?.fields['Fase Actual']
         ?? asString(latestConsulta?.fields['Fase de Dieta Actual']),

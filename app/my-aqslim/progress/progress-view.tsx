@@ -52,7 +52,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
     ? '—'
     : `${data.totalChange > 0 ? '+' : '−'}${Math.abs(Math.round(data.totalChange * 10) / 10)} ${data.unit}`
   const percent = data.percentChange === null ? '—' : `${data.percentChange.toFixed(1)}%`
-  const daysSinceStart = first ? Math.floor((Date.now() - Date.parse(first.date)) / 86_400_000) : 0
+  const daysSinceStart = first?.date ? Math.floor((Date.now() - Date.parse(first.date)) / 86_400_000) : 0
   const poundsLost = data.totalChange !== null && data.totalChange < 0
     ? Math.abs(data.unit === 'lb' ? data.totalChange : data.totalChange * 2.2046226218)
     : 0
@@ -112,7 +112,9 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
             <b>{formatSource(latest?.source, language, demo)}</b>
           </div>
           <div className={styles.sourceText}>
-            <span>{es ? 'Registrado en tu consulta con el equipo AQSLIM.' : 'Recorded during your consultation with the AQSLIM team.'}</span>
+            <span>{latest?.source === 'AQSLIM (FAST 36)'
+              ? (es ? 'Registrado en tu seguimiento FAST 36.' : 'Recorded in your FAST 36 tracking.')
+              : (es ? 'Registrado en tu consulta con el equipo AQSLIM.' : 'Recorded during your consultation with the AQSLIM team.')}</span>
             <b><i />{es ? 'Dato verificado' : 'Verified data'}</b>
           </div>
         </div>
@@ -146,7 +148,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
           <div className={styles.historyRows}>
             {[...data.measurements].reverse().map(measurement => (
               <div key={measurement.id}>
-                <span>{formatDate(measurement.date, language)}</span>
+                <span>{measurement.label || formatDate(measurement.date, language)}</span>
                 <strong>{formatWeight(measurement.weight, data.unit)}</strong>
                 <small><BuildingIcon />{formatSource(measurement.source, language, demo)}</small>
               </div>
