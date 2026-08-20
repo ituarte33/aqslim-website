@@ -3,12 +3,13 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
-import type { Cliente } from '@/lib/airtable'
+import type { Cliente, PlanAqslim } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
 import { updatePaciente, sendReinitiationEmail } from './actions'
 
 type Props = {
   patient: Cliente
+  plan: PlanAqslim | null
 }
 
 const inputStyle: React.CSSProperties = {
@@ -72,7 +73,7 @@ function formatDate(raw: string) {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
 }
 
-export function EditPatientClient({ patient }: Props) {
+export function EditPatientClient({ patient, plan }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -368,6 +369,52 @@ export function EditPatientClient({ patient }: Props) {
           </div>
 
           <SectionDivider label="Programa" />
+
+          <div>
+            <label htmlFor="planName" style={labelStyle}>Plan asignado</label>
+            <input
+              id="planName"
+              name="planName"
+              type="text"
+              list="aqslim-plan-options"
+              defaultValue={plan?.fields['Notas del Plan'] ?? plan?.fields['Dieta en Nutrimind'] ?? ''}
+              placeholder="Selecciona o escribe el plan autorizado"
+              style={inputStyle}
+            />
+            <datalist id="aqslim-plan-options">
+              <option value="FAST 36 + Plan Hipocalórico" />
+              <option value="Kenkho Path — Jing" />
+              <option value="Kenkho Path — Qi" />
+              <option value="Kenkho Path — Xue" />
+              <option value="Kenkho Path — Yang Sheng" />
+            </datalist>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div>
+              <label htmlFor="planStartDate" style={labelStyle}>Inicio del plan</label>
+              <input id="planStartDate" name="planStartDate" type="date" defaultValue={plan?.fields['Fecha Inicio Tratamiento'] ?? ''} style={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="planWeek" style={labelStyle}>Semana actual</label>
+              <input id="planWeek" name="planWeek" type="number" min="1" max="99" defaultValue={plan?.fields['Semana en Fase Actual'] ?? ''} style={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="calorieTarget" style={labelStyle}>Calorías/día</label>
+              <input id="calorieTarget" name="calorieTarget" type="number" min="500" max="5000" defaultValue={plan?.fields['Calorías Objetivo'] ?? ''} placeholder="Pendiente" style={inputStyle} />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="planInstructions" style={labelStyle}>Indicaciones del plan</label>
+            <textarea
+              id="planInstructions"
+              name="planInstructions"
+              defaultValue={plan?.fields['Instrucciones Especiales'] ?? ''}
+              placeholder="Indicaciones autorizadas que también verá el paciente."
+              style={textareaStyle}
+            />
+          </div>
 
           <div>
             <span style={labelStyle}>Idioma Preferido</span>
