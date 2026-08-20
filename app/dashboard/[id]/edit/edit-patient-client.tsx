@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, PlanAqslim } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
-import { updatePaciente, sendReinitiationEmail } from './actions'
+import { bindCurrentAccountToPatient, updatePaciente, sendReinitiationEmail } from './actions'
 
 type Props = {
   patient: Cliente
@@ -86,6 +86,10 @@ export function EditPatientClient({ patient, plan }: Props) {
   const [emailPending, startEmailTransition] = useTransition()
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'error'>('idle')
   const [emailError, setEmailError] = useState<string | null>(null)
+
+  const [bindingPending, startBindingTransition] = useTransition()
+  const [bindingStatus, setBindingStatus] = useState<'idle' | 'bound' | 'error'>('idle')
+  const [bindingError, setBindingError] = useState<string | null>(null)
 
   const f = patient.fields
   const nameParts = (f['Nombre Completo'] ?? '').split(' ')
@@ -662,6 +666,91 @@ export function EditPatientClient({ patient, plan }: Props) {
             </button>
           </div>
         </form>
+
+        <section style={{
+          marginTop: 40,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          paddingTop: 32,
+        }}>
+          <p style={{ fontSize: pt.sm, color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Acceso MY AQSLIM
+          </p>
+          <h2 style={{ fontFamily: pt.serif, fontSize: pt.lg, fontWeight: 400, marginBottom: 8 }}>
+            Vincular mi cuenta a este expediente
+          </h2>
+          <p style={{ fontSize: pt.sm, color: '#9A9590', marginBottom: 20, lineHeight: 1.6 }}>
+            MY AQSLIM abrirá únicamente el expediente de {f['Nombre Completo'] ?? 'este paciente'} para tu cuenta actual.
+            Esto no cambia el correo del paciente ni combina historiales.
+          </p>
+
+          {bindingStatus === 'bound' ? (
+            <div style={{
+              padding: '14px 16px',
+              background: 'rgba(111,191,111,0.08)',
+              border: '1px solid rgba(111,191,111,0.35)',
+              color: '#9ed06c',
+              fontSize: pt.sm,
+              fontFamily: pt.sans,
+            }}>
+              <p style={{ margin: '0 0 12px' }}>Cuenta vinculada correctamente a {f['Nombre Completo']}.</p>
+              <button
+                type="button"
+                onClick={() => router.push('/my-aqslim/materials')}
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(111,191,111,0.45)',
+                  color: '#9ed06c',
+                  padding: '10px 18px',
+                  fontSize: pt.xs,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  fontFamily: pt.sans,
+                  cursor: 'pointer',
+                }}
+              >
+                Ver mis materiales →
+              </button>
+            </div>
+          ) : (
+            <>
+              {bindingStatus === 'error' && bindingError ? (
+                <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: '0 0 16px' }}>{bindingError}</p>
+              ) : null}
+              <button
+                type="button"
+                disabled={bindingPending}
+                onClick={() => {
+                  setBindingStatus('idle')
+                  setBindingError(null)
+                  startBindingTransition(async () => {
+                    try {
+                      await bindCurrentAccountToPatient(patient.id)
+                      setBindingStatus('bound')
+                      router.refresh()
+                    } catch (err) {
+                      setBindingStatus('error')
+                      setBindingError(err instanceof Error ? err.message : 'No fue posible vincular la cuenta.')
+                    }
+                  })
+                }}
+                style={{
+                  background: bindingPending ? 'rgba(201,168,76,0.4)' : '#C9A84C',
+                  color: '#0A0A0A',
+                  border: 'none',
+                  padding: '12px 24px',
+                  fontSize: pt.sm,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  fontFamily: pt.sans,
+                  fontWeight: 500,
+                  cursor: bindingPending ? 'wait' : 'pointer',
+                }}
+              >
+                {bindingPending ? 'Vinculando…' : 'Vincular mi cuenta'}
+              </button>
+            </>
+          )}
+        </section>
 
         {/* Re-initiation email */}
         <div style={{
