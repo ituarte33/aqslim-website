@@ -7,6 +7,35 @@ const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
 export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
 export const PILOT_FEEDBACK_TABLE = 'tbl0yg7fqfaXS5Dva'
+export const PLAN_AQSLIM_TABLE = 'tblO1xi8kyIcpw5cY'
+export const FAST_36_MEASUREMENTS_TABLE = 'tblgOIGTREU63FdW0'
+
+export const PLAN_AQSLIM_FIELDS = {
+  PATIENT: 'fld5egFOgztSG8qgU',
+  PATIENT_NAME: 'fldsvAWD2ZSSmDDBV',
+  PLAN_LABEL: 'fldQb7JzeqeelSkOL',
+  TREATMENT_START: 'fldYRudQhtyJUxWf9',
+  WEEK: 'fld8w3QhNfAzjByAI',
+  PHASE_START: 'fldHugDraBhgct0SC',
+  CALORIE_TARGET: 'fldd7wEqWMjsnLRn8',
+  NUTRIMIND_DIET: 'flda5XjZWTO4lslEn',
+  STARTING_WEIGHT_KG: 'fldtjvUovy3E5DsL7',
+  CURRENT_WEIGHT_KG: 'fldhzEgeA0Ozo9amr',
+  GOAL_WEIGHT_KG: 'fldQ1ZGeKxckEuM0a',
+  SPECIAL_INSTRUCTIONS: 'fldITr5A5DNLVOdKE',
+} as const
+
+export const FAST_36_MEASUREMENTS_FIELDS = {
+  RECORD: 'fld7XlWXjNyLGubS8',
+  PATIENT: 'fldGXd9LEfY3c9JoO',
+  TYPE: 'fldJqeg44hANgZTKw',
+  SEQUENCE: 'fldAGOBHG90jZ7a1d',
+  DATE: 'fldwr5PiPjWq4ZWJj',
+  WEIGHT: 'fldRBRG7jvro0WckW',
+  WAIST: 'fldCzlgZjvno42lwy',
+  BODY_FAT: 'fldCLBPgMYezqJyFh',
+  DATA: 'fldGC2y6mOHjBXRnL',
+} as const
 
 export const PILOT_FEEDBACK_FIELDS = {
   REPORTE: 'fldq9JvW9mV8SlIvJ',
@@ -82,6 +111,7 @@ async function airtableFetch(path: string, options?: RequestInit) {
 export interface Cliente {
   id: string
   fields: {
+    'Registro'?: string
     'Nombre Completo'?: string
     'ID Cliente'?: number
     'Edad'?: number
@@ -767,6 +797,8 @@ export interface PlanAqslim {
     'Semana en Fase Actual'?: number
     'Fecha Inicio Fase Actual'?: string
     'Fecha Estimada Cambio de Fase'?: string
+    'Calorías Objetivo'?: number
+    'Dieta en Nutrimind'?: string
     'Peso Inicio (kg)'?: number
     'Peso Actual (kg)'?: number
     'Peso Meta (kg)'?: number
@@ -774,12 +806,79 @@ export interface PlanAqslim {
     '% Progreso hacia Meta'?: string
     'Siguiente Fase'?: string[]
     'Instrucciones Especiales'?: string
+    'Notas del Plan'?: string
     [key: string]: unknown
   }
 }
 
 export async function getPlanById(id: string): Promise<PlanAqslim> {
   return airtableFetch(`/Plan%20AQSLIM/${id}`)
+}
+
+export async function createPlanForPatient(
+  patientId: string,
+  fields: Record<string, unknown>,
+): Promise<PlanAqslim> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) throw new Error('Invalid patient record')
+  return airtableFetch(`/${PLAN_AQSLIM_TABLE}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      fields: {
+        ...fields,
+        [PLAN_AQSLIM_FIELDS.PATIENT]: [patientId],
+      },
+    }),
+  })
+}
+
+export async function updatePlan(
+  id: string,
+  fields: Record<string, unknown>,
+): Promise<PlanAqslim> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(id)) throw new Error('Invalid plan record')
+  return airtableFetch(`/${PLAN_AQSLIM_TABLE}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fields }),
+  })
+}
+
+export interface Fast36MeasurementRecord {
+  id: string
+  createdTime?: string
+  fields: {
+    'Cliente'?: string[]
+    'Tipo'?: string
+    'Secuencia'?: number
+    'Fecha'?: string
+    'Peso'?: number
+    'Cintura'?: number
+    'Grasa corporal %'?: number
+    'Datos de medición'?: string
+  }
+}
+
+export async function getFast36MeasurementsByPatient(
+  patientId: string,
+): Promise<Fast36MeasurementRecord[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) return []
+  const records: Fast36MeasurementRecord[] = []
+  let offset: string | undefined
+
+  do {
+    const params = new URLSearchParams({ pageSize: '100' })
+    Object.values(FAST_36_MEASUREMENTS_FIELDS).forEach(field => params.append('fields[]', field))
+    if (offset) params.set('offset', offset)
+
+    const data = await airtableFetch(`/${FAST_36_MEASUREMENTS_TABLE}?${params}`)
+    records.push(...(data.records ?? []).filter((record: Fast36MeasurementRecord) =>
+      record.fields['Cliente']?.includes(patientId),
+    ))
+    offset = data.offset
+  } while (offset)
+
+  return records.sort((a, b) =>
+    (a.fields['Secuencia'] ?? 0) - (b.fields['Secuencia'] ?? 0),
+  )
 }
 
 // ---------- Suplementos ----------
