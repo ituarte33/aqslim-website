@@ -10,6 +10,8 @@ export type FoodScanContextData = {
   fats: number | null
   proteins: number | null
   mealType: string | null
+  planName: string | null
+  calorieTarget: number | null
   phase: string | null
   weekInPhase: number | null
   consumptionStatus: 'Unconfirmed' | 'Consumed' | 'Reference only'
@@ -45,6 +47,7 @@ function metric(value: number | null, unit: string): string {
 
 export function buildFoodScanContextPrompt(data: FoodScanContextData): string {
   const phase = data.phase ? safeText(data.phase, 80) : 'not available'
+  const planName = data.planName ? safeText(data.planName, 120) : 'not available'
   const phaseWeek = typeof data.weekInPhase === 'number' && data.weekInPhase >= 0
     ? String(Math.round(data.weekInPhase))
     : 'not available'
@@ -59,6 +62,8 @@ This context was retrieved server-side from the authenticated user's own saved m
 - Approximate fat: ${metric(data.fats, ' g')}
 - Approximate protein: ${metric(data.proteins, ' g')}
 - Meal type selected: ${data.mealType ? safeText(data.mealType, 40) : 'not available'}
+- Current AQSLIM plan: ${planName}
+- Authorized daily calorie target: ${metric(data.calorieTarget, ' kcal')}
 - Current AQSLIM phase: ${phase}
 - Week in current phase: ${phaseWeek}
 - Consumption status of this saved scan: ${data.consumptionStatus}
@@ -66,6 +71,8 @@ This context was retrieved server-side from the authenticated user's own saved m
 - Approximate carbohydrates logged today from other meals, excluding this saved meal: ${metric(data.carbsLoggedTodayExcludingCurrentMeal, ' g')}
 
 When the user says "this plate", "this meal", "este plato", or similar, they mean this saved food scan. Use these approximate values and the identified foods directly; do not ask the user to upload or describe the same plate again. Give practical modifications appropriate to the known AQSLIM phase. If the phase is not available, say that clearly and provide conditional options without guessing. Remind the user that image-based values are estimates.
+
+If the verified plan is hypocaloric, acknowledge that plan when discussing portions or daily balance. Use the calorie target only when it is explicitly available above; otherwise do not invent one.
 
 DAILY CARBOHYDRATE BUDGET — MANDATORY FOR PHASE-SPECIFIC PLATE GUIDANCE
 
