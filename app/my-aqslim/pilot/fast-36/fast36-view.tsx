@@ -1,16 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   effectiveFast36Status,
   fast36ProgressPercent,
   selectCurrentFast36Session,
   DEFAULT_FAST36_TIME_ZONE,
   type Fast36EffectiveStatus,
+  type Fast36ConfirmationOutcome,
   type Fast36Session,
 } from '@/lib/fast36-policy'
 import { usePortalLanguage } from '../../use-portal-language'
+import { confirmFast36SessionAction } from './actions'
 import styles from './fast36.module.css'
 
 const STATUS_LABELS: Record<Fast36EffectiveStatus, { es: string; en: string }> = {
@@ -53,8 +56,12 @@ export function Fast36View({
   initialLanguage: 'es' | 'en'
   sessions: Fast36Session[]
 }) {
+  const router = useRouter()
   const [language] = usePortalLanguage(initialLanguage, profileId)
   const [now, setNow] = useState(() => Date.now())
+  const [isPending, startTransition] = useTransition()
+  const [confirmingOutcome, setConfirmingOutcome] = useState<Fast36ConfirmationOutcome | null>(null)
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const es = language === 'es'
 
   useEffect(() => {
@@ -73,6 +80,20 @@ export function Fast36View({
   const completedCount = sessions.filter(session =>
     effectiveFast36Status(session, now) === 'completed',
   ).length
+
+  const confirmOutcome = (outcome: Fast36ConfirmationOutcome) => {
+    setConfirmationError(null)
+    setConfirmingOutcome(outcome)
+    startTransition(async () => {
+      const result = await confirmFast36SessionAction(current.id, outcome)
+      if (result.ok) {
+        router.refresh()
+      } else {
+        setConfirmationError(result.error)
+      }
+      setConfirmingOutcome(null)
+    })
+  }
 
   return (
     <main className={styles.page}>
@@ -115,6 +136,46 @@ export function Fast36View({
           <div className={styles.timerMeta}><span>{Math.round(progress)}% {es ? 'del horario' : 'of schedule'}</span><span>36 {es ? 'horas' : 'hours'}</span></div>
         </section>
 
+        {status === 'awaiting_confirmation' ? (
+          <section className={styles.confirmationPanel} aria-labelledby="fast36-confirmation-title">
+            <small>{es ? 'CONFIRMA TU RESULTADO' : 'CONFIRM YOUR RESULT'}</small>
+            <h2 id="fast36-confirmation-title">{es ? '¿Cómo terminó esta sesión?' : 'How did this session end?'}</h2>
+            <p>{es ? 'Selecciona solamente lo que realmente ocurrió. El resultado quedará guardado en tu expediente personal.' : 'Select only what actually happened. The result will be saved to your personal record.'}</p>
+            <div className={styles.confirmationActions}>
+              <button
+                type="button"
+                className={styles.completeButton}
+                disabled={isPending}
+                onClick={() => confirmOutcome('completed')}
+              >
+                {isPending && confirmingOutcome === 'completed'
+                  ? (es ? 'Guardando…' : 'Saving…')
+                  : (es ? 'Sí, completé las 36 horas' : 'Yes, I completed 36 hours')}
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => confirmOutcome('ended_early')}
+              >
+                {isPending && confirmingOutcome === 'ended_early'
+                  ? (es ? 'Guardando…' : 'Saving…')
+                  : (es ? 'Terminé antes' : 'I ended early')}
+              </button>
+              <button
+                type="button"
+                className={styles.safetyButton}
+                disabled={isPending}
+                onClick={() => confirmOutcome('stopped_for_safety')}
+              >
+                {isPending && confirmingOutcome === 'stopped_for_safety'
+                  ? (es ? 'Guardando…' : 'Saving…')
+                  : (es ? 'Interrumpí por seguridad' : 'I stopped for safety')}
+              </button>
+            </div>
+            {confirmationError ? <p className={styles.confirmationError} role="alert">{confirmationError}</p> : null}
+          </section>
+        ) : null}
+
         <section className={styles.schedule}>
           <div><small>{es ? 'ÚLTIMA COMIDA' : 'LAST MEAL'}</small><strong>{formatDate(current.startAt, language, timeZone)}</strong></div>
           <div><small>{es ? 'FIN PROGRAMADO' : 'SCHEDULED END'}</small><strong>{formatDate(current.plannedEndAt, language, timeZone)}</strong></div>
@@ -139,7 +200,7 @@ export function Fast36View({
           </div>
         </section>
 
-        <p className={styles.note}>{es ? 'Primera integración: horarios y avance ya están protegidos en tu expediente. Los controles de registro se habilitarán en la siguiente revisión.' : 'First integration: your schedule and progress are now protected in your patient record. Logging controls will be enabled in the next review.'}</p>
+        <p className={styles.note}>{es ? 'Tus horarios y resultados se guardan de forma separada y segura en tu expediente personal.' : 'Your schedule and results are stored separately and securely in your personal record.'}</p>
       </div>
     </main>
   )
