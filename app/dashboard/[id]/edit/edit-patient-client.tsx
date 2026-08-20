@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, PlanAqslim } from '@/lib/airtable'
@@ -78,6 +78,10 @@ export function EditPatientClient({ patient, plan }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const materialInputRef = useRef<HTMLInputElement>(null)
+  const [materialPending, setMaterialPending] = useState(false)
+  const [materialStatus, setMaterialStatus] = useState<'idle' | 'uploaded' | 'error'>('idle')
+  const [materialError, setMaterialError] = useState<string | null>(null)
 
   const [emailPending, startEmailTransition] = useTransition()
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'error'>('idle')
@@ -162,11 +166,6 @@ export function EditPatientClient({ patient, plan }: Props) {
     }
 
     const formData = new FormData(e.currentTarget)
-    const planMaterials = formData
-      .getAll('planMaterials')
-      .filter((value): value is File => value instanceof File && value.size > 0)
-    // Files use a dedicated authenticated route. Keeping them out of the
-    // Server Action avoids production serialization/body handling failures.
     formData.delete('planMaterials')
     formData.set('clienteId',       patient.id)
     formData.set('telefono',        telefono)
@@ -189,37 +188,58 @@ export function EditPatientClient({ patient, plan }: Props) {
     startTransition(async () => {
       try {
         await updatePaciente(formData)
-        if (planMaterials.length) {
-          const materialData = new FormData()
-          planMaterials.forEach(material => materialData.append('planMaterials', material))
-          const response = await fetch(`/api/dashboard/patients/${patient.id}/materials`, {
-            method: 'POST',
-            body: materialData,
-          })
-          const result = await response.json().catch(() => null) as {
-            error?: string
-            correlationId?: string
-          } | null
-          if (!response.ok) {
-            const suffix = result?.correlationId ? ` (${result.correlationId})` : ''
-            const message = result?.error === 'plan_required'
-              ? 'Asigna primero un plan antes de agregar materiales.'
-              : result?.error === 'invalid_material'
-                ? 'Los materiales deben ser archivos PDF válidos.'
-                : result?.error === 'too_many_materials'
-                  ? 'Puedes agregar hasta 5 materiales a la vez.'
-                  : result?.error === 'materials_too_large'
-                    ? 'La carga total de materiales debe pesar 10 MB o menos.'
-                    : `No fue posible cargar los materiales. Intenta nuevamente${suffix}.`
-            throw new Error(message)
-          }
-        }
         setSaved(true)
         setTimeout(() => router.push(`/dashboard/${patient.id}`), 1200)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al guardar.')
       }
     })
+  }
+
+  async function handleMaterialUpload() {
+    const materials = Array.from(materialInputRef.current?.files ?? [])
+    if (!materials.length) {
+      setMaterialStatus('error')
+      setMaterialError('Selecciona por lo menos un archivo PDF.')
+      return
+    }
+
+    setMaterialPending(true)
+    setMaterialStatus('idle')
+    setMaterialError(null)
+    try {
+      const materialData = new FormData()
+      materials.forEach(material => materialData.append('planMaterials', material))
+      const response = await fetch(`/api/dashboard/patients/${patient.id}/materials`, {
+        method: 'POST',
+        body: materialData,
+      })
+      const result = await response.json().catch(() => null) as {
+        error?: string
+        correlationId?: string
+      } | null
+      if (!response.ok) {
+        const suffix = result?.correlationId ? ` (${result.correlationId})` : ''
+        const message = result?.error === 'plan_required'
+          ? 'Asigna primero un plan antes de agregar materiales.'
+          : result?.error === 'invalid_material'
+            ? 'Los materiales deben ser archivos PDF válidos.'
+            : result?.error === 'too_many_materials'
+              ? 'Puedes agregar hasta 5 materiales a la vez.'
+              : result?.error === 'materials_too_large'
+                ? 'La carga total de materiales debe pesar 10 MB o menos.'
+                : `No fue posible cargar los materiales. Intenta nuevamente${suffix}.`
+        throw new Error(message)
+      }
+      if (materialInputRef.current) materialInputRef.current.value = ''
+      setMaterialStatus('uploaded')
+      router.refresh()
+    } catch (uploadError) {
+      setMaterialStatus('error')
+      setMaterialError(uploadError instanceof Error ? uploadError.message : 'Error al cargar el material.')
+    } finally {
+      setMaterialPending(false)
+    }
   }
 
   return (
@@ -468,6 +488,7 @@ export function EditPatientClient({ patient, plan }: Props) {
           <div>
             <label htmlFor="planMaterials" style={labelStyle}>Materiales asignados</label>
             <input
+              ref={materialInputRef}
               id="planMaterials"
               name="planMaterials"
               type="file"
@@ -475,9 +496,38 @@ export function EditPatientClient({ patient, plan }: Props) {
               multiple
               style={inputStyle}
             />
+            <button
+              type="button"
+              onClick={handleMaterialUpload}
+              disabled={materialPending}
+              style={{
+                marginTop: 10,
+                padding: '11px 18px',
+                border: '1px solid rgba(201,168,76,0.45)',
+                background: materialPending ? 'rgba(201,168,76,0.08)' : 'rgba(201,168,76,0.16)',
+                color: '#C9A84C',
+                cursor: materialPending ? 'wait' : 'pointer',
+                fontFamily: pt.sans,
+                fontSize: pt.sm,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {materialPending ? 'Cargando…' : 'Cargar PDF'}
+            </button>
             <small style={{ display: 'block', marginTop: 8, color: '#6A6560', fontSize: pt.xs, lineHeight: 1.5 }}>
-              PDF únicamente, hasta 10 MB por carga. El paciente los verá en MY AQSLIM.
+              PDF únicamente, hasta 10 MB por carga. Usa “Cargar PDF” para asignarlo sin modificar los demás datos del expediente.
             </small>
+            {materialStatus === 'uploaded' && (
+              <p style={{ margin: '8px 0 0', color: '#9ed06c', fontSize: pt.xs }}>
+                Material cargado correctamente. Ya está disponible en MY AQSLIM.
+              </p>
+            )}
+            {materialStatus === 'error' && materialError && (
+              <p style={{ margin: '8px 0 0', color: '#E07A6A', fontSize: pt.xs }}>
+                {materialError}
+              </p>
+            )}
             {Boolean(plan?.fields['Materiales asignados']?.length) && (
               <div style={{ marginTop: 12, display: 'grid', gap: 6 }}>
                 {plan?.fields['Materiales asignados']?.map(material => (
