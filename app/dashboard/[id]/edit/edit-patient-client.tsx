@@ -162,6 +162,12 @@ export function EditPatientClient({ patient, plan }: Props) {
     }
 
     const formData = new FormData(e.currentTarget)
+    const planMaterials = formData
+      .getAll('planMaterials')
+      .filter((value): value is File => value instanceof File && value.size > 0)
+    // Files use a dedicated authenticated route. Keeping them out of the
+    // Server Action avoids production serialization/body handling failures.
+    formData.delete('planMaterials')
     formData.set('clienteId',       patient.id)
     formData.set('telefono',        telefono)
     formData.set('fechaNacimiento', fechaNacimiento)
@@ -183,6 +189,31 @@ export function EditPatientClient({ patient, plan }: Props) {
     startTransition(async () => {
       try {
         await updatePaciente(formData)
+        if (planMaterials.length) {
+          const materialData = new FormData()
+          planMaterials.forEach(material => materialData.append('planMaterials', material))
+          const response = await fetch(`/api/dashboard/patients/${patient.id}/materials`, {
+            method: 'POST',
+            body: materialData,
+          })
+          const result = await response.json().catch(() => null) as {
+            error?: string
+            correlationId?: string
+          } | null
+          if (!response.ok) {
+            const suffix = result?.correlationId ? ` (${result.correlationId})` : ''
+            const message = result?.error === 'plan_required'
+              ? 'Asigna primero un plan antes de agregar materiales.'
+              : result?.error === 'invalid_material'
+                ? 'Los materiales deben ser archivos PDF válidos.'
+                : result?.error === 'too_many_materials'
+                  ? 'Puedes agregar hasta 5 materiales a la vez.'
+                  : result?.error === 'materials_too_large'
+                    ? 'La carga total de materiales debe pesar 10 MB o menos.'
+                    : `No fue posible cargar los materiales. Intenta nuevamente${suffix}.`
+            throw new Error(message)
+          }
+        }
         setSaved(true)
         setTimeout(() => router.push(`/dashboard/${patient.id}`), 1200)
       } catch (err) {
