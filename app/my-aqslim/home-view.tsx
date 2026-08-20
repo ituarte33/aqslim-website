@@ -45,7 +45,9 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
     ? '—'
     : `${data.totalChange > 0 ? '+' : '−'}${Math.abs(Math.round(data.totalChange * 10) / 10)} ${data.unit}`
   const percent = data.percentChange === null ? '—' : `${data.percentChange.toFixed(1)}%`
-  const phase = data.phase || (es ? 'Por confirmar' : 'To be confirmed')
+  const plan = data.planName || data.phase || (es ? 'Por confirmar' : 'To be confirmed')
+  const isFast36Hypocaloric = plan.toLowerCase().includes('fast 36') && plan.toLowerCase().includes('hipocal')
+  const planTitle = isFast36Hypocaloric ? 'FAST 36' : plan
 
   return (
     <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
@@ -59,9 +61,10 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
 
       <section className={`${styles.panel} ${styles.phasePanel}`}>
         <div>
-          <p className={styles.eyebrow}>{es ? 'Tu fase actual' : 'Your current phase'}</p>
-          <h1>{phase}</h1>
+          <p className={styles.eyebrow}>{es ? 'Tu plan actual' : 'Your current plan'}</p>
+          <h1>{planTitle}</h1>
           <p className={styles.phaseWeek}>
+            {isFast36Hypocaloric ? `${es ? 'Plan Hipocalórico' : 'Hypocaloric Plan'} · ` : ''}
             {data.weekInPhase
               ? `${es ? 'Semana' : 'Week'} ${data.weekInPhase}`
               : (es ? 'Semana por confirmar' : 'Week to be confirmed')}
@@ -69,7 +72,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
           <Link href={demo ? '/my-aqslim/demo/plan' : '/my-aqslim/plan'} className={styles.phaseLinkText}>{es ? 'Ver mi plan' : 'View my plan'} <ChevronIcon /></Link>
         </div>
         <div className={styles.phaseSeal} aria-hidden="true">
-          <span>{phase.slice(0, 1).toUpperCase()}</span>
+          <span>{planTitle.slice(0, 1).toUpperCase()}</span>
           <small>MY AQSLIM</small>
         </div>
       </section>
@@ -79,7 +82,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
         <div className={styles.nextStep}>
           <div className={styles.roundIcon}><CalendarIcon /></div>
           <div>
-            <strong>{es ? `Continúa con tu plan ${phase}.` : `Continue with your ${phase} plan.`}</strong>
+            <strong>{es ? `Continúa con tu plan ${plan}.` : `Continue with your ${plan} plan.`}</strong>
             <span>{es ? 'Próxima revisión' : 'Next review'}</span>
             <b>{formatDate(data.nextReview, language)}</b>
           </div>
@@ -124,7 +127,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
           <span>{es ? 'Vista previa' : 'Preview'}</span>
         </div>
         <div className={styles.materialRows}>
-          <div><MaterialsIcon /><span><b>{es ? `Guía ${phase}` : `${phase} Guide`}</b><small>{es ? 'Guía de fase' : 'Phase guide'}</small></span></div>
+          <div><MaterialsIcon /><span><b>{es ? `Guía ${planTitle}` : `${planTitle} Guide`}</b><small>{es ? 'Guía del plan' : 'Plan guide'}</small></span></div>
           <div><MaterialsIcon /><span><b>{es ? 'Manual del Participante' : 'Participant Manual'}</b><small>{es ? 'Manual' : 'Manual'}</small></span></div>
         </div>
       </section>
