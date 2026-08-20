@@ -78,14 +78,16 @@ const FEATURES: FeatureDefinition[] = [
 
 export function PilotView({
   pilot,
+  profileId,
   linkedProfileName,
   fast36Enabled = false,
 }: {
   pilot: AuthenticatedPilot
+  profileId: string
   linkedProfileName?: string | null
   fast36Enabled?: boolean
 }) {
-  const [language, setLanguage] = usePortalLanguage(pilot.language)
+  const [language, setLanguage] = usePortalLanguage(pilot.language, profileId)
   const es = language === 'es'
 
   return (

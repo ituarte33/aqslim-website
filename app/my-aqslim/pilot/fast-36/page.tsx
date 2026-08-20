@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation'
 import { getFast36SessionsByPatient } from '@/lib/airtable'
 import { requireOwnPatient } from '@/lib/auth'
-import { normalizeFast36Status, type Fast36Session } from '@/lib/fast36-policy'
+import {
+  fast36TimeZoneFromSessionData,
+  normalizeFast36Status,
+  type Fast36Session,
+} from '@/lib/fast36-policy'
 import { Fast36View } from './fast36-view'
 
 export const metadata = {
@@ -26,12 +30,20 @@ export default async function Fast36Page() {
       plannedEndAt,
       actualEndAt: record.fields['Fin real'] ?? null,
       status: normalizeFast36Status(record.fields['Estado']),
+      timeZone: fast36TimeZoneFromSessionData(record.fields['Datos de sesión']),
     }]
   })
+
+  const preferredLanguage = String(patient.fields['Idioma Preferido'] ?? '').toLowerCase()
+  const initialLanguage = preferredLanguage.includes('english') || preferredLanguage.includes('ingl')
+    ? 'en'
+    : 'es'
 
   return (
     <Fast36View
       firstName={patient.fields['Nombre Completo']?.trim().split(/\s+/)[0] || 'Paciente'}
+      profileId={patient.id}
+      initialLanguage={initialLanguage}
       sessions={sessions}
     />
   )

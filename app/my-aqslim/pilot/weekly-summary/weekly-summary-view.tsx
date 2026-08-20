@@ -30,16 +30,18 @@ function shortDay(date: string, language: 'es' | 'en') {
 
 export function WeeklySummaryView({
   firstName,
+  profileId,
   phase,
   initialLanguage,
   summary,
 }: {
   firstName: string
+  profileId: string
   phase: string | null
   initialLanguage: 'es' | 'en'
   summary: WeeklySummaryData
 }) {
-  const [language] = usePortalLanguage(initialLanguage)
+  const [language] = usePortalLanguage(initialLanguage, profileId)
   const es = language === 'es'
   const maxCarbs = Math.max(1, ...summary.days.map(day => day.carbs))
   const facts = buildFacts(summary, language)

@@ -5,6 +5,10 @@ export type Fast36Status =
   | 'ended_early'
   | 'stopped_for_safety'
 
+export type Fast36EffectiveStatus = Fast36Status | 'awaiting_confirmation'
+
+export const DEFAULT_FAST36_TIME_ZONE = 'America/Los_Angeles'
+
 export type Fast36Session = {
   id: string
   week: number
@@ -12,6 +16,7 @@ export type Fast36Session = {
   plannedEndAt: string
   actualEndAt: string | null
   status: Fast36Status
+  timeZone?: string
 }
 
 export function normalizeFast36Status(value: string | undefined): Fast36Status {
@@ -25,7 +30,7 @@ export function normalizeFast36Status(value: string | undefined): Fast36Status {
 export function effectiveFast36Status(
   session: Fast36Session,
   nowMs = Date.now(),
-): Fast36Status {
+): Fast36EffectiveStatus {
   if (
     session.status === 'completed'
     || session.status === 'ended_early'
@@ -36,8 +41,29 @@ export function effectiveFast36Status(
   const endMs = Date.parse(session.plannedEndAt)
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return session.status
   if (nowMs < startMs) return 'pending'
-  if (nowMs >= endMs) return 'completed'
+  if (nowMs >= endMs) return 'awaiting_confirmation'
   return 'active'
+}
+
+export function normalizeFast36TimeZone(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) return DEFAULT_FAST36_TIME_ZONE
+  const candidate = value.trim()
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format(0)
+    return candidate
+  } catch {
+    return DEFAULT_FAST36_TIME_ZONE
+  }
+}
+
+export function fast36TimeZoneFromSessionData(value: string | undefined): string {
+  if (!value) return DEFAULT_FAST36_TIME_ZONE
+  try {
+    const data = JSON.parse(value) as { timeZone?: unknown }
+    return normalizeFast36TimeZone(data.timeZone)
+  } catch {
+    return DEFAULT_FAST36_TIME_ZONE
+  }
 }
 
 export function fast36ProgressPercent(session: Fast36Session, nowMs = Date.now()): number {
@@ -54,6 +80,11 @@ export function selectCurrentFast36Session(
   if (!sessions.length) return null
   const active = sessions.find(session => effectiveFast36Status(session, nowMs) === 'active')
   if (active) return active
+  for (let index = sessions.length - 1; index >= 0; index -= 1) {
+    if (effectiveFast36Status(sessions[index], nowMs) === 'awaiting_confirmation') {
+      return sessions[index]
+    }
+  }
   const next = sessions.find(session => effectiveFast36Status(session, nowMs) === 'pending')
   return next ?? sessions.at(-1) ?? null
 }

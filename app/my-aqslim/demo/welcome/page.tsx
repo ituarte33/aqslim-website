@@ -9,6 +9,7 @@ export default async function DemoWelcomePage() {
   return (
     <WelcomeView
       firstName={demoPatientPortalData.firstName}
+      profileId={demoPatientPortalData.clienteId}
       initialLanguage={demoPatientPortalData.language}
       destination="/my-aqslim/demo"
       demo

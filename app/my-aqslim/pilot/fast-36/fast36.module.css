@@ -28,6 +28,9 @@
 .timer { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0 24px; }
 .timer strong { font: 500 clamp(48px, 12vw, 88px)/1 'Playfair Display', serif; font-variant-numeric: tabular-nums; }
 .timer span { color: #d2a545; font: 500 38px 'Playfair Display', serif; }
+.confirmationMessage { display: grid; gap: 8px; margin: 24px 0 28px; text-align: center; }
+.confirmationMessage strong { font: 500 clamp(30px, 7vw, 48px)/1.1 'Playfair Display', serif; }
+.confirmationMessage span { color: #c7ddd7; font-size: 13px; }
 .progress { height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.18); }
 .progress span { display: block; height: 100%; border-radius: inherit; background: #d8a948; transition: width 1s linear; }
 .timerMeta { display: flex; justify-content: space-between; margin-top: 13px; color: #c7ddd7; font-size: 12px; }

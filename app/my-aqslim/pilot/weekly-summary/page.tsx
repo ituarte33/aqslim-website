@@ -42,6 +42,7 @@ export default async function WeeklySummaryPage() {
   return (
     <WeeklySummaryView
       firstName={patient.firstName}
+      profileId={patient.clienteId}
       phase={patient.phase}
       initialLanguage={patient.language ?? pilot.language}
       summary={buildWeeklySummary(mealLogs, fast36Sessions)}

@@ -17,7 +17,7 @@ type MaterialsViewProps = {
 export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
   const router = useRouter()
   const [openingBuddy, setOpeningBuddy] = useState(false)
-  const [language] = usePortalLanguage(data.language)
+  const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const phase = data.phase || (es ? 'Tu fase' : 'Your phase')
   const week = data.weekInPhase
@@ -44,7 +44,7 @@ export function MaterialsView({ data, demo = false }: MaterialsViewProps) {
   ]
 
   return (
-    <PortalShell firstName={data.firstName} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
       <section className={styles.pageIntro}>
         <div>
           <h1>{es ? 'Materiales' : 'Materials'}</h1>

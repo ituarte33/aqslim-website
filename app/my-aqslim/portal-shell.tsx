@@ -15,6 +15,7 @@ import styles from './portal.module.css'
 
 type Props = {
   firstName: string
+  profileId: string
   initialLanguage: 'es' | 'en'
   children: React.ReactNode
   demo?: boolean
@@ -28,9 +29,9 @@ const navItems = [
   { href: '/my-aqslim/buddy', es: 'AQ Buddy', en: 'AQ Buddy', icon: BuddyIcon },
 ]
 
-export function PortalShell({ firstName, initialLanguage, children, demo = false }: Props) {
+export function PortalShell({ firstName, profileId, initialLanguage, children, demo = false }: Props) {
   const pathname = usePathname()
-  const [language, setLanguage] = usePortalLanguage(initialLanguage)
+  const [language, setLanguage] = usePortalLanguage(initialLanguage, profileId)
   const basePath = demo ? '/my-aqslim/demo' : '/my-aqslim'
   const isBuddyPage = pathname.endsWith('/buddy')
 

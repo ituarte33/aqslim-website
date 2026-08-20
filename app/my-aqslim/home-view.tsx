@@ -33,7 +33,7 @@ type HomeViewProps = {
 }
 
 export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
-  const [language] = usePortalLanguage(data.language)
+  const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const today = new Intl.DateTimeFormat(es ? 'es-MX' : 'en-US', {
     timeZone: 'America/Los_Angeles',
@@ -48,7 +48,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
   const phase = data.phase || (es ? 'Por confirmar' : 'To be confirmed')
 
   return (
-    <PortalShell firstName={data.firstName} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
       <section className={styles.welcome}>
         <p>{es ? `Hola, ${data.firstName}` : `Hello, ${data.firstName}`}</p>
         <span>{capitalize(today)}</span>

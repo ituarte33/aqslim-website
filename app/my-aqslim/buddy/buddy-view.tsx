@@ -9,7 +9,7 @@ type BuddyViewProps = {
 
 export function BuddyView({ data, demo = false }: BuddyViewProps) {
   return (
-    <PortalShell firstName={data.firstName} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
       <div className={styles.buddyPageAnchor} aria-hidden="true" />
     </PortalShell>
   )

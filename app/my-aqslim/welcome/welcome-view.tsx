@@ -7,13 +7,14 @@ import styles from '../auth.module.css'
 
 type Props = {
   firstName: string
+  profileId: string
   initialLanguage: 'es' | 'en'
   destination?: string
   demo?: boolean
 }
 
-export function WelcomeView({ firstName, initialLanguage, destination = '/my-aqslim', demo = false }: Props) {
-  const [language, setLanguage] = usePortalLanguage(initialLanguage)
+export function WelcomeView({ firstName, profileId, initialLanguage, destination = '/my-aqslim', demo = false }: Props) {
+  const [language, setLanguage] = usePortalLanguage(initialLanguage, profileId)
   const es = language === 'es'
 
   return (
