@@ -115,6 +115,15 @@ export function DashboardClient({ user, patients, upcomingBookings, monthlyReven
         }}>
           + {t.consultaSubsecuente}
         </Link>
+        <Link href="/dashboard/ventas-suplementos" style={{
+          background: 'none', color: '#C9A84C',
+          border: '1px solid rgba(201,168,76,0.5)',
+          padding: '12px 24px', fontSize: pt.sm, letterSpacing: '0.14em',
+          textTransform: 'uppercase', fontFamily: pt.sans, fontWeight: 500,
+          textDecoration: 'none', display: 'inline-block',
+        }}>
+          + Venta de suplementos
+        </Link>
         <button
           onClick={() => setShowBooking(v => !v)}
           style={{
