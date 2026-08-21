@@ -1015,10 +1015,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
               {es ? 'No hay suplementos activos registrados.' : 'No active supplements found.'}
             </p>
           ) : (() => {
-            const q = suppSearch.toLowerCase()
+            const q = suppSearch.trim().toLowerCase()
             const filtered = q
               ? supplementos.filter(s => String(s.fields['Nombre'] ?? '').toLowerCase().includes(q))
-              : supplementos
+              : []
 
             // Group by category, preserving sort order within each group
             const groups = new Map<string, typeof supplementos>()
@@ -1042,7 +1042,11 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
                   onChange={e => setSuppSearch(e.target.value)}
                   style={{ ...inputStyle, maxWidth: 340 }}
                 />
-                {filtered.length === 0 ? (
+                {!q ? (
+                  <p style={{ fontSize: pt.sm, color: '#6A6560', margin: 0, fontFamily: pt.sans }}>
+                    {es ? 'Escribe el nombre para ver resultados.' : 'Type a name to see results.'}
+                  </p>
+                ) : filtered.length === 0 ? (
                   <p style={{ fontSize: pt.sm, color: '#6A6560', margin: 0, fontFamily: pt.sans }}>
                     {es ? 'Sin resultados.' : 'No results.'}
                   </p>
