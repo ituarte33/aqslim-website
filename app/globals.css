@@ -1808,6 +1808,29 @@ body.aqb-fullscreen-active {
   font-size: 12px;
   line-height: 1.55;
 }
+.fs-correction { margin-top: 12px; }
+.fs-correction-toggle {
+  width: 100%; min-height: 42px; padding: 10px 12px;
+  border: 1px solid rgba(201,168,76,.45); color: #E2C87A; background: transparent;
+  font: 600 11px/1.4 'Montserrat', sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+}
+.fs-correction-title { color: #E2C87A; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.fs-correction-entry { display: flex; flex-direction: column; gap: 7px; }
+.fs-correction-entry > span { color: #b9b4ad; font-size: 12px; }
+.fs-correction-entry textarea {
+  min-height: 116px; resize: vertical; padding: 12px; border: 1px solid rgba(201,168,76,.32);
+  background: #0d0d0d; color: #FAFAF8; font: 400 14px/1.55 'Montserrat', sans-serif;
+}
+.fs-correction-entry textarea:focus { outline: none; border-color: #C9A84C; }
+.fs-correction-entry small { color: #6A6560; font-size: 11px; line-height: 1.5; }
+.fs-correction-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 12px; }
+.fs-correction-actions button {
+  min-height: 42px; padding: 10px 12px; border: 1px solid rgba(201,168,76,.45);
+  color: #E2C87A; background: transparent; font: 600 10px/1.4 'Montserrat', sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+}
+.fs-correction-actions button:last-child { color: #0A0A0A; background: #C9A84C; }
+.fs-correction-actions button:disabled { opacity: .45; cursor: default; }
 .fs-confirmation {
   margin-top: 16px;
   padding: 15px;
