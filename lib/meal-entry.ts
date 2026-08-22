@@ -4,6 +4,7 @@ import type { FoodAnalysis } from './food-analysis'
 export const MEAL_PORTION_MIN = 10
 export const MEAL_PORTION_MAX = 100
 export const MEAL_DESCRIPTION_MAX = 500
+export const MEAL_CORRECTION_MAX = 700
 
 const MEAL_TYPES = new Set<MealType>(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'])
 
@@ -22,6 +23,13 @@ export function parseMealDescription(value: unknown): string | null {
   const description = value.trim().replace(/\s+/g, ' ')
   if (description.length < 3 || description.length > MEAL_DESCRIPTION_MAX) return null
   return description
+}
+
+export function parseMealCorrection(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const correction = value.trim().replace(/\s+/g, ' ')
+  if (correction.length < 3 || correction.length > MEAL_CORRECTION_MAX) return null
+  return correction
 }
 
 export function applyMealPortion(result: FoodAnalysis, portionPercent: number): FoodAnalysis {
