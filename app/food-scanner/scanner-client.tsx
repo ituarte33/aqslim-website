@@ -111,6 +111,15 @@ const COPY = {
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `Límite ${period === 'month' ? 'mensual' : 'diario'} alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}).`,
     estimateNotice: 'Valores aproximados para fines informativos. Confirma las porciones e ingredientes para mejorar la estimación.',
+    correctEstimate: 'Corregir ingredientes o porción',
+    correctionTitle: 'Ayuda a AQ Buddy a corregir la estimación',
+    correctionLabel: '¿Qué contiene y cuánto comerás?',
+    correctionPlaceholder: 'Ejemplo: No hay papas. Comeré aproximadamente 4 oz de pollo shawarma, 3 oz de res desmenuzada y ½ taza de arroz griego. Los chiles son pepperoncini.',
+    correctionHint: 'Indica qué alimento fue identificado incorrectamente, los ingredientes reales y tu porción aproximada.',
+    recalculate: 'Recalcular sin usar otro escaneo',
+    recalculating: 'Recalculando…',
+    cancelCorrection: 'Cancelar',
+    correctionError: 'No pudimos corregir la estimación. Revisa la descripción e inténtalo de nuevo.',
     confirmationTitle: '¿Qué deseas hacer con este escaneo?',
     confirmationDetail: 'Solo las comidas confirmadas se suman a tu presupuesto diario de carbohidratos.',
     confirmConsumed: 'Registrar como consumido',
@@ -168,6 +177,15 @@ const COPY = {
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `${period === 'month' ? 'Monthly' : 'Daily'} limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}).`,
     estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
+    correctEstimate: 'Correct ingredients or serving',
+    correctionTitle: 'Help AQ Buddy correct the estimate',
+    correctionLabel: 'What does it contain, and how much will you eat?',
+    correctionPlaceholder: 'Example: There are no potatoes. I will eat about 4 oz chicken shawarma, 3 oz shredded beef, and ½ cup Greek rice. The peppers are pepperoncini.',
+    correctionHint: 'Identify what was wrong, list the actual ingredients, and describe your approximate serving.',
+    recalculate: 'Recalculate without another scan',
+    recalculating: 'Recalculating…',
+    cancelCorrection: 'Cancel',
+    correctionError: 'We could not correct the estimate. Review the description and try again.',
     confirmationTitle: 'What would you like to do with this scan?',
     confirmationDetail: 'Only confirmed meals are added to your daily carbohydrate budget.',
     confirmConsumed: 'Log as consumed',
@@ -204,6 +222,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [scanning, setScanning]  = useState(false)
   const [result, setResult]      = useState<ScanResult | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [correctionOpen, setCorrectionOpen] = useState(false)
+  const [correction, setCorrection] = useState('')
+  const [recalculating, setRecalculating] = useState(false)
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const [error, setError]        = useState<string | null>(null)
   const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; context: unknown } | null>(null)
@@ -333,6 +354,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       }
 
       setResult(data)
+      setCorrectionOpen(false)
+      setCorrection('')
       setFeedbackTarget({ id: data.mealLogId, context: { mealType, inputMode, portionPercent, result: data } })
       setUsed(data.used)
       setMonthlyUsed(data.monthlyUsed)
@@ -358,6 +381,48 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       setFeedbackTarget({ id: crypto.randomUUID(), context: { errorCode: 'network_error', mealType, inputMode, portionPercent } })
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function recalculateEstimate() {
+    if (!result || !image || recalculating || correction.trim().length < 3) return
+    setRecalculating(true)
+    setConfirmationError(null)
+    const base64 = image.split(',')[1]
+    try {
+      const response = await fetch('/api/food-scan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reanalyze',
+          mealLogId: result.mealLogId,
+          imageBase64: base64,
+          mimeType,
+          correction,
+          portionPercent,
+          language: lang,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'correction_failed')
+      setResult(current => current ? { ...current, ...data } : current)
+      setLogs(current => current.map(log => log.id === result.mealLogId ? {
+        ...log,
+        fields: {
+          ...log.fields,
+          'Food Description': data.food,
+          'Calories': data.calories,
+          'Carbs (g)': data.carbs,
+          'Fats (g)': data.fats,
+          'Proteins (g)': data.proteins,
+        },
+      } : log))
+      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionPercent, corrected: true, correction, result: data } })
+      setCorrectionOpen(false)
+    } catch {
+      setConfirmationError(t.correctionError)
+    } finally {
+      setRecalculating(false)
     }
   }
 
@@ -618,6 +683,36 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 <div className="fs-notes">{result.notes}</div>
               )}
               <div className="fs-estimate-notice">{t.estimateNotice}</div>
+
+              {result.inputMode === 'photo' && result.consumptionStatus === 'Unconfirmed' && (
+                <div className="fs-correction">
+                  {!correctionOpen ? (
+                    <button type="button" className="fs-correction-toggle" onClick={() => setCorrectionOpen(true)}>
+                      {t.correctEstimate}
+                    </button>
+                  ) : (
+                    <>
+                      <div className="fs-correction-title">{t.correctionTitle}</div>
+                      <label className="fs-correction-entry">
+                        <span>{t.correctionLabel}</span>
+                        <textarea
+                          value={correction}
+                          maxLength={700}
+                          placeholder={t.correctionPlaceholder}
+                          onChange={event => { setCorrection(event.target.value); setConfirmationError(null) }}
+                        />
+                        <small>{t.correctionHint}</small>
+                      </label>
+                      <div className="fs-correction-actions">
+                        <button type="button" onClick={() => setCorrectionOpen(false)} disabled={recalculating}>{t.cancelCorrection}</button>
+                        <button type="button" onClick={() => void recalculateEstimate()} disabled={recalculating || correction.trim().length < 3}>
+                          {recalculating ? t.recalculating : t.recalculate}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="fs-confirmation" aria-live="polite">
                 {result.consumptionStatus === 'Unconfirmed' ? (
