@@ -302,6 +302,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           ...(inputMode === 'photo' ? { imageBase64: base64, mimeType } : { description }),
           mealType,
           portionPercent,
+          language: lang,
         }),
       })
       const data = await res.json()
