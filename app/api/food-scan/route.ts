@@ -77,16 +77,18 @@ export async function POST(req: Request) {
     }, { status: 429 })
   }
 
-  const { imageBase64, mimeType, mealType: rawMealType, description: rawDescription, portionPercent: rawPortion } = await req.json() as {
+  const { imageBase64, mimeType, mealType: rawMealType, description: rawDescription, portionPercent: rawPortion, language: rawLanguage } = await req.json() as {
     imageBase64?: string
     mimeType?: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
     mealType?: MealType
     description?: string
     portionPercent?: number
+    language?: 'es' | 'en'
   }
   const mealType = parseMealType(rawMealType) ?? 'Other'
   const description = parseMealDescription(rawDescription)
   const portionPercent = parseMealPortion(rawPortion ?? 100)
+  const language = rawLanguage === 'en' ? 'en' : 'es'
   const hasImage = typeof imageBase64 === 'string' && imageBase64.length > 0 && typeof mimeType === 'string'
 
   if (!portionPercent) {
@@ -101,6 +103,7 @@ export async function POST(req: Request) {
 
   let message: Anthropic.Message
   try {
+    const responseLanguage = language === 'es' ? 'Spanish' : 'English'
     const outputInstructions = `Return ONLY valid JSON with no markdown or extra text:
 {
   "food": "concise food name",
@@ -110,7 +113,7 @@ export async function POST(req: Request) {
   "proteins": number,
   "notes": "brief note on serving size assumptions or estimation confidence"
 }
-All numeric values are non-negative integers representing grams (carbs/fats/proteins) or kcal (calories) for the complete meal described or visible. The notes must briefly state the key serving-size or ingredient assumptions and that the result is an estimate.`
+Write the food name and notes in ${responseLanguage}. All numeric values are non-negative integers representing grams (carbs/fats/proteins) or kcal (calories) for the complete meal described or visible. Estimate each named ingredient separately using its stated amount and brand when supplied, then sum the meal. Before returning JSON, compare calories with the macro totals and correct any materially inconsistent estimate. The notes must briefly state the key serving-size, ingredient, and product assumptions and that the result is an estimate.`
 
     if (hasImage) {
       message = await client.messages.create({
@@ -158,10 +161,15 @@ All numeric values are non-negative integers representing grams (carbs/fats/prot
   }
 
   const portionedResult = applyMealPortion(completeMealResult, portionPercent)
-  const sourceLabel = hasImage ? 'photo' : 'description'
+  const sourceLabel = language === 'es'
+    ? (hasImage ? 'fotografía' : 'descripción')
+    : (hasImage ? 'photo' : 'description')
+  const sourceAndPortionNote = language === 'es'
+    ? `Fuente: ${sourceLabel}. Porción registrada: ${portionPercent}% de la porción completa estimada.`
+    : `Source: ${sourceLabel}. Portion logged: ${portionPercent}% of the estimated complete serving.`
   const result = {
     ...portionedResult,
-    notes: `${portionedResult.notes} Source: ${sourceLabel}. Portion logged: ${portionPercent}% of the estimated complete serving.`,
+    notes: `${portionedResult.notes} ${sourceAndPortionNote}`,
   }
 
   try {
