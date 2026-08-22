@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   applyMealPortion,
   parseMealDescription,
+  parseMealCorrection,
   parseMealPortion,
   parseMealType,
 } from '../lib/meal-entry.ts'
@@ -13,6 +14,12 @@ test('accepts supported meal portions and rejects unsafe values', () => {
   assert.equal(parseMealPortion(9), null)
   assert.equal(parseMealPortion(101), null)
   assert.equal(parseMealPortion(50.5), null)
+})
+
+test('normalizes ingredient corrections and rejects empty or oversized corrections', () => {
+  assert.equal(parseMealCorrection('  No potatoes.  Chicken shawarma and Greek rice. '), 'No potatoes. Chicken shawarma and Greek rice.')
+  assert.equal(parseMealCorrection('x'), null)
+  assert.equal(parseMealCorrection('x'.repeat(701)), null)
 })
 
 test('normalizes manual meal descriptions and validates meal types', () => {
