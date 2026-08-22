@@ -1476,6 +1476,60 @@ body.aqb-fullscreen-active {
   margin-bottom: 20px;
 }
 
+.fs-input-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.fs-input-mode button {
+  min-height: 44px;
+  border: 1px solid #2e2e2e;
+  border-radius: 2px;
+  background: transparent;
+  color: #77716b;
+  font: 600 12px/1.2 'Montserrat', sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.fs-input-mode button.active {
+  border-color: #c9a84c;
+  background: rgba(201,168,76,.08);
+  color: #e2c87a;
+}
+.fs-manual-entry {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 16px;
+  color: #9a9590;
+  font: 600 12px/1.2 'Montserrat', sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.fs-manual-entry textarea {
+  min-height: 154px;
+  resize: vertical;
+  border: 1px solid rgba(201,168,76,.3);
+  border-radius: 3px;
+  padding: 16px;
+  background: #0b0b0b;
+  color: #fafaf8;
+  font: 16px/1.55 'Montserrat', sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.fs-manual-entry textarea:focus {
+  border-color: #c9a84c;
+  outline: 1px solid rgba(201,168,76,.22);
+}
+.fs-manual-entry small {
+  color: #5f5a55;
+  font: 12px/1.5 'Montserrat', sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 /* Drop zone */
 .fs-drop-zone {
   border: 1px dashed rgba(201,168,76,0.3);
@@ -1535,6 +1589,67 @@ body.aqb-fullscreen-active {
 }
 .fs-meal-type-btn:hover { border-color: #9A9590; color: #9A9590; }
 .fs-meal-type-btn.active { border-color: #C9A84C; color: #C9A84C; background: rgba(201,168,76,0.08); }
+
+.fs-portion-block {
+  margin: 18px 0;
+  padding-top: 18px;
+  border-top: 1px solid #242220;
+}
+.fs-portion-title {
+  margin-bottom: 12px;
+  color: #9a9590;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.fs-portion-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.fs-portion-options button {
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
+  align-content: center;
+  border: 1px solid #2e2e2e;
+  border-radius: 2px;
+  background: transparent;
+  color: #77716b;
+  cursor: pointer;
+}
+.fs-portion-options button strong { color: inherit; font-size: 15px; }
+.fs-portion-options button span { font-size: 10px; line-height: 1.2; }
+.fs-portion-options button.active {
+  border-color: #c9a84c;
+  background: rgba(201,168,76,.08);
+  color: #e2c87a;
+}
+.fs-custom-portion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: #6a6560;
+  font-size: 12px;
+}
+.fs-custom-portion input {
+  width: 76px;
+  border: 1px solid #36322f;
+  border-radius: 2px;
+  padding: 8px 10px;
+  background: #0b0b0b;
+  color: #fafaf8;
+  font: 15px 'Montserrat', sans-serif;
+}
+.fs-portion-result {
+  margin: -8px 0 18px;
+  color: #c9a84c;
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+@media (max-width: 440px) {
+  .fs-portion-options { grid-template-columns: 1fr 1fr; }
+}
 
 .fs-btn-row {
   display: flex;
