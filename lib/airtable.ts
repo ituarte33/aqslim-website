@@ -1058,6 +1058,52 @@ export async function updateMealLogConsumptionStatus(
   })
 }
 
+export async function updateMealLogMealType(
+  recordId: string,
+  userId: string,
+  mealType: MealType,
+): Promise<MealLog | null> {
+  const record = await getMealLogForUser(recordId, userId)
+  if (!record) return null
+
+  return airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: { [MEAL_LOGS_FIELDS.MEAL_TYPE]: mealType },
+    }),
+  })
+}
+
+export async function updateUnconfirmedMealLogEstimate(
+  recordId: string,
+  userId: string,
+  data: {
+    foodDescription: string
+    calories: number
+    carbs: number
+    fats: number
+    proteins: number
+    notes: string
+  },
+): Promise<MealLog | null> {
+  const record = await getMealLogForUser(recordId, userId)
+  if (!record || (record.fields['Consumption Status'] ?? 'Unconfirmed') !== 'Unconfirmed') return null
+
+  return airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: {
+        [MEAL_LOGS_FIELDS.FOOD_DESCRIPTION]: data.foodDescription,
+        [MEAL_LOGS_FIELDS.CALORIES]: data.calories,
+        [MEAL_LOGS_FIELDS.CARBS_G]: data.carbs,
+        [MEAL_LOGS_FIELDS.FATS_G]: data.fats,
+        [MEAL_LOGS_FIELDS.PROTEINS_G]: data.proteins,
+        [MEAL_LOGS_FIELDS.NOTES]: data.notes,
+      },
+    }),
+  })
+}
+
 export async function countTodayScans(userId: string, date: string): Promise<number> {
   // Use TIMESTAMP range instead of DATE field equality — avoids issues with
   // Airtable Date-type fields where = "YYYY-MM-DD" can silently match nothing.

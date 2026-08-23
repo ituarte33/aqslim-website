@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { FoodLogWidget, type LogEntry } from '../food-log-widget'
+import { FoodLogWidget, type LogEntry, type MealType } from '../food-log-widget'
 import type { FoodScanPlan } from '@/lib/food-scan-policy'
 import { PilotFeedback } from '@/app/pilot-feedback'
 
@@ -23,7 +23,12 @@ interface ScanResult {
   monthlyUsed: number
   monthlyLimit: number
   monthlyRemaining: number
+  inputMode: 'photo' | 'description'
+  portionPercent: number
+  portionBasis: 'selected_percentage' | 'described_serving'
 }
+
+type InputMode = 'photo' | 'description'
 
 const DISCLOSURE_KEY = 'aqslim-food-scan-disclosure-v1'
 const BUDDY_CONTEXT_KEY = 'aqslim-buddy-context-v1'
@@ -79,19 +84,28 @@ const COPY = {
     monthlyUsage: (used: number, limit: number) => `${used} de ${limit} este mes`,
     remaining:  (n: number) => `${n} restante${n !== 1 ? 's' : ''}`,
     limitReached: 'Límite alcanzado',
-    uploadTitle: 'Sube una foto de tu comida',
+    uploadTitle: 'Registra tu comida',
+    inputModes: { photo: 'Con fotografía', description: 'Sin fotografía' } as Record<InputMode, string>,
+    manualLabel: 'Describe alimentos y cantidades',
+    manualPlaceholder: 'Ejemplo: un tazón de Rice Krispies con 8 oz de leche',
+    manualHint: 'Incluye marcas, cantidades y preparación cuando las conozcas.',
+    portionTitle: '¿Cuánto de esta comida piensas consumir?',
+    portionOptions: { 25: '¼ del plato', 50: '½ del plato', 75: '¾ del plato', 100: 'Todo' } as Record<number, string>,
+    customPortion: 'Otro porcentaje',
+    portionResult: (n: number) => `Estimación para ${n}% de la porción completa`,
+    personalServingResult: 'Estimación de tu porción personal descrita',
     dropText:   'Suelta aquí o haz clic para buscar',
     dropHint:   'JPG, PNG, WEBP · máx. 5 MB',
     mealTypes:  { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<string, string>,
     clear:      'Borrar',
-    analyze:    'Analizar con AQ Buddy',
+    analyze:    'Estimar y registrar',
     analyzing:  'Analizando…',
     nutritionTitle: 'Estimación Nutricional',
     carbs:      'Carbos',
     fats:       'Grasas',
     protein:    'Proteína',
     kcal:       'kcal',
-    placeholder: 'Los resultados aparecerán aquí tras el análisis',
+    placeholder: 'La estimación aparecerá aquí después de registrar tu comida',
     wantMore:   '¿Quieres más escaneos?',
     upgradeText: 'Con Kenkho Start, Plus o Elite puedes analizar más platos cada día.',
     viewPlans:  'Ver Planes',
@@ -99,6 +113,15 @@ const COPY = {
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `Límite ${period === 'month' ? 'mensual' : 'diario'} alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}).`,
     estimateNotice: 'Valores aproximados para fines informativos. Confirma las porciones e ingredientes para mejorar la estimación.',
+    correctEstimate: 'Corregir ingredientes o porción',
+    correctionTitle: 'Ayuda a AQ Buddy a corregir la estimación',
+    correctionLabel: '¿Qué contiene y cuánto comerás?',
+    correctionPlaceholder: 'Ejemplo: No hay papas. Comeré aproximadamente 4 oz de pollo shawarma, 3 oz de res desmenuzada y ½ taza de arroz griego. Los chiles son pepperoncini.',
+    correctionHint: 'Escribe las cantidades que realmente comerás. Estas reemplazan el porcentaje anterior; no se volverá a aplicar el 25%, 50% o 75%.',
+    recalculate: 'Recalcular sin usar otro escaneo',
+    recalculating: 'Recalculando…',
+    cancelCorrection: 'Cancelar',
+    correctionError: 'No pudimos corregir la estimación. Revisa la descripción e inténtalo de nuevo.',
     confirmationTitle: '¿Qué deseas hacer con este escaneo?',
     confirmationDetail: 'Solo las comidas confirmadas se suman a tu presupuesto diario de carbohidratos.',
     confirmConsumed: 'Registrar como consumido',
@@ -108,7 +131,7 @@ const COPY = {
     confirmedReference: 'Guardado solo como referencia. No cuenta como alimento consumido.',
     confirmationError: 'No pudimos guardar tu elección. Inténtalo de nuevo.',
     disclosureTitle: 'Antes de tu primer análisis',
-    disclosureBody: 'AQ Buddy utiliza análisis automatizado de imágenes para estimar calorías, carbohidratos, grasas y proteínas. Los resultados pueden contener errores y variar según las porciones, los ingredientes y la preparación.',
+    disclosureBody: 'AQ Buddy utiliza análisis automatizado de fotografías o descripciones para estimar calorías, carbohidratos, grasas y proteínas. Los resultados pueden contener errores y variar según las porciones, los ingredientes y la preparación.',
     disclosureDetail: 'Esta referencia no sustituye una etiqueta nutricional ni la orientación de un profesional de salud.',
     disclosureAccept: 'Entiendo · Continuar',
     failError:    'El análisis falló. Inténtalo de nuevo.',
@@ -118,6 +141,7 @@ const COPY = {
     networkError: 'Error de red. Inténtalo de nuevo.',
     imageError:   'Por favor sube un archivo de imagen.',
     sizeError:    'La imagen debe ser menor a 5 MB.',
+    inputError:   'Agrega una fotografía o describe tu comida.',
   },
   en: {
     sub:        'AQ Buddy Scanner',
@@ -127,19 +151,28 @@ const COPY = {
     monthlyUsage: (used: number, limit: number) => `${used} of ${limit} this month`,
     remaining:  (n: number) => `${n} remaining`,
     limitReached: 'Limit reached',
-    uploadTitle: 'Upload a meal photo',
+    uploadTitle: 'Log your meal',
+    inputModes: { photo: 'With a photo', description: 'Without a photo' } as Record<InputMode, string>,
+    manualLabel: 'Describe foods and amounts',
+    manualPlaceholder: 'Example: one bowl of Rice Krispies with 8 oz of milk',
+    manualHint: 'Include brands, amounts, and preparation when known.',
+    portionTitle: 'How much of this meal do you plan to eat?',
+    portionOptions: { 25: '¼ of the plate', 50: '½ of the plate', 75: '¾ of the plate', 100: 'All of it' } as Record<number, string>,
+    customPortion: 'Other percentage',
+    portionResult: (n: number) => `Estimate for ${n}% of the complete serving`,
+    personalServingResult: 'Estimate for your described personal serving',
     dropText:   'Drop photo here or click to browse',
     dropHint:   'JPG, PNG, WEBP · max 5 MB',
     mealTypes:  { Breakfast: 'Breakfast', Lunch: 'Lunch', Dinner: 'Dinner', Snack: 'Snack', Other: 'Other' } as Record<string, string>,
     clear:      'Clear',
-    analyze:    'Analyze with AQ Buddy',
+    analyze:    'Estimate and log',
     analyzing:  'Analyzing…',
     nutritionTitle: 'Nutrition Estimate',
     carbs:      'Carbs',
     fats:       'Fats',
     protein:    'Protein',
     kcal:       'kcal',
-    placeholder: 'Results will appear here after analysis',
+    placeholder: 'Your estimate will appear here after you log the meal',
     wantMore:   'Want more scans?',
     upgradeText: 'Kenkho Start, Plus, or Elite lets you analyze more plates each day.',
     viewPlans:  'View Plans',
@@ -147,6 +180,15 @@ const COPY = {
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `${period === 'month' ? 'Monthly' : 'Daily'} limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}).`,
     estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
+    correctEstimate: 'Correct ingredients or serving',
+    correctionTitle: 'Help AQ Buddy correct the estimate',
+    correctionLabel: 'What does it contain, and how much will you eat?',
+    correctionPlaceholder: 'Example: There are no potatoes. I will eat about 4 oz chicken shawarma, 3 oz shredded beef, and ½ cup Greek rice. The peppers are pepperoncini.',
+    correctionHint: 'Enter the amounts you will actually eat. They replace the previous percentage; 25%, 50%, or 75% will not be applied again.',
+    recalculate: 'Recalculate without another scan',
+    recalculating: 'Recalculating…',
+    cancelCorrection: 'Cancel',
+    correctionError: 'We could not correct the estimate. Review the description and try again.',
     confirmationTitle: 'What would you like to do with this scan?',
     confirmationDetail: 'Only confirmed meals are added to your daily carbohydrate budget.',
     confirmConsumed: 'Log as consumed',
@@ -156,7 +198,7 @@ const COPY = {
     confirmedReference: 'Saved for reference only. It does not count as food consumed.',
     confirmationError: 'We could not save your choice. Please try again.',
     disclosureTitle: 'Before your first analysis',
-    disclosureBody: 'AQ Buddy uses automated image analysis to estimate calories, carbohydrates, fats, and protein. Results may contain errors and vary with portions, ingredients, and preparation.',
+    disclosureBody: 'AQ Buddy uses automated photo or description analysis to estimate calories, carbohydrates, fats, and protein. Results may contain errors and vary with portions, ingredients, and preparation.',
     disclosureDetail: 'This reference does not replace a nutrition label or guidance from a healthcare professional.',
     disclosureAccept: 'I understand · Continue',
     failError:    'Analysis failed. Please try again.',
@@ -166,6 +208,7 @@ const COPY = {
     networkError: 'Network error. Please try again.',
     imageError:   'Please upload an image file.',
     sizeError:    'Image must be under 5 MB.',
+    inputError:   'Add a photo or describe your meal.',
   },
 }
 
@@ -174,11 +217,18 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
   const [lang, setLang]          = useState<'es' | 'en'>('es')
   const [image, setImage]        = useState<string | null>(null)
+  const [inputMode, setInputMode] = useState<InputMode>('photo')
+  const [description, setDescription] = useState('')
+  const [portionPercent, setPortionPercent] = useState(100)
   const [mimeType, setMimeType]  = useState<'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'>('image/jpeg')
   const [mealType, setMealType]  = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other'>('Other')
   const [scanning, setScanning]  = useState(false)
   const [result, setResult]      = useState<ScanResult | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [updatingMealType, setUpdatingMealType] = useState(false)
+  const [correctionOpen, setCorrectionOpen] = useState(false)
+  const [correction, setCorrection] = useState('')
+  const [recalculating, setRecalculating] = useState(false)
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const [error, setError]        = useState<string | null>(null)
   const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; context: unknown } | null>(null)
@@ -258,25 +308,34 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function analyze() {
-    if (!image || scanning) return
+    if (scanning) return
+    if ((inputMode === 'photo' && !image) || (inputMode === 'description' && description.trim().length < 3)) {
+      setError(t.inputError)
+      return
+    }
     setScanning(true)
     setError(null)
     setConfirmationError(null)
 
-    const base64 = image.split(',')[1]
+    const base64 = image?.split(',')[1]
 
     try {
       const res = await fetch('/api/food-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType, mealType }),
+        body: JSON.stringify({
+          ...(inputMode === 'photo' ? { imageBase64: base64, mimeType } : { description }),
+          mealType,
+          portionPercent,
+          language: lang,
+        }),
       })
       const data = await res.json()
 
       if (!res.ok) {
         setFeedbackTarget({
           id: crypto.randomUUID(),
-          context: { errorCode: data.error || 'analysis_failed', correlationId: data.correlationId ?? null, status: res.status, mealType },
+          context: { errorCode: data.error || 'analysis_failed', correlationId: data.correlationId ?? null, status: res.status, mealType, inputMode, portionPercent },
         })
         if (data.error === 'limit_reached') {
           const period = data.period === 'month' ? 'month' : 'day'
@@ -299,7 +358,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       }
 
       setResult(data)
-      setFeedbackTarget({ id: data.mealLogId, context: { mealType, result: data } })
+      setCorrectionOpen(false)
+      setCorrection('')
+      setFeedbackTarget({ id: data.mealLogId, context: { mealType, inputMode, portionPercent, result: data } })
       setUsed(data.used)
       setMonthlyUsed(data.monthlyUsed)
       setMonthlyLimit(data.monthlyLimit)
@@ -321,9 +382,50 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       }, ...prev])
     } catch {
       setError(t.networkError)
-      setFeedbackTarget({ id: crypto.randomUUID(), context: { errorCode: 'network_error', mealType } })
+      setFeedbackTarget({ id: crypto.randomUUID(), context: { errorCode: 'network_error', mealType, inputMode, portionPercent } })
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function recalculateEstimate() {
+    if (!result || !image || recalculating || correction.trim().length < 3) return
+    setRecalculating(true)
+    setConfirmationError(null)
+    const base64 = image.split(',')[1]
+    try {
+      const response = await fetch('/api/food-scan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reanalyze',
+          mealLogId: result.mealLogId,
+          imageBase64: base64,
+          mimeType,
+          correction,
+          language: lang,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'correction_failed')
+      setResult(current => current ? { ...current, ...data } : current)
+      setLogs(current => current.map(log => log.id === result.mealLogId ? {
+        ...log,
+        fields: {
+          ...log.fields,
+          'Food Description': data.food,
+          'Calories': data.calories,
+          'Carbs (g)': data.carbs,
+          'Fats (g)': data.fats,
+          'Proteins (g)': data.proteins,
+        },
+      } : log))
+      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionBasis: 'described_serving', corrected: true, correction, result: data } })
+      setCorrectionOpen(false)
+    } catch {
+      setConfirmationError(t.correctionError)
+    } finally {
+      setRecalculating(false)
     }
   }
 
@@ -348,6 +450,39 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       setConfirmationError(t.confirmationError)
     } finally {
       setConfirming(false)
+    }
+  }
+
+  async function updateSavedMealType(mealLogId: string, nextMealType: MealType) {
+    const response = await fetch('/api/food-scan', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_meal_type', mealLogId, mealType: nextMealType }),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'meal_type_update_failed')
+    setLogs(current => current.map(log => log.id === mealLogId
+      ? { ...log, fields: { ...log.fields, 'Meal Type': data.mealType } }
+      : log))
+    return data.mealType as MealType
+  }
+
+  async function selectMealType(nextMealType: MealType) {
+    if (nextMealType === mealType || updatingMealType) return
+    if (!result) {
+      setMealType(nextMealType)
+      return
+    }
+
+    setUpdatingMealType(true)
+    setConfirmationError(null)
+    try {
+      const savedMealType = await updateSavedMealType(result.mealLogId, nextMealType)
+      setMealType(savedMealType)
+    } catch {
+      setConfirmationError(t.confirmationError)
+    } finally {
+      setUpdatingMealType(false)
     }
   }
 
@@ -395,7 +530,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         <PilotFeedback
           tool="Escáner de alimentos"
           language={lang}
-          context={{ surface: 'food_scanner', hasImage: Boolean(image), hasResult: Boolean(result), hasError: Boolean(error) }}
+          context={{ surface: 'food_scanner', inputMode, hasImage: Boolean(image), hasDescription: Boolean(description.trim()), portionPercent, hasResult: Boolean(result), hasError: Boolean(error) }}
           standalone
         />
 
@@ -427,30 +562,57 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           <div className="fs-card">
             <div className="fs-card-title">{t.uploadTitle}</div>
 
-            <div
-              className={`fs-drop-zone ${dragging ? 'dragging' : ''} ${image ? 'has-image' : ''}`}
-              onClick={() => fileRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); setDragging(true) }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-            >
-              {image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={image} alt="Food preview" className="fs-preview-img" />
-              ) : (
-                <div className="fs-drop-placeholder">
-                  <div className="fs-drop-icon">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                      <path d="M6 22l7-9 5 6 3-4 5 7H6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                      <circle cx="21" cy="11" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                      <rect x="3" y="5" width="26" height="22" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                    </svg>
-                  </div>
-                  <div className="fs-drop-text">{t.dropText}</div>
-                  <div className="fs-drop-hint">{t.dropHint}</div>
-                </div>
-              )}
+            <div className="fs-input-mode" role="group" aria-label={t.uploadTitle}>
+              {(['photo', 'description'] as const).map(mode => (
+                <button
+                  type="button"
+                  key={mode}
+                  className={inputMode === mode ? 'active' : ''}
+                  aria-pressed={inputMode === mode}
+                  onClick={() => { setInputMode(mode); setError(null); setResult(null); setFeedbackTarget(null) }}
+                >
+                  {t.inputModes[mode]}
+                </button>
+              ))}
             </div>
+
+            {inputMode === 'photo' ? (
+              <div
+                className={`fs-drop-zone ${dragging ? 'dragging' : ''} ${image ? 'has-image' : ''}`}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragging(true) }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={onDrop}
+              >
+                {image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={image} alt="Food preview" className="fs-preview-img" />
+                ) : (
+                  <div className="fs-drop-placeholder">
+                    <div className="fs-drop-icon">
+                      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <path d="M6 22l7-9 5 6 3-4 5 7H6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                        <circle cx="21" cy="11" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                        <rect x="3" y="5" width="26" height="22" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                      </svg>
+                    </div>
+                    <div className="fs-drop-text">{t.dropText}</div>
+                    <div className="fs-drop-hint">{t.dropHint}</div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <label className="fs-manual-entry">
+                <span>{t.manualLabel}</span>
+                <textarea
+                  value={description}
+                  maxLength={500}
+                  placeholder={t.manualPlaceholder}
+                  onChange={event => { setDescription(event.target.value); setError(null); setResult(null) }}
+                />
+                <small>{t.manualHint}</small>
+              </label>
+            )}
 
             <input
               ref={fileRef}
@@ -465,7 +627,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 <button
                   key={mt}
                   className={`fs-meal-type-btn ${mealType === mt ? 'active' : ''}`}
-                  onClick={() => setMealType(mt)}
+                  onClick={() => void selectMealType(mt)}
+                  disabled={updatingMealType}
                   type="button"
                 >
                   {t.mealTypes[mt]}
@@ -473,8 +636,42 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               ))}
             </div>
 
+            <div className="fs-portion-block">
+              <div className="fs-portion-title">{t.portionTitle}</div>
+              <div className="fs-portion-options">
+                {[25, 50, 75, 100].map(value => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={portionPercent === value ? 'active' : ''}
+                    aria-pressed={portionPercent === value}
+                    onClick={() => { setPortionPercent(value); setResult(null) }}
+                  >
+                    <strong>{value}%</strong>
+                    <span>{t.portionOptions[value]}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="fs-custom-portion">
+                <span>{t.customPortion}</span>
+                <input
+                  type="number"
+                  min="10"
+                  max="100"
+                  step="5"
+                  value={portionPercent}
+                  onChange={event => {
+                    const next = Math.min(100, Math.max(10, Number(event.target.value) || 10))
+                    setPortionPercent(Math.round(next))
+                    setResult(null)
+                  }}
+                />
+                <span>%</span>
+              </label>
+            </div>
+
             <div className="fs-btn-row">
-              {image && (
+              {inputMode === 'photo' && image && (
                 <button
                   className="fs-btn-secondary"
                   onClick={() => { setImage(null); setResult(null); setError(null); setConfirmationError(null); setFeedbackTarget(null) }}
@@ -485,7 +682,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               <button
                 className="fs-btn-primary"
                 onClick={analyze}
-                disabled={!image || scanning || remaining <= 0}
+                disabled={(inputMode === 'photo' ? !image : description.trim().length < 3) || scanning || remaining <= 0}
               >
                 {scanning ? t.analyzing : t.analyze}
               </button>
@@ -500,6 +697,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             <div className="fs-card fs-result-card">
               <div className="fs-card-title">{t.nutritionTitle}</div>
               <div className="fs-food-name">{result.food}</div>
+              <div className="fs-portion-result">
+                {result.portionBasis === 'described_serving' ? t.personalServingResult : t.portionResult(result.portionPercent)}
+              </div>
 
               <div className="fs-calories-row">
                 <div className="fs-calories-num">{result.calories}</div>
@@ -522,6 +722,36 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 <div className="fs-notes">{result.notes}</div>
               )}
               <div className="fs-estimate-notice">{t.estimateNotice}</div>
+
+              {result.inputMode === 'photo' && result.consumptionStatus === 'Unconfirmed' && (
+                <div className="fs-correction">
+                  {!correctionOpen ? (
+                    <button type="button" className="fs-correction-toggle" onClick={() => setCorrectionOpen(true)}>
+                      {t.correctEstimate}
+                    </button>
+                  ) : (
+                    <>
+                      <div className="fs-correction-title">{t.correctionTitle}</div>
+                      <label className="fs-correction-entry">
+                        <span>{t.correctionLabel}</span>
+                        <textarea
+                          value={correction}
+                          maxLength={700}
+                          placeholder={t.correctionPlaceholder}
+                          onChange={event => { setCorrection(event.target.value); setConfirmationError(null) }}
+                        />
+                        <small>{t.correctionHint}</small>
+                      </label>
+                      <div className="fs-correction-actions">
+                        <button type="button" onClick={() => setCorrectionOpen(false)} disabled={recalculating}>{t.cancelCorrection}</button>
+                        <button type="button" onClick={() => void recalculateEstimate()} disabled={recalculating || correction.trim().length < 3}>
+                          {recalculating ? t.recalculating : t.recalculate}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="fs-confirmation" aria-live="polite">
                 {result.consumptionStatus === 'Unconfirmed' ? (
@@ -581,6 +811,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               weekStart={logWeekStart}
               monthStart={logMonthStart}
               lang={lang}
+              onMealTypeChange={updateSavedMealType}
             />
           </div>
         )}

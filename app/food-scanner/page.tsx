@@ -5,8 +5,8 @@ import { effectiveFoodScanPlan } from '@/lib/food-scan-policy'
 import { getPilotAccess } from '@/lib/pilot-access'
 
 export const metadata = {
-  title: 'AQ Buddy Food Scanner — AQSLIM',
-  description: 'Get an approximate nutrition estimate from a meal photo with AQ Buddy',
+  title: 'AQ Buddy Meal Log — AQSLIM',
+  description: 'Log a meal with or without a photo and estimate nutrition for the portion you plan to eat',
 }
 
 export default async function FoodScannerPage() {
