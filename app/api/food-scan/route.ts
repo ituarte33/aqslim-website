@@ -5,6 +5,7 @@ import {
   createMealLog,
   getMealLogsSince,
   updateUnconfirmedMealLogEstimate,
+  updateMealLogMealType,
   updateMealLogConsumptionStatus,
   type ConsumptionStatus,
   type MealType,
@@ -246,14 +247,31 @@ export async function PATCH(req: Request) {
   const payload = await req.json() as {
     mealLogId?: string
     consumptionStatus?: ConsumptionStatus
-    action?: 'reanalyze'
+    action?: 'reanalyze' | 'update_meal_type'
     imageBase64?: string
     mimeType?: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
     correction?: string
+    mealType?: MealType
     portionPercent?: number
     language?: 'es' | 'en'
   }
   const { mealLogId, consumptionStatus } = payload
+
+  if (payload.action === 'update_meal_type') {
+    const mealType = parseMealType(payload.mealType)
+    if (typeof mealLogId !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(mealLogId) || !mealType) {
+      return Response.json({ error: 'invalid_meal_type' }, { status: 400 })
+    }
+    try {
+      const updated = await updateMealLogMealType(mealLogId, userId, mealType)
+      if (!updated) return Response.json({ error: 'not_found' }, { status: 404 })
+      return Response.json({ mealLogId, mealType: updated.fields['Meal Type'] ?? mealType })
+    } catch (error) {
+      const correlationId = crypto.randomUUID()
+      console.error('[food-scan] meal_type_update_failed', { correlationId, errorType: error instanceof Error ? error.name : 'unknown' })
+      return Response.json({ error: 'meal_type_unavailable', correlationId }, { status: 503 })
+    }
+  }
 
   if (payload.action === 'reanalyze') {
     const correction = parseMealCorrection(payload.correction)
