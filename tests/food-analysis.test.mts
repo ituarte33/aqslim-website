@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isFoodAnalysisConsistent, parseFoodAnalysis } from '../lib/food-analysis.ts'
+import { isFoodAnalysisConsistent, normalizeFoodAnalysisMath, parseFoodAnalysis } from '../lib/food-analysis.ts'
 
 const valid = {
   food: 'Carnitas con ensalada',
@@ -25,6 +25,26 @@ test('rejects internally inconsistent ingredient nutrition math', () => {
     ...valid,
     ingredients: [{ name: 'Arroz', calories: 70, carbs: 38, fats: 0, proteins: 2 }],
   }), false)
+})
+
+test('normalizes calories deterministically from ingredient macros', () => {
+  const normalized = normalizeFoodAnalysisMath({
+    ...valid,
+    calories: 70,
+    carbs: 38,
+    fats: 0,
+    proteins: 2,
+    ingredients: [{ name: 'Arroz', calories: 70, carbs: 38, fats: 0, proteins: 2 }],
+  })
+  assert.deepEqual(normalized, {
+    ...valid,
+    calories: 160,
+    carbs: 38,
+    fats: 0,
+    proteins: 2,
+    ingredients: [{ name: 'Arroz', calories: 160, carbs: 38, fats: 0, proteins: 2 }],
+  })
+  assert.equal(normalized && isFoodAnalysisConsistent(normalized), true)
 })
 
 test('accepts JSON wrapped in a markdown fence', () => {
