@@ -20,6 +20,23 @@ function macroCalories(carbs: number, fats: number, proteins: number): number {
   return carbs * 4 + fats * 9 + proteins * 4
 }
 
+export function normalizeFoodAnalysisMath(analysis: FoodAnalysis): FoodAnalysis | null {
+  if (!analysis.ingredients?.length) return null
+
+  const ingredients = analysis.ingredients.map(item => ({
+    ...item,
+    calories: Math.round(macroCalories(item.carbs, item.fats, item.proteins)),
+  }))
+  const totals = ingredients.reduce((sum, item) => ({
+    calories: sum.calories + item.calories,
+    carbs: sum.carbs + item.carbs,
+    fats: sum.fats + item.fats,
+    proteins: sum.proteins + item.proteins,
+  }), { calories: 0, carbs: 0, fats: 0, proteins: 0 })
+
+  return { ...analysis, ...totals, ingredients }
+}
+
 function caloriesAreConsistent(calories: number, carbs: number, fats: number, proteins: number): boolean {
   const calculated = macroCalories(carbs, fats, proteins)
   return Math.abs(calories - calculated) <= Math.max(20, calculated * 0.15)
