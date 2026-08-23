@@ -2238,6 +2238,39 @@ body.aqb-fullscreen-active {
   border-radius: 2px;
   flex-shrink: 0;
 }
+.flw-row-type-button {
+  border: 1px solid rgba(201,168,76,.32);
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+}
+.flw-row-type-button:hover,
+.flw-row-type-button[aria-expanded="true"] { border-color: var(--gold); color: #e2c87a; }
+.flw-row-type-button:disabled { cursor: wait; opacity: .65; }
+.flw-meal-type-menu {
+  flex: 0 0 100%;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.flw-meal-type-menu button {
+  border: 1px solid #36322f;
+  border-radius: 2px;
+  padding: 7px 10px;
+  background: #0b0b0b;
+  color: #8f8a83;
+  font: 600 10px/1.2 'Montserrat', sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.flw-meal-type-menu button:hover,
+.flw-meal-type-menu button.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+.flw-meal-type-menu button:disabled { cursor: wait; opacity: .65; }
+.flw-meal-type-error {
+  flex: 0 0 100%;
+  color: #e06f6f;
+  font-size: 12px;
+}
 .flw-row-status {
   display: inline-block;
   margin-left: 8px;
