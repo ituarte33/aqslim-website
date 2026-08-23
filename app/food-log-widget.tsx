@@ -34,6 +34,7 @@ const COPY = {
     noPeriod:  (p: Period) => p === 'today' ? 'Sin escaneos hoy.' : p === 'week' ? 'Sin escaneos esta semana.' : 'Sin escaneos este mes.',
     status: { Unconfirmed: 'Sin confirmar', Consumed: 'Consumido', 'Reference only': 'Solo referencia' } as Record<string, string>,
     editMealType: 'Cambiar categoría',
+    editLatest: 'Editar',
     mealTypes: { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<MealType, string>,
     updateError: 'No se pudo cambiar la categoría. Inténtalo de nuevo.',
     kcal: 'kcal', carbs: 'carbos', fats: 'grasas', protein: 'proteína',
@@ -49,6 +50,7 @@ const COPY = {
     noPeriod:  (p: Period) => p === 'today' ? 'No scans today.' : p === 'week' ? 'No scans this week.' : 'No scans this month.',
     status: { Unconfirmed: 'Unconfirmed', Consumed: 'Consumed', 'Reference only': 'Reference only' } as Record<string, string>,
     editMealType: 'Change category',
+    editLatest: 'Edit',
     mealTypes: { Breakfast: 'Breakfast', Lunch: 'Lunch', Dinner: 'Dinner', Snack: 'Snack', Other: 'Other' } as Record<MealType, string>,
     updateError: 'The category could not be changed. Please try again.',
     kcal: 'kcal', carbs: 'carbs', fats: 'fats', protein: 'protein',
@@ -180,7 +182,7 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
         <div className="flw-empty">{t.noPeriod(period)}</div>
       ) : (
         <div className="flw-list">
-          {filtered.map(log => (
+          {filtered.map((log, index) => (
             <div key={log.id} className="flw-row">
               <div className="flw-row-food">
                 {log.fields['Meal Type'] && (onMealTypeChange ? (
@@ -211,6 +213,18 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
                   ? new Date(log.fields['Timestamp']).toLocaleTimeString(lang === 'es' ? 'es-MX' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
                   : log.fields['Date'] ?? ''}
               </div>
+              {period === 'today' && index === 0 && onMealTypeChange && (
+                <button
+                  type="button"
+                  className="flw-row-edit-latest"
+                  aria-label={`${t.editLatest}: ${log.fields['Food Description'] ?? ''}`}
+                  aria-expanded={editingMealTypeId === log.id}
+                  onClick={() => setEditingMealTypeId(current => current === log.id ? null : log.id)}
+                  disabled={savingMealTypeId === log.id}
+                >
+                  {t.editLatest}
+                </button>
+              )}
               {editingMealTypeId === log.id && (
                 <div className="flw-meal-type-menu" role="group" aria-label={t.editMealType}>
                   {(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'] as MealType[]).map(option => (
