@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { FoodLogWidget, type LogEntry } from '../food-log-widget'
+import { FoodLogWidget, type LogEntry, type MealType } from '../food-log-widget'
 import type { FoodScanPlan } from '@/lib/food-scan-policy'
 import { PilotFeedback } from '@/app/pilot-feedback'
 
@@ -453,7 +453,21 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     }
   }
 
-  async function selectMealType(nextMealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other') {
+  async function updateSavedMealType(mealLogId: string, nextMealType: MealType) {
+    const response = await fetch('/api/food-scan', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_meal_type', mealLogId, mealType: nextMealType }),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'meal_type_update_failed')
+    setLogs(current => current.map(log => log.id === mealLogId
+      ? { ...log, fields: { ...log.fields, 'Meal Type': data.mealType } }
+      : log))
+    return data.mealType as MealType
+  }
+
+  async function selectMealType(nextMealType: MealType) {
     if (nextMealType === mealType || updatingMealType) return
     if (!result) {
       setMealType(nextMealType)
@@ -463,17 +477,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     setUpdatingMealType(true)
     setConfirmationError(null)
     try {
-      const response = await fetch('/api/food-scan', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_meal_type', mealLogId: result.mealLogId, mealType: nextMealType }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'meal_type_update_failed')
-      setMealType(data.mealType)
-      setLogs(current => current.map(log => log.id === result.mealLogId
-        ? { ...log, fields: { ...log.fields, 'Meal Type': data.mealType } }
-        : log))
+      const savedMealType = await updateSavedMealType(result.mealLogId, nextMealType)
+      setMealType(savedMealType)
     } catch {
       setConfirmationError(t.confirmationError)
     } finally {
@@ -806,6 +811,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               weekStart={logWeekStart}
               monthStart={logMonthStart}
               lang={lang}
+              onMealTypeChange={updateSavedMealType}
             />
           </div>
         )}
