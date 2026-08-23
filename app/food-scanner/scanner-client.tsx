@@ -25,6 +25,7 @@ interface ScanResult {
   monthlyRemaining: number
   inputMode: 'photo' | 'description'
   portionPercent: number
+  portionBasis: 'selected_percentage' | 'described_serving'
 }
 
 type InputMode = 'photo' | 'description'
@@ -92,6 +93,7 @@ const COPY = {
     portionOptions: { 25: '¼ del plato', 50: '½ del plato', 75: '¾ del plato', 100: 'Todo' } as Record<number, string>,
     customPortion: 'Otro porcentaje',
     portionResult: (n: number) => `Estimación para ${n}% de la porción completa`,
+    personalServingResult: 'Estimación de tu porción personal descrita',
     dropText:   'Suelta aquí o haz clic para buscar',
     dropHint:   'JPG, PNG, WEBP · máx. 5 MB',
     mealTypes:  { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<string, string>,
@@ -115,7 +117,7 @@ const COPY = {
     correctionTitle: 'Ayuda a AQ Buddy a corregir la estimación',
     correctionLabel: '¿Qué contiene y cuánto comerás?',
     correctionPlaceholder: 'Ejemplo: No hay papas. Comeré aproximadamente 4 oz de pollo shawarma, 3 oz de res desmenuzada y ½ taza de arroz griego. Los chiles son pepperoncini.',
-    correctionHint: 'Indica qué alimento fue identificado incorrectamente, los ingredientes reales y tu porción aproximada.',
+    correctionHint: 'Escribe las cantidades que realmente comerás. Estas reemplazan el porcentaje anterior; no se volverá a aplicar el 25%, 50% o 75%.',
     recalculate: 'Recalcular sin usar otro escaneo',
     recalculating: 'Recalculando…',
     cancelCorrection: 'Cancelar',
@@ -158,6 +160,7 @@ const COPY = {
     portionOptions: { 25: '¼ of the plate', 50: '½ of the plate', 75: '¾ of the plate', 100: 'All of it' } as Record<number, string>,
     customPortion: 'Other percentage',
     portionResult: (n: number) => `Estimate for ${n}% of the complete serving`,
+    personalServingResult: 'Estimate for your described personal serving',
     dropText:   'Drop photo here or click to browse',
     dropHint:   'JPG, PNG, WEBP · max 5 MB',
     mealTypes:  { Breakfast: 'Breakfast', Lunch: 'Lunch', Dinner: 'Dinner', Snack: 'Snack', Other: 'Other' } as Record<string, string>,
@@ -181,7 +184,7 @@ const COPY = {
     correctionTitle: 'Help AQ Buddy correct the estimate',
     correctionLabel: 'What does it contain, and how much will you eat?',
     correctionPlaceholder: 'Example: There are no potatoes. I will eat about 4 oz chicken shawarma, 3 oz shredded beef, and ½ cup Greek rice. The peppers are pepperoncini.',
-    correctionHint: 'Identify what was wrong, list the actual ingredients, and describe your approximate serving.',
+    correctionHint: 'Enter the amounts you will actually eat. They replace the previous percentage; 25%, 50%, or 75% will not be applied again.',
     recalculate: 'Recalculate without another scan',
     recalculating: 'Recalculating…',
     cancelCorrection: 'Cancel',
@@ -399,7 +402,6 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           imageBase64: base64,
           mimeType,
           correction,
-          portionPercent,
           language: lang,
         }),
       })
@@ -417,7 +419,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           'Proteins (g)': data.proteins,
         },
       } : log))
-      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionPercent, corrected: true, correction, result: data } })
+      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionBasis: 'described_serving', corrected: true, correction, result: data } })
       setCorrectionOpen(false)
     } catch {
       setConfirmationError(t.correctionError)
@@ -660,7 +662,9 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             <div className="fs-card fs-result-card">
               <div className="fs-card-title">{t.nutritionTitle}</div>
               <div className="fs-food-name">{result.food}</div>
-              <div className="fs-portion-result">{t.portionResult(result.portionPercent)}</div>
+              <div className="fs-portion-result">
+                {result.portionBasis === 'described_serving' ? t.personalServingResult : t.portionResult(result.portionPercent)}
+              </div>
 
               <div className="fs-calories-row">
                 <div className="fs-calories-num">{result.calories}</div>
