@@ -54,3 +54,14 @@ test('meal type can be corrected on the existing scan without another analysis',
   assert.doesNotMatch(updateBranch, /createMealLog/)
   assert.doesNotMatch(updateBranch, /client\.messages\.create/)
 })
+
+test('meal type can be corrected directly from scan history', async () => {
+  const widget = await readFile(new URL('../app/food-log-widget.tsx', import.meta.url), 'utf8')
+  const scanner = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+
+  assert.match(widget, /onMealTypeChange/)
+  assert.match(widget, /editingMealTypeId/)
+  assert.match(widget, /changeMealType\(log\.id, option\)/)
+  assert.match(scanner, /onMealTypeChange=\{updateSavedMealType\}/)
+  assert.match(scanner, /action: 'update_meal_type'/)
+})
