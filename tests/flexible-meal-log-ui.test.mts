@@ -17,6 +17,9 @@ test('meal analysis requests localized and internally checked estimates', async 
   assert.match(route, /Write the food name and notes in \$\{responseLanguage\}/)
   assert.match(route, /Estimate each named ingredient separately/)
   assert.match(route, /compare calories with the macro totals/)
+  assert.match(route, /isFoodAnalysisConsistent/)
+  assert.match(route, /repairNutritionMath/)
+  assert.match(route, /ingredients array/)
   assert.match(route, /Fuente: \$\{sourceLabel\}/)
 })
 
