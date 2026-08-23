@@ -225,6 +225,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [scanning, setScanning]  = useState(false)
   const [result, setResult]      = useState<ScanResult | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [updatingMealType, setUpdatingMealType] = useState(false)
   const [correctionOpen, setCorrectionOpen] = useState(false)
   const [correction, setCorrection] = useState('')
   const [recalculating, setRecalculating] = useState(false)
@@ -452,6 +453,34 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     }
   }
 
+  async function selectMealType(nextMealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Other') {
+    if (nextMealType === mealType || updatingMealType) return
+    if (!result) {
+      setMealType(nextMealType)
+      return
+    }
+
+    setUpdatingMealType(true)
+    setConfirmationError(null)
+    try {
+      const response = await fetch('/api/food-scan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_meal_type', mealLogId: result.mealLogId, mealType: nextMealType }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'meal_type_update_failed')
+      setMealType(data.mealType)
+      setLogs(current => current.map(log => log.id === result.mealLogId
+        ? { ...log, fields: { ...log.fields, 'Meal Type': data.mealType } }
+        : log))
+    } catch {
+      setConfirmationError(t.confirmationError)
+    } finally {
+      setUpdatingMealType(false)
+    }
+  }
+
   const remaining = Math.min(limit - used, monthlyLimit - monthlyUsed)
   const pct = (val: number, total: number) => total > 0 ? Math.min(100, Math.round((val / total) * 100)) : 0
 
@@ -593,7 +622,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
                 <button
                   key={mt}
                   className={`fs-meal-type-btn ${mealType === mt ? 'active' : ''}`}
-                  onClick={() => setMealType(mt)}
+                  onClick={() => void selectMealType(mt)}
+                  disabled={updatingMealType}
                   type="button"
                 >
                   {t.mealTypes[mt]}
