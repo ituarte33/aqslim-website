@@ -40,3 +40,17 @@ test('photo estimates can be corrected without creating another scan', async () 
   assert.doesNotMatch(correctionBranch, /createMealLog/)
   assert.doesNotMatch(correctionBranch, /applyMealPortion/)
 })
+
+test('meal type can be corrected on the existing scan without another analysis', async () => {
+  const component = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+  const route = await readFile(new URL('../app/api/food-scan/route.ts', import.meta.url), 'utf8')
+  const airtable = await readFile(new URL('../lib/airtable.ts', import.meta.url), 'utf8')
+  assert.match(component, /action: 'update_meal_type'/)
+  assert.match(component, /selectMealType/)
+  assert.match(route, /payload\.action === 'update_meal_type'/)
+  assert.match(route, /updateMealLogMealType/)
+  assert.match(airtable, /export async function updateMealLogMealType/)
+  const updateBranch = route.match(/if \(payload\.action === 'update_meal_type'\)[\s\S]*?\n  }\n\n  if \(payload\.action === 'reanalyze'\)/)?.[0] ?? ''
+  assert.doesNotMatch(updateBranch, /createMealLog/)
+  assert.doesNotMatch(updateBranch, /client\.messages\.create/)
+})
