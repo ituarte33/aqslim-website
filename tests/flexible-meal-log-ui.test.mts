@@ -65,3 +65,11 @@ test('meal type can be corrected directly from scan history', async () => {
   assert.match(scanner, /onMealTypeChange=\{updateSavedMealType\}/)
   assert.match(scanner, /action: 'update_meal_type'/)
 })
+
+test('today view exposes a direct edit button for only the latest meal', async () => {
+  const widget = await readFile(new URL('../app/food-log-widget.tsx', import.meta.url), 'utf8')
+  assert.match(widget, /period === 'today' && index === 0 && onMealTypeChange/)
+  assert.match(widget, /className="flw-row-edit-latest"/)
+  assert.match(widget, /editLatest: 'Editar'/)
+  assert.match(widget, /editLatest: 'Edit'/)
+})
