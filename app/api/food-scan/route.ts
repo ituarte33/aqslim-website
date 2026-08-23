@@ -16,7 +16,7 @@ import {
   foodScanPolicyFor,
 } from '@/lib/food-scan-policy'
 import { getPilotAccess } from '@/lib/pilot-access'
-import { isFoodAnalysisConsistent, parseFoodAnalysis, type FoodAnalysis } from '@/lib/food-analysis'
+import { isFoodAnalysisConsistent, normalizeFoodAnalysisMath, parseFoodAnalysis, type FoodAnalysis } from '@/lib/food-analysis'
 import {
   applyMealPortion,
   parseMealCorrection,
@@ -44,7 +44,9 @@ async function repairNutritionMath(raw: string, language: 'es' | 'en', mealConte
     })
     const repairedRaw = repair.content[0].type === 'text' ? repair.content[0].text.trim() : ''
     const repaired = parseFoodAnalysis(repairedRaw)
-    return repaired && isFoodAnalysisConsistent(repaired) ? repaired : null
+    if (!repaired) return null
+    const normalized = normalizeFoodAnalysisMath(repaired)
+    return normalized && isFoodAnalysisConsistent(normalized) ? normalized : null
   } catch {
     return null
   }
@@ -179,6 +181,7 @@ Write the food name and notes in ${responseLanguage}. All numeric values are non
   const completeMealResult = parsedCompleteMealResult && isFoodAnalysisConsistent(parsedCompleteMealResult)
     ? parsedCompleteMealResult
     : await repairNutritionMath(raw, language, description ?? 'meal shown in the submitted photo')
+      ?? (parsedCompleteMealResult ? normalizeFoodAnalysisMath(parsedCompleteMealResult) : null)
   if (!completeMealResult) {
     const correlationId = crypto.randomUUID()
     console.error('[food-scan] invalid_provider_response', { correlationId })
@@ -298,6 +301,7 @@ export async function PATCH(req: Request) {
     const personalServingResult = parsedPersonalServingResult && isFoodAnalysisConsistent(parsedPersonalServingResult)
       ? parsedPersonalServingResult
       : await repairNutritionMath(raw, language, correction)
+        ?? (parsedPersonalServingResult ? normalizeFoodAnalysisMath(parsedPersonalServingResult) : null)
     if (!personalServingResult) return Response.json({ error: 'analysis_format_invalid' }, { status: 502 })
     const correctionNote = language === 'es'
       ? 'Fuente: fotografía con corrección del usuario. La estimación corresponde directamente a la porción personal descrita.'
