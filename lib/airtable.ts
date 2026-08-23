@@ -1058,6 +1058,22 @@ export async function updateMealLogConsumptionStatus(
   })
 }
 
+export async function updateMealLogMealType(
+  recordId: string,
+  userId: string,
+  mealType: MealType,
+): Promise<MealLog | null> {
+  const record = await getMealLogForUser(recordId, userId)
+  if (!record) return null
+
+  return airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      fields: { [MEAL_LOGS_FIELDS.MEAL_TYPE]: mealType },
+    }),
+  })
+}
+
 export async function updateUnconfirmedMealLogEstimate(
   recordId: string,
   userId: string,
