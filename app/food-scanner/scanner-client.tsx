@@ -182,9 +182,9 @@ const COPY = {
     estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
     correctEstimate: 'Correct ingredients or serving',
     correctionTitle: 'Help AQ Buddy correct the estimate',
-    correctionLabel: 'What does the complete serving contain?',
-    correctionPlaceholder: 'Example: There are no potatoes. The complete plate has chicken shawarma, shredded beef, Greek rice, and pepperoncini.',
-    correctionHint: 'Correct the ingredients or amounts for the complete plate. We will then apply your selected percentage.',
+    correctionLabel: 'What does it contain, and how much will you eat?',
+    correctionPlaceholder: 'Example: There are no potatoes. I will eat about 4 oz chicken shawarma, 3 oz shredded beef, and ½ cup Greek rice. The peppers are pepperoncini.',
+    correctionHint: 'Enter the amounts you will actually eat. They replace the previous percentage; 25%, 50%, or 75% will not be applied again.',
     recalculate: 'Recalculate without another scan',
     recalculating: 'Recalculating…',
     cancelCorrection: 'Cancel',
@@ -403,7 +403,6 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           imageBase64: base64,
           mimeType,
           correction,
-          portionPercent,
           language: lang,
         }),
       })
@@ -421,7 +420,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           'Proteins (g)': data.proteins,
         },
       } : log))
-      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionPercent, portionBasis: 'selected_percentage', corrected: true, correction, result: data } })
+      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionBasis: 'described_serving', corrected: true, correction, result: data } })
       setCorrectionOpen(false)
     } catch {
       setConfirmationError(t.correctionError)

@@ -41,14 +41,13 @@ test('photo estimates can be corrected without creating another scan', async () 
   assert.match(component, /action: 'reanalyze'/)
   assert.match(route, /payload\.action === 'reanalyze'/)
   assert.match(route, /Do not reintroduce an ingredient the member explicitly says is absent/)
-  assert.match(component, /correction,\s*portionPercent,\s*language: lang/)
-  assert.match(route, /application will apply \$\{portionPercent\}%/)
-  assert.match(route, /applyMealPortion\(completeMealResult, portionPercent\)/)
-  assert.match(route, /portionBasis: 'selected_percentage'/)
+  assert.match(route, /do not apply the photo's previously selected plate percentage again/)
+  assert.match(route, /portionBasis: 'described_serving'/)
+  assert.match(component, /personalServingResult/)
   assert.match(airtable, /updateUnconfirmedMealLogEstimate/)
   const correctionBranch = route.match(/if \(payload\.action === 'reanalyze'\)[\s\S]*?\n  }\n\n  if \(/)?.[0] ?? ''
   assert.doesNotMatch(correctionBranch, /createMealLog/)
-  assert.match(correctionBranch, /applyMealPortion/)
+  assert.doesNotMatch(correctionBranch, /applyMealPortion/)
 })
 
 test('meal type can be corrected on the existing scan without another analysis', async () => {
@@ -74,4 +73,12 @@ test('meal type can be corrected directly from scan history', async () => {
   assert.match(widget, /changeMealType\(log\.id, option\)/)
   assert.match(scanner, /onMealTypeChange=\{updateSavedMealType\}/)
   assert.match(scanner, /action: 'update_meal_type'/)
+})
+
+test('today view exposes a direct edit button for only the latest meal', async () => {
+  const widget = await readFile(new URL('../app/food-log-widget.tsx', import.meta.url), 'utf8')
+  assert.match(widget, /period === 'today' && index === 0 && onMealTypeChange/)
+  assert.match(widget, /className="flw-row-edit-latest"/)
+  assert.match(widget, /editLatest: 'Editar'/)
+  assert.match(widget, /editLatest: 'Edit'/)
 })
