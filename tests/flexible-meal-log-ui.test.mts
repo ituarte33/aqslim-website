@@ -12,6 +12,15 @@ test('meal log offers photo, manual description, and portion controls', async ()
   assert.match(component, /inputMode === 'photo'.*imageBase64/s)
 })
 
+test('meal log always provides a route back to My AQSLIM', async () => {
+  const component = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+  const styles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8')
+
+  assert.match(component, /href="\/my-aqslim" className="fs-brand-link"/)
+  assert.match(component, /href="\/my-aqslim" className="fs-nav-link fs-nav-link--home"/)
+  assert.match(styles, /\.fs-nav-link--home\s*\{[\s\S]*?display: inline-flex/)
+})
+
 test('meal analysis requests localized and internally checked estimates', async () => {
   const route = await readFile(new URL('../app/api/food-scan/route.ts', import.meta.url), 'utf8')
   assert.match(route, /Write the food name and notes in \$\{responseLanguage\}/)

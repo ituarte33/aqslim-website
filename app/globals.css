@@ -1313,6 +1313,10 @@ body.aqb-fullscreen-active {
   color: #FAFAF8;
 }
 .fs-logo span { color: #C9A84C; }
+.fs-brand-link {
+  color: inherit;
+  text-decoration: none;
+}
 .fs-header-sub {
   font-size: 15px;
   letter-spacing: 0.28em;
@@ -2326,6 +2330,18 @@ body.aqb-fullscreen-active {
   .fs-header { padding: 0 20px; }
   .fs-header-right { gap: 10px; }
   .fs-nav-link { display: none; }
+  .fs-nav-link--home {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid rgba(201,168,76,0.35);
+    color: var(--gold);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+  .fs-plan-badge { display: none; }
+  .fs-header-sub { font-size: 11px; letter-spacing: 0.18em; }
   .flw-header { flex-direction: column; align-items: flex-start; }
   .flw-summary { gap: 12px; }
   .flw-summary-count { margin-left: 0; }
