@@ -79,7 +79,7 @@ const COPY = {
   es: {
     sub:        'Escáner de AQ Buddy',
     dashboard:  '← Panel',
-    home:       '← Inicio',
+    home:       '← My AQSLIM',
     usage:      (name: string) => `${name ? name + ' · ' : ''}Escaneos de hoy`,
     monthlyUsage: (used: number, limit: number) => `${used} de ${limit} este mes`,
     remaining:  (n: number) => `${n} restante${n !== 1 ? 's' : ''}`,
@@ -115,9 +115,9 @@ const COPY = {
     estimateNotice: 'Valores aproximados para fines informativos. Confirma las porciones e ingredientes para mejorar la estimación.',
     correctEstimate: 'Corregir ingredientes o porción',
     correctionTitle: 'Ayuda a AQ Buddy a corregir la estimación',
-    correctionLabel: '¿Qué contiene y cuánto comerás?',
-    correctionPlaceholder: 'Ejemplo: No hay papas. Comeré aproximadamente 4 oz de pollo shawarma, 3 oz de res desmenuzada y ½ taza de arroz griego. Los chiles son pepperoncini.',
-    correctionHint: 'Escribe las cantidades que realmente comerás. Estas reemplazan el porcentaje anterior; no se volverá a aplicar el 25%, 50% o 75%.',
+    correctionLabel: '¿Qué contiene la porción completa?',
+    correctionPlaceholder: 'Ejemplo: No hay papas. El plato completo tiene pollo shawarma, res desmenuzada, arroz griego y pepperoncini.',
+    correctionHint: 'Corrige los ingredientes o cantidades del plato completo. Después aplicaremos el porcentaje que seleccionaste.',
     recalculate: 'Recalcular sin usar otro escaneo',
     recalculating: 'Recalculando…',
     cancelCorrection: 'Cancelar',
@@ -146,7 +146,7 @@ const COPY = {
   en: {
     sub:        'AQ Buddy Scanner',
     dashboard:  '← Dashboard',
-    home:       '← Home',
+    home:       '← My AQSLIM',
     usage:      (name: string) => `${name ? name + ' · ' : ''}Today's scans`,
     monthlyUsage: (used: number, limit: number) => `${used} of ${limit} this month`,
     remaining:  (n: number) => `${n} remaining`,
@@ -182,9 +182,9 @@ const COPY = {
     estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
     correctEstimate: 'Correct ingredients or serving',
     correctionTitle: 'Help AQ Buddy correct the estimate',
-    correctionLabel: 'What does it contain, and how much will you eat?',
-    correctionPlaceholder: 'Example: There are no potatoes. I will eat about 4 oz chicken shawarma, 3 oz shredded beef, and ½ cup Greek rice. The peppers are pepperoncini.',
-    correctionHint: 'Enter the amounts you will actually eat. They replace the previous percentage; 25%, 50%, or 75% will not be applied again.',
+    correctionLabel: 'What does the complete serving contain?',
+    correctionPlaceholder: 'Example: There are no potatoes. The complete plate has chicken shawarma, shredded beef, Greek rice, and pepperoncini.',
+    correctionHint: 'Correct the ingredients or amounts for the complete plate. We will then apply your selected percentage.',
     recalculate: 'Recalculate without another scan',
     recalculating: 'Recalculating…',
     cancelCorrection: 'Cancel',
@@ -403,6 +403,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           imageBase64: base64,
           mimeType,
           correction,
+          portionPercent,
           language: lang,
         }),
       })
@@ -420,7 +421,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           'Proteins (g)': data.proteins,
         },
       } : log))
-      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionBasis: 'described_serving', corrected: true, correction, result: data } })
+      setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionPercent, portionBasis: 'selected_percentage', corrected: true, correction, result: data } })
       setCorrectionOpen(false)
     } catch {
       setConfirmationError(t.correctionError)
@@ -494,13 +495,13 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       {/* Header */}
       <header className="fs-header">
         <div className="fs-header-inner">
-          <div>
+          <Link href="/my-aqslim" className="fs-brand-link" aria-label={t.home.replace('← ', '')}>
             <div className="fs-logo">AQ<span>SLIM</span></div>
             <div className="fs-header-sub">{t.sub}</div>
-          </div>
+          </Link>
           <div className="fs-header-right">
             <Link href="/dashboard" className="fs-nav-link">{t.dashboard}</Link>
-            <Link href="/" className="fs-nav-link">{t.home}</Link>
+            <Link href="/my-aqslim" className="fs-nav-link fs-nav-link--home">{t.home}</Link>
             <div className="fs-plan-badge">{t.plans[typedPlan]}</div>
           </div>
         </div>
