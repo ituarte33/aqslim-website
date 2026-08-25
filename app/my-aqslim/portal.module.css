@@ -201,6 +201,25 @@
 .phaseSeal span { font-family: 'Playfair Display', serif; font-size: 42px; line-height: 1; }
 .phaseSeal small { margin-top: 5px; color: var(--portal-muted); font-size: 8px; letter-spacing: .13em; }
 
+.mealHub { display: grid; gap: 20px; }
+.mealHub h2 { margin: 0; font-family: 'Playfair Display', serif; font-size: 25px; font-weight: 400; }
+.mealHub > div:first-child > p:last-child { margin: 9px 0 0; color: var(--portal-muted); font-size: 12px; line-height: 1.6; }
+.mealActions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.mealSecondary,
+.mealHistory { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; text-decoration: none; font-size: 11px; font-weight: 600; }
+.mealSecondary { border: 1px solid var(--portal-border); color: var(--portal-text); background: rgba(255,255,255,.025); }
+.mealHistory { grid-column: 1 / -1; gap: 8px; color: var(--portal-gold-light); }
+.mealHistory svg { width: 17px; }
+
+.loadingPulse { animation: portalPulse 1.35s ease-in-out infinite alternate; }
+.loadingLine,
+.loadingBlock { border-radius: 999px; background: rgba(255,255,255,.09); }
+.loadingLine { height: 13px; }
+.loadingLineWide { width: 72%; }
+.loadingLineShort { width: 42%; }
+.loadingBlock { min-height: 180px; border-radius: 18px; }
+@keyframes portalPulse { from { opacity: .42; } to { opacity: .78; } }
+
 .nextStep { display: flex; align-items: flex-start; gap: 16px; }
 .roundIcon {
   flex: 0 0 46px;
@@ -508,6 +527,7 @@
   .planActions { grid-template-columns: 1fr 1fr; }
   .libraryList { grid-template-columns: repeat(2, 1fr); }
   .materialEmpty { grid-column: 1 / -1; }
+  .mealHub { grid-template-columns: 1fr 1.25fr; align-items: center; }
 }
 
 @media (min-width: 980px) {
@@ -551,4 +571,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .progressSummary { transition: none; }
+  .loadingPulse { animation: none; }
 }
