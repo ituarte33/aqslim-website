@@ -54,13 +54,13 @@ test('photo estimates can be corrected without creating another scan', async () 
   assert.match(component, /action: 'reanalyze'/)
   assert.match(route, /payload\.action === 'reanalyze'/)
   assert.match(route, /Do not reintroduce an ingredient the member explicitly says is absent/)
-  assert.match(route, /do not apply the photo's previously selected plate percentage again/)
-  assert.match(route, /portionBasis: 'described_serving'/)
-  assert.match(component, /personalServingResult/)
+  assert.match(route, /Do not apply the member's selected percentage/)
+  assert.match(route, /portionBasis: 'selected_percentage'/)
+  assert.match(component, /portionPercent/)
   assert.match(airtable, /updateUnconfirmedMealLogEstimate/)
   const correctionBranch = route.match(/if \(payload\.action === 'reanalyze'\)[\s\S]*?\n  }\n\n  if \(/)?.[0] ?? ''
   assert.doesNotMatch(correctionBranch, /createMealLog/)
-  assert.doesNotMatch(correctionBranch, /applyMealPortion/)
+  assert.match(correctionBranch, /applyMealPortion/)
 })
 
 test('meal type can be corrected on the existing scan without another analysis', async () => {
