@@ -21,6 +21,19 @@ test('meal log always provides a route back to My AQSLIM', async () => {
   assert.match(styles, /\.fs-nav-link--home\s*\{[\s\S]*?display: inline-flex/)
 })
 
+test('My AQSLIM home links directly to each meal logging path and history', async () => {
+  const home = await readFile(new URL('../app/my-aqslim/home-view.tsx', import.meta.url), 'utf8')
+  const scanner = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+  const loading = await readFile(new URL('../app/my-aqslim/loading.tsx', import.meta.url), 'utf8')
+
+  assert.match(home, /href="\/food-scanner\?mode=photo"/)
+  assert.match(home, /href="\/food-scanner\?mode=description"/)
+  assert.match(home, /href="\/food-scanner#food-history"/)
+  assert.match(scanner, /new URLSearchParams\(window\.location\.search\)\.get\('mode'\)/)
+  assert.match(scanner, /id="food-history"/)
+  assert.match(loading, /aria-busy="true"/)
+})
+
 test('meal analysis requests localized and internally checked estimates', async () => {
   const route = await readFile(new URL('../app/api/food-scan/route.ts', import.meta.url), 'utf8')
   assert.match(route, /Write the food name and notes in \$\{responseLanguage\}/)
