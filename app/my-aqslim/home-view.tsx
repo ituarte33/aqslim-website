@@ -77,6 +77,27 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
         </div>
       </section>
 
+      <section className={`${styles.panel} ${styles.mealHub}`}>
+        <div>
+          <p className={styles.eyebrow}>{es ? 'Tus comidas' : 'Your meals'}</p>
+          <h2>{es ? 'Registra o revisa una comida' : 'Log or review a meal'}</h2>
+          <p>{es
+            ? 'Elige cómo deseas registrar lo que vas a comer.'
+            : 'Choose how you would like to log what you plan to eat.'}</p>
+        </div>
+        <div className={styles.mealActions}>
+          <Link href="/food-scanner?mode=photo" className={styles.goldButton}>
+            {es ? 'Con fotografía' : 'With a photo'}
+          </Link>
+          <Link href="/food-scanner?mode=description" className={styles.mealSecondary}>
+            {es ? 'Sin fotografía' : 'Without a photo'}
+          </Link>
+          <Link href="/food-scanner#food-history" className={styles.mealHistory}>
+            {es ? 'Ver historial' : 'View history'} <ChevronIcon />
+          </Link>
+        </div>
+      </section>
+
       <section className={styles.panel}>
         <p className={styles.eyebrow}>{es ? 'Tu próximo paso' : 'Your next step'}</p>
         <div className={styles.nextStep}>
