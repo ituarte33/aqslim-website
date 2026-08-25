@@ -95,6 +95,17 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
           <Link href="/food-scanner#food-history" className={styles.mealHistory}>
             {es ? 'Ver historial' : 'View history'} <ChevronIcon />
           </Link>
+          <div className={styles.mealExplore}>
+            <p>{es ? 'Explora antes de elegir' : 'Explore before choosing'}</p>
+            <Link href="/my-aqslim/pilot/restaurant" className={styles.mealExploreLink}>
+              <span>{es ? '¿Qué puedo comer aquí?' : 'What can I eat here?'}</span>
+              <ChevronIcon />
+            </Link>
+            <Link href="/my-aqslim/pilot/fridge" className={styles.mealExploreLink}>
+              <span>{es ? 'Recetas de mi refrigerador' : 'Recipes from my refrigerator'}</span>
+              <ChevronIcon />
+            </Link>
+          </div>
         </div>
       </section>
 
