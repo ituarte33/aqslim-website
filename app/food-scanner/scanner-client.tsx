@@ -238,6 +238,17 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [monthlyLimit, setMonthlyLimit] = useState(30)
   const [logs, setLogs]          = useState<LogEntry[]>([])
   const [logToday, setLogToday]  = useState('')
+
+  useEffect(() => {
+    const requestedMode = new URLSearchParams(window.location.search).get('mode')
+    if (requestedMode === 'description') setInputMode('description')
+    if (requestedMode === 'photo') setInputMode('photo')
+  }, [])
+
+  useEffect(() => {
+    if (!logToday || window.location.hash !== '#food-history') return
+    requestAnimationFrame(() => document.getElementById('food-history')?.scrollIntoView({ behavior: 'smooth' }))
+  }, [logToday])
   const [logWeekStart, setLogWeekStart]   = useState('')
   const [logMonthStart, setLogMonthStart] = useState('')
   const [dragging, setDragging]  = useState(false)
@@ -804,7 +815,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
         {/* Meal log with period tabs */}
         {logToday && (
-          <div className="fs-log-section">
+          <div className="fs-log-section" id="food-history">
             <FoodLogWidget
               logs={logs}
               today={logToday}
