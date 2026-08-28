@@ -34,7 +34,7 @@ test('the real client plan route remains connected to its existing portal data',
   assert.doesNotMatch(route, /nutrition\/preview|buildSyntheticGuidedPlan/)
 })
 
-test('the Dashboard Preview is admin-only and has no persistence path', async () => {
+test('the Dashboard Preview is admin-only, review-first, and has no persistence path', async () => {
   const [page, client, shell] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
