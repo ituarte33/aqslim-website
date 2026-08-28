@@ -7,8 +7,14 @@ import {
 } from './fixtures'
 
 export function buildSyntheticGuidedPlan() {
+  return buildSyntheticPersonalizationPlan(SYNTHETIC_GUIDED_PROFILE.id)
+}
+
+export function buildSyntheticPersonalizationPlan(profileId?: string) {
+  const profile = SYNTHETIC_PERSONALIZATION_PROFILES.find(item => item.id === profileId)
+    ?? SYNTHETIC_GUIDED_PROFILE
   return buildGuidedPlan({
-    profile: SYNTHETIC_GUIDED_PROFILE,
+    profile,
     recipes: JING_RECIPE_VARIANTS,
     components: JING_COMPLETION_COMPONENTS,
   })

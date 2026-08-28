@@ -48,7 +48,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
             ? 'Elige lo que se te antoje. AQ Buddy ya revisó las combinaciones por ti.'
             : 'Choose what sounds good. AQ Buddy already checked the combinations for you.'}</p>
         </div>
-        <span className={styles.syntheticBadge}>{es ? 'Preview sintético' : 'Synthetic Preview'}</span>
+        <span className={styles.syntheticBadge}>{es ? `Preview sintético · ${plan.profile.firstName}` : `Synthetic Preview · ${plan.profile.firstName}`}</span>
       </section>
 
       <section className={`${styles.panel} ${styles.guidedPhase}`}>

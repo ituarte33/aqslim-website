@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { GuidedPlan, MealSlot } from '@/lib/nutrition/types'
 import { DashboardShell } from '../dashboard-shell'
 import styles from './plan-preview.module.css'
@@ -69,6 +69,18 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
   const generationPassed = plan.status === 'ready_for_review'
   const coverageGap = plan.groups.find(group => group.options.length < 3)
 
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.history.scrollRestoration = previousScrollRestoration
+    }
+  }, [])
+
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang}>
       <div className={styles.page}>
@@ -82,7 +94,20 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
           </div>
           <div className={styles.headerActions}>
             <span className={styles.syntheticBadge}>{es ? 'Datos sintéticos' : 'Synthetic data'}</span>
-            <Link href="/my-aqslim/demo/plan" className={styles.previewLink}>{es ? 'Abrir vista del cliente ↗' : 'Open client view ↗'}</Link>
+            {generationPassed ? (
+              <Link
+                href={{ pathname: '/my-aqslim/demo/plan', query: { profile: plan.profile.id } }}
+                className={styles.previewLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {es ? `Abrir vista de ${plan.profile.firstName} ↗` : `Open ${plan.profile.firstName}’s view ↗`}
+              </Link>
+            ) : (
+              <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
+                {es ? `Vista de ${plan.profile.firstName} no disponible` : `${plan.profile.firstName}’s view unavailable`}
+              </span>
+            )}
           </div>
         </header>
 
