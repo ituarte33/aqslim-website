@@ -51,4 +51,5 @@ test('the guided plan keeps headings clear and cards readable on narrow screens'
   assert.match(styles, /\.choiceSection \{[^}]*padding-top: 6px;[^}]*scroll-margin-top: 170px;/)
   assert.match(styles, /@media \(max-width: 760px\) \{[\s\S]*?\.choiceList \{ grid-template-columns: 1fr; \}/)
   assert.match(styles, /\.choiceCard \{ grid-template-columns: 45px 1fr; \}/)
+  assert.match(styles, /\.mealTabs \{[^}]*position: static;[^}]*height: auto;[^}]*padding: 0;[^}]*background: transparent;/)
 })
