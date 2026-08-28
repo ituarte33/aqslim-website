@@ -26,6 +26,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const [activeSlot, setActiveSlot] = useState<MealSlot>(plan.groups[0]?.slot ?? 'lunch')
   const [selected, setSelected] = useState<Partial<Record<MealSlot, string>>>({})
   const es = language === 'es'
+  const shellFirstName = demo ? (es ? 'Vista de ejemplo' : 'Example view') : data.firstName
   const group = plan.groups.find(item => item.slot === activeSlot) ?? plan.groups[0]
   const chosenCount = Object.keys(selected).length
   const guidePath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
@@ -38,7 +39,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   }
 
   return (
-    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={shellFirstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
       <section className={styles.guidedIntro}>
         <div>
           <p className={styles.eyebrow}>{es ? 'Libertad guiada' : 'Guided freedom'}</p>
@@ -127,7 +128,6 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
             : 'If you do not want a recipe today, use your guide. You can then log your meal by photo or text.'}</p>
         </div>
         <Link href={guidePath} className={styles.goldButton}>{es ? 'Quiero decidir con mi lista' : 'Choose from my list'}</Link>
-        <span className={styles.previewOnlyAction}>{es ? 'Registrar otra comida · disponible al conectar Preview' : 'Log another meal · available after Preview connection'}</span>
       </section>
 
       <details className={styles.guidedDetails}>
