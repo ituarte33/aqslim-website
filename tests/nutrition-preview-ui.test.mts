@@ -15,7 +15,10 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
     readFile(CLIENT_VIEW, 'utf8'),
     readFile(CLIENT_DEMO, 'utf8'),
   ])
-  assert.match(demo, /buildSyntheticGuidedPlan/)
+  assert.match(demo, /buildSyntheticPersonalizationPlan/)
+  assert.match(demo, /searchParams/)
+  assert.match(demo, /plan\.status !== 'ready_for_review'/)
+  assert.match(demo, /firstName: plan\.profile\.firstName/)
   assert.match(demo, /process\.env\.VERCEL_ENV === 'preview'/)
   assert.match(demo, /!isVercelPreview && await getRole\(\) !== 'admin'/)
   assert.doesNotMatch(demo, /airtable/i)
@@ -26,6 +29,7 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.match(view, /aqslim_buddy_open_arms\.png/)
   assert.doesNotMatch(view, /Snack/)
   assert.match(view, /Vista de ejemplo/)
+  assert.match(view, /Preview sintético · \$\{plan\.profile\.firstName\}/)
   assert.doesNotMatch(view, /disponible al conectar Preview|available after Preview connection/)
 })
 
@@ -58,6 +62,11 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /Exclusión estricta/)
   assert.match(client, /AQ Buddy no improvisó un plan/)
   assert.match(client, /generación detenida/)
+  assert.match(client, /window\.history\.scrollRestoration = 'manual'/)
+  assert.match(client, /window\.scrollTo\(\{ top: 0, left: 0, behavior: 'auto' \}\)/)
+  assert.match(client, /query: \{ profile: plan\.profile\.id \}/)
+  assert.match(client, /target="_blank"/)
+  assert.match(client, /Vista de \$\{plan\.profile\.firstName\} no disponible/)
   assert.match(shell, /es: 'Clientes', en: 'Clients'/)
   assert.doesNotMatch(client, /Constructor de planes/)
 })
