@@ -17,7 +17,7 @@ const NAV = [
   { href: '/dashboard', exact: true, es: 'Resumen', en: 'Overview' },
   { href: '/dashboard/appointments', exact: false, es: 'Citas', en: 'Appointments' },
   { href: '/dashboard/finances', exact: false, es: 'Finanzas', en: 'Finances' },
-  { href: '/dashboard/patients', exact: false, es: 'Pacientes', en: 'Patients' },
+  { href: '/dashboard/patients', exact: false, es: 'Clientes', en: 'Clients' },
   { href: '/dashboard/plan-preview', exact: false, es: 'Planes Preview', en: 'Plan Preview' },
   { href: '/dashboard/pilot-feedback', exact: false, es: 'Reportes', en: 'Reports' },
   { href: '/food-scanner', exact: false, es: '🍽 Mis Comidas', en: '🍽 My Meals' },

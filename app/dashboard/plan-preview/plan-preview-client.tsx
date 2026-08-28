@@ -33,10 +33,10 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
         <header className={styles.intro}>
           <div>
             <div className={styles.kicker}>{es ? 'MYAQ-001-REC-001 · Preview aislado' : 'MYAQ-001-REC-001 · Isolated Preview'}</div>
-            <h1>{es ? 'Constructor de planes' : 'Plan builder'}</h1>
+            <h1>{es ? 'Revisión de planes personalizados' : 'Personalized plan review'}</h1>
             <p>{es
-              ? 'Revisión humana de libertad guiada. Todos los datos de esta pantalla son sintéticos.'
-              : 'Human review for guided freedom. All data on this screen is synthetic.'}</p>
+              ? 'AQ Buddy genera las opciones automáticamente; aquí revisas las excepciones antes de publicar. Todos los datos son sintéticos.'
+              : 'AQ Buddy generates the choices automatically; review exceptions here before publishing. All data is synthetic.'}</p>
           </div>
           <div className={styles.headerActions}>
             <span className={styles.syntheticBadge}>{es ? 'Datos sintéticos' : 'Synthetic data'}</span>
@@ -51,9 +51,9 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
             <small>{plan.profile.phase} · {plan.profile.mealSlots.length} {es ? 'comidas' : 'meals'} · {plan.profile.calorieTarget.toLocaleString()} kcal</small>
           </article>
           <article>
-            <span>{es ? 'Biblioteca activa' : 'Active library'}</span>
+            <span>{es ? 'Biblioteca piloto' : 'Pilot library'}</span>
             <strong>{recipeVariantCount}</strong>
-            <small>{es ? 'variantes calculadas' : 'calculated variants'}</small>
+            <small>{es ? 'variantes piloto calculadas' : 'calculated pilot variants'}</small>
           </article>
           <article>
             <span>{es ? 'Componentes' : 'Components'}</span>
@@ -107,16 +107,28 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
 
           <aside className={styles.inspector}>
             <div className={styles.statusCard}>
-              <span className={styles.statusDot} />
-              <div>
-                <small>{es ? 'Estado del plan' : 'Plan status'}</small>
-                <strong>{es ? 'Listo para revisión humana' : 'Ready for human review'}</strong>
+              <div className={styles.statusItem}>
+                <span className={styles.statusDot} />
+                <div>
+                  <small>{es ? 'Validación automática' : 'Automated validation'}</small>
+                  <strong>{es ? `Aprobada · ${combinationCount}/${combinationCount} combinaciones` : `Passed · ${combinationCount}/${combinationCount} combinations`}</strong>
+                </div>
+              </div>
+              <div className={styles.statusDivider} />
+              <div className={styles.statusItem}>
+                <span className={`${styles.statusDot} ${styles.reviewDot}`} />
+                <div>
+                  <small>{es ? 'Publicación' : 'Publishing'}</small>
+                  <strong className={styles.reviewStatus}>{es ? 'Pendiente de revisión humana' : 'Pending human review'}</strong>
+                </div>
               </div>
             </div>
 
             <section>
               <span>{es ? 'Sobre de compatibilidad' : 'Compatibility envelope'}</span>
-              <h2>{plan.envelope.passes ? (es ? 'Todas pasan' : 'All pass') : (es ? 'Requiere ajustes' : 'Needs changes')}</h2>
+              <h2>{plan.envelope.passes
+                ? (es ? `${combinationCount} de ${combinationCount} combinaciones compatibles` : `${combinationCount} of ${combinationCount} compatible combinations`)
+                : (es ? 'Requiere ajustes' : 'Needs changes')}</h2>
               <dl>
                 <div><dt>{es ? 'Energía posible' : 'Possible energy'}</dt><dd>{plan.envelope.minCalories}–{plan.envelope.maxCalories} kcal</dd></div>
                 <div><dt>{es ? 'Rango permitido' : 'Allowed range'}</dt><dd>{plan.envelope.calorieFloor}–{plan.envelope.calorieCeiling} kcal</dd></div>

@@ -8,6 +8,7 @@ const CLIENT_DEMO = new URL('../app/my-aqslim/demo/plan/page.tsx', import.meta.u
 const REAL_PLAN = new URL('../app/my-aqslim/plan/page.tsx', import.meta.url)
 const DASHBOARD_PAGE = new URL('../app/dashboard/plan-preview/page.tsx', import.meta.url)
 const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-client.tsx', import.meta.url)
+const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
 
 test('the client demo uses only the deterministic synthetic plan', async () => {
   const [view, demo] = await Promise.all([
@@ -28,15 +29,16 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.doesNotMatch(view, /disponible al conectar Preview|available after Preview connection/)
 })
 
-test('the real patient plan route remains connected to its existing portal data', async () => {
+test('the real client plan route remains connected to its existing portal data', async () => {
   const route = await readFile(REAL_PLAN, 'utf8')
   assert.doesNotMatch(route, /nutrition\/preview|buildSyntheticGuidedPlan/)
 })
 
 test('the Dashboard Preview is admin-only and has no persistence path', async () => {
-  const [page, client] = await Promise.all([
+  const [page, client, shell] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
+    readFile(DASHBOARD_SHELL, 'utf8'),
   ])
   assert.match(page, /actor\.role !== 'admin'/)
   assert.match(page, /buildSyntheticGuidedPlan/)
@@ -44,8 +46,15 @@ test('the Dashboard Preview is admin-only and has no persistence path', async ()
   assert.match(client, /disabled>.*Guardar borrador/)
   assert.match(client, /disabled>.*Aprobar y publicar/)
   assert.doesNotMatch(client, /fetch\(|createRecord|updateRecord|from ['\"]@\/lib\/airtable/)
+  assert.match(client, /Revisión de planes personalizados/)
+  assert.match(client, /AQ Buddy genera las opciones automáticamente/)
+  assert.match(client, /Biblioteca piloto/)
+  assert.match(client, /Validación automática/)
+  assert.match(client, /Pendiente de revisión humana/)
+  assert.match(client, /combinaciones compatibles/)
+  assert.match(shell, /es: 'Clientes', en: 'Clients'/)
+  assert.doesNotMatch(client, /Constructor de planes/)
 })
-
 
 test('the guided plan keeps headings clear and cards readable on narrow screens', async () => {
   const styles = await readFile(PORTAL_STYLES, 'utf8')
