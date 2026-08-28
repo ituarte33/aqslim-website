@@ -15,7 +15,8 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
     readFile(CLIENT_DEMO, 'utf8'),
   ])
   assert.match(demo, /buildSyntheticGuidedPlan/)
-  assert.match(demo, /getRole\(\).*admin/)
+  assert.match(demo, /process\.env\.VERCEL_ENV === 'preview'/)
+  assert.match(demo, /!isVercelPreview && await getRole\(\) !== 'admin'/)
   assert.doesNotMatch(demo, /airtable/i)
   assert.match(view, /plan\.groups\.map/)
   assert.match(view, /¿Qué se te antoja\?/)
