@@ -9,6 +9,7 @@ import {
   JING_COMPLETION_COMPONENTS,
   JING_RECIPE_VARIANTS,
   SYNTHETIC_GUIDED_PROFILE,
+  SYNTHETIC_PERSONALIZATION_PROFILES,
 } from '../lib/nutrition/fixtures.ts'
 import type { NutritionProfile } from '../lib/nutrition/types.ts'
 import { planContainsBlockedFood, validateEveryCombination } from '../lib/nutrition/validation.ts'
@@ -82,6 +83,29 @@ test('the approved synthetic target matrix is deterministic', () => {
     assert.equal(plan.status, item.expected, `${item.calories} kcal`)
     if (item.expected === 'ready_for_review') assert.deepEqual(validateEveryCombination(plan), [])
   }
+})
+
+test('the automatic personalization proof changes safely across four synthetic profiles', () => {
+  const plans = SYNTHETIC_PERSONALIZATION_PROFILES.map(build)
+  assert.deepEqual(
+    plans.map(plan => [plan.profile.firstName, plan.profile.calorieTarget, plan.profile.mealSlots.length, plan.status]),
+    [
+      ['Elena', 1_400, 3, 'ready_for_review'],
+      ['Rom', 1_600, 2, 'ready_for_review'],
+      ['Sofía', 1_800, 3, 'ready_for_review'],
+      ['Marco', 2_000, 2, 'blocked_high_target'],
+    ],
+  )
+
+  const dairyFreePlan = plans.find(plan => plan.profile.firstName === 'Sofía')
+  assert.ok(dairyFreePlan)
+  assert.equal(planContainsBlockedFood(dairyFreePlan, 'dairy'), false)
+  assert.equal(planContainsBlockedFood(dairyFreePlan, 'oaxaca cheese'), false)
+
+  const blockedPlan = plans.find(plan => plan.profile.firstName === 'Marco')
+  assert.ok(blockedPlan)
+  assert.equal(blockedPlan.groups.length, 0)
+  assert.equal(blockedPlan.envelope.passes, false)
 })
 
 test('the Preview supports exactly two or three actual meals without forcing a snack', () => {

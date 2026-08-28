@@ -12,20 +12,62 @@ const SLOT_LABEL: Record<MealSlot, { es: string; en: string }> = {
   dinner: { es: 'Cena', en: 'Dinner' },
 }
 
+const FOOD_LABEL: Record<string, { es: string; en: string }> = {
+  chicken: { es: 'pollo', en: 'chicken' },
+  dairy: { es: 'lácteos', en: 'dairy' },
+  egg: { es: 'huevo', en: 'egg' },
+  fish: { es: 'pescado', en: 'fish' },
+  'ground beef': { es: 'carne molida', en: 'ground beef' },
+  nopales: { es: 'nopales', en: 'nopales' },
+  pork: { es: 'cerdo', en: 'pork' },
+  sirloin: { es: 'bistec', en: 'steak' },
+  spinach: { es: 'espinaca', en: 'spinach' },
+  tilapia: { es: 'tilapia', en: 'tilapia' },
+}
+
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
-  plan: GuidedPlan
+  plans: readonly GuidedPlan[]
   recipeVariantCount: number
   componentCount: number
 }
 
-export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCount }: Props) {
+function foodList(values: readonly string[], lang: 'es' | 'en') {
+  return values.map(value => FOOD_LABEL[value]?.[lang] ?? value).join(', ')
+}
+
+function blockedMessage(status: GuidedPlan['status'], es: boolean) {
+  if (status === 'blocked_high_target') {
+    return es
+      ? 'La biblioteca piloto todavía no cubre automáticamente una meta de 2,000 kcal. AQ Buddy detuvo la generación para revisión humana.'
+      : 'The pilot library does not yet cover a 2,000 kcal target automatically. AQ Buddy stopped generation for human review.'
+  }
+  if (status === 'blocked_profile') {
+    return es
+      ? 'Este perfil está fuera de la cobertura autorizada para la prueba y requiere revisión humana.'
+      : 'This profile is outside the authorized test coverage and requires human review.'
+  }
+  return es
+    ? 'La biblioteca actual no tiene suficientes opciones compatibles para completar este perfil.'
+    : 'The current library does not have enough compatible choices to complete this profile.'
+}
+
+export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
+  const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
   const es = lang === 'es'
+  const plan = useMemo(
+    () => plans.find(item => item.profile.id === selectedProfileId) ?? plans[0],
+    [plans, selectedProfileId],
+  )
   const combinationCount = useMemo(
-    () => plan.groups.reduce((total, group) => total * group.options.length, 1),
+    () => plan.groups.length > 0
+      ? plan.groups.reduce((total, group) => total * group.options.length, 1)
+      : 0,
     [plan.groups],
   )
+  const generationPassed = plan.status === 'ready_for_review'
+  const coverageGap = plan.groups.find(group => group.options.length < 3)
 
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang}>
@@ -43,6 +85,43 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
             <Link href="/my-aqslim/demo/plan" className={styles.previewLink}>{es ? 'Abrir vista del cliente ↗' : 'Open client view ↗'}</Link>
           </div>
         </header>
+
+        <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
+          <div className={styles.profilePickerIntro}>
+            <div>
+              <span>{es ? 'Prueba de personalización automática v0.1' : 'Automatic personalization test v0.1'}</span>
+              <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
+            </div>
+            <p>{es
+              ? 'Estos perfiles ficticios comprueban que fase, número de comidas, gustos y exclusiones cambian el resultado sin armar cada plan a mano.'
+              : 'These fictional profiles verify that phase, meal count, preferences, and exclusions change the result without building every plan by hand.'}</p>
+          </div>
+          <div className={styles.profileOptions}>
+            {plans.map(item => {
+              const active = item.profile.id === plan.profile.id
+              const ready = item.status === 'ready_for_review'
+              return (
+                <button
+                  key={item.profile.id}
+                  type="button"
+                  className={active ? styles.profileOptionActive : undefined}
+                  aria-pressed={active}
+                  onClick={() => setSelectedProfileId(item.profile.id)}
+                >
+                  <span className={ready ? styles.profileReady : styles.profileBlocked} />
+                  <strong>{item.profile.firstName}</strong>
+                  <small>{item.profile.calorieTarget.toLocaleString()} kcal · {item.profile.mealSlots.length} {es ? 'comidas' : 'meals'}</small>
+                  <b>{ready ? (es ? 'Generado' : 'Generated') : (es ? 'Detenido' : 'Stopped')}</b>
+                </button>
+              )
+            })}
+          </div>
+          <dl className={styles.profileSignals}>
+            <div><dt>{es ? 'Prioriza' : 'Prioritizes'}</dt><dd>{foodList(plan.profile.preferredFoods, lang)}</dd></div>
+            <div><dt>{es ? 'No le gusta' : 'Dislikes'}</dt><dd>{plan.profile.dislikedFoods.length > 0 ? foodList(plan.profile.dislikedFoods, lang) : (es ? 'Sin dislikes' : 'No dislikes')}</dd></div>
+            <div><dt>{es ? 'Exclusión estricta' : 'Hard exclusion'}</dt><dd>{plan.profile.excludedFoods.length > 0 ? foodList(plan.profile.excludedFoods, lang) : (es ? 'Ninguna' : 'None')}</dd></div>
+          </dl>
+        </section>
 
         <section className={styles.summaryGrid}>
           <article className={styles.profileCard}>
@@ -63,13 +142,13 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
           <article>
             <span>{es ? 'Combinaciones diarias' : 'Daily combinations'}</span>
             <strong>{combinationCount}</strong>
-            <small>{es ? 'todas validadas' : 'all validated'}</small>
+            <small>{generationPassed ? (es ? 'compatibles automáticamente' : 'automatically compatible') : (es ? 'generación detenida' : 'generation stopped')}</small>
           </article>
         </section>
 
         <div className={styles.workspace}>
           <main className={styles.groups}>
-            {plan.groups.map(group => (
+            {plan.groups.length > 0 ? plan.groups.map(group => (
               <section key={group.slot} className={styles.groupCard}>
                 <header>
                   <div>
@@ -102,16 +181,29 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
                   ))}
                 </div>
               </section>
-            ))}
+            )) : (
+              <section className={styles.blockedPanel}>
+                <span>{es ? 'Revisión requerida' : 'Review required'}</span>
+                <h2>{es ? 'AQ Buddy no improvisó un plan' : 'AQ Buddy did not improvise a plan'}</h2>
+                <p>{blockedMessage(plan.status, es)}</p>
+                <ul>
+                  <li>{es ? 'No se mostraron recetas incompatibles.' : 'No incompatible recipes were shown.'}</li>
+                  <li>{es ? 'No se aumentaron porciones fuera de las reglas.' : 'Portions were not increased beyond the rules.'}</li>
+                  <li>{es ? 'La publicación permanece desactivada.' : 'Publishing remains disabled.'}</li>
+                </ul>
+              </section>
+            )}
           </main>
 
           <aside className={styles.inspector}>
-            <div className={styles.statusCard}>
+            <div className={`${styles.statusCard} ${generationPassed ? '' : styles.blockedStatusCard}`}>
               <div className={styles.statusItem}>
-                <span className={styles.statusDot} />
+                <span className={`${styles.statusDot} ${generationPassed ? '' : styles.stopDot}`} />
                 <div>
                   <small>{es ? 'Validación automática' : 'Automated validation'}</small>
-                  <strong>{es ? `Aprobada · ${combinationCount}/${combinationCount} combinaciones` : `Passed · ${combinationCount}/${combinationCount} combinations`}</strong>
+                  <strong>{generationPassed
+                    ? (es ? `Aprobada · ${combinationCount}/${combinationCount} combinaciones` : `Passed · ${combinationCount}/${combinationCount} combinations`)
+                    : (es ? 'Detenida por regla de cobertura' : 'Stopped by coverage rule')}</strong>
                 </div>
               </div>
               <div className={styles.statusDivider} />
@@ -119,20 +211,30 @@ export function PlanPreviewClient({ user, plan, recipeVariantCount, componentCou
                 <span className={`${styles.statusDot} ${styles.reviewDot}`} />
                 <div>
                   <small>{es ? 'Publicación' : 'Publishing'}</small>
-                  <strong className={styles.reviewStatus}>{es ? 'Pendiente de revisión humana' : 'Pending human review'}</strong>
+                  <strong className={styles.reviewStatus}>{generationPassed
+                    ? (es ? 'Pendiente de revisión humana' : 'Pending human review')
+                    : (es ? 'No disponible' : 'Unavailable')}</strong>
                 </div>
               </div>
             </div>
+
+            {coverageGap ? (
+              <div className={styles.coverageNote}>
+                <span>{es ? 'Cobertura piloto' : 'Pilot coverage'}</span>
+                <strong>{SLOT_LABEL[coverageGap.slot][lang]}: {coverageGap.options.length}/3 {es ? 'opciones' : 'choices'}</strong>
+                <p>{es ? 'La prueba muestra la limitación; no inventa una tercera opción.' : 'The test shows the limitation; it does not invent a third choice.'}</p>
+              </div>
+            ) : null}
 
             <section>
               <span>{es ? 'Sobre de compatibilidad' : 'Compatibility envelope'}</span>
               <h2>{plan.envelope.passes
                 ? (es ? `${combinationCount} de ${combinationCount} combinaciones compatibles` : `${combinationCount} of ${combinationCount} compatible combinations`)
-                : (es ? 'Requiere ajustes' : 'Needs changes')}</h2>
+                : (es ? 'Generación detenida' : 'Generation stopped')}</h2>
               <dl>
-                <div><dt>{es ? 'Energía posible' : 'Possible energy'}</dt><dd>{plan.envelope.minCalories}–{plan.envelope.maxCalories} kcal</dd></div>
+                <div><dt>{es ? 'Energía posible' : 'Possible energy'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal` : '—'}</dd></div>
                 <div><dt>{es ? 'Rango permitido' : 'Allowed range'}</dt><dd>{plan.envelope.calorieFloor}–{plan.envelope.calorieCeiling} kcal</dd></div>
-                <div><dt>{es ? 'Máximo de carbos' : 'Maximum carbs'}</dt><dd>{plan.envelope.maxNetCarbsG}/{plan.envelope.carbCeilingG} g</dd></div>
+                <div><dt>{es ? 'Máximo de carbos' : 'Maximum carbs'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.maxNetCarbsG}/${plan.envelope.carbCeilingG} g` : `—/${plan.envelope.carbCeilingG} g`}</dd></div>
               </dl>
             </section>
 

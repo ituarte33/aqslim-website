@@ -279,3 +279,43 @@ export const SYNTHETIC_GUIDED_PROFILE: NutritionProfile = {
   excludedFoods: [],
   safetyReviewRequired: false,
 }
+
+export const SYNTHETIC_PERSONALIZATION_PROFILES: readonly NutritionProfile[] = [
+  {
+    id: 'SYN-JING-ELENA-1400',
+    firstName: 'Elena',
+    language: 'es',
+    phase: 'Jing',
+    calorieTarget: 1_400,
+    mealSlots: ['first_meal', 'lunch', 'dinner'],
+    preferredFoods: ['egg', 'tilapia', 'spinach'],
+    dislikedFoods: ['pork'],
+    excludedFoods: [],
+    safetyReviewRequired: false,
+  },
+  SYNTHETIC_GUIDED_PROFILE,
+  {
+    id: 'SYN-JING-SOFIA-1800',
+    firstName: 'Sofía',
+    language: 'es',
+    phase: 'Jing',
+    calorieTarget: 1_800,
+    mealSlots: ['first_meal', 'lunch', 'dinner'],
+    preferredFoods: ['chicken', 'tilapia', 'spinach'],
+    dislikedFoods: ['pork'],
+    excludedFoods: ['dairy'],
+    safetyReviewRequired: false,
+  },
+  {
+    id: 'SYN-JING-MARCO-2000',
+    firstName: 'Marco',
+    language: 'es',
+    phase: 'Jing',
+    calorieTarget: 2_000,
+    mealSlots: ['lunch', 'dinner'],
+    preferredFoods: ['chicken', 'sirloin'],
+    dislikedFoods: ['fish'],
+    excludedFoods: [],
+    safetyReviewRequired: false,
+  },
+]
