@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   PILOT_COHORT_ID,
+  PLANNED_PILOT_FEATURES,
   pilotAccessFromFast36Enrollment,
   pilotAccessFromMetadata,
   pilotHasFeature,
@@ -46,6 +47,8 @@ test('active pilot features are always available to an enrolled participant', ()
   assert.equal(pilotHasFeature(access, 'fridge_recipes'), true)
   assert.equal(pilotHasFeature(access, 'weekly_summary'), true)
   assert.equal(access.enabledFeatures.has('unknown_feature' as never), false)
+  assert.equal(pilotHasFeature(access, 'guided_meal_plan'), false)
+  assert.deepEqual(PLANNED_PILOT_FEATURES, ['guided_meal_plan'])
 })
 
 test('the linked patient name takes precedence over the Clerk profile name', () => {
