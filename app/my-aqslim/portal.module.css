@@ -670,6 +670,10 @@
   .demoBanner { min-height: 50px; align-items: flex-start; flex-direction: column; gap: 2px; }
 }
 
+@media (max-width: 760px) {
+  .choiceList { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 600px) {
   .topbar { height: 66px; }
   .main { padding-top: 28px; padding-bottom: 70px; }

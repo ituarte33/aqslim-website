@@ -2,7 +2,8 @@
 
 import Image from 'next/image'
 import { useEffect } from 'react'
-import type { LocalizedText, PlateOption, PortionBand } from '@/lib/nutrition/types'
+import type { PlateOption } from '@/lib/nutrition/types'
+import { RECIPE_DETAILS, type RecipeAllergen } from './recipe-detail-data'
 import styles from './recipe-detail-dialog.module.css'
 
 type Language = 'es' | 'en'
@@ -14,43 +15,28 @@ type Props = {
   onClose: () => void
 }
 
-const text = (es: string, en: string): LocalizedText => ({ es, en })
-
-const INGREDIENTS: Record<PortionBand, readonly LocalizedText[]> = {
-  L: [
-    text('1½ palmas de filete de tilapia', '1½ palms tilapia fillet'),
-    text('3 tazas de espinaca fresca', '3 cups fresh spinach'),
-    text('2 cucharaditas de aceite de oliva', '2 teaspoons olive oil'),
-    text('Ajo, sal, pimienta y limón al gusto', 'Garlic, salt, pepper, and lemon to taste'),
-  ],
-  E: [
-    text('2 palmas de filete de tilapia', '2 palms tilapia fillet'),
-    text('3 tazas de espinaca fresca', '3 cups fresh spinach'),
-    text('2 cucharadas de aceite de oliva', '2 tablespoons olive oil'),
-    text('Ajo, sal, pimienta y limón al gusto', 'Garlic, salt, pepper, and lemon to taste'),
-  ],
-  M: [
-    text('3 palmas de filete de tilapia', '3 palms tilapia fillet'),
-    text('3 tazas de espinaca fresca', '3 cups fresh spinach'),
-    text('2 cucharadas de aceite de oliva', '2 tablespoons olive oil'),
-    text('Ajo, sal, pimienta y limón al gusto', 'Garlic, salt, pepper, and lemon to taste'),
-  ],
+const ALLERGEN_LABEL: Record<RecipeAllergen, { es: string; en: string }> = {
+  dairy: { es: 'lácteos', en: 'dairy' },
+  egg: { es: 'huevo', en: 'egg' },
+  fish: { es: 'pescado', en: 'fish' },
 }
 
-const STEPS = [
-  text('Seca la tilapia y sazónala con ajo, sal, pimienta y unas gotas de limón.', 'Pat the tilapia dry and season it with garlic, salt, pepper, and a few drops of lemon.'),
-  text('Calienta la mitad del aceite en un sartén a fuego medio.', 'Heat half of the oil in a skillet over medium heat.'),
-  text('Cocina la tilapia de 3 a 4 minutos por lado, hasta que se desmenuce fácilmente.', 'Cook the tilapia for 3 to 4 minutes per side, until it flakes easily.'),
-  text('Retira el pescado. Agrega el resto del aceite y cocina la espinaca de 2 a 3 minutos.', 'Remove the fish. Add the remaining oil and cook the spinach for 2 to 3 minutes.'),
-]
+function optionAllergens(option: PlateOption): readonly RecipeAllergen[] {
+  const detail = RECIPE_DETAILS[option.familyId]
+  const allergens = new Set<RecipeAllergen>(detail?.allergens ?? [])
 
-const SUBSTITUTIONS = [
-  text('Tilapia → bacalao o lenguado, conservando la misma porción', 'Tilapia → cod or sole, keeping the same portion'),
-  text('Espinaca → acelga o calabacita', 'Spinach → chard or zucchini'),
-]
+  for (const component of option.componentNames) {
+    const name = component.es.toLocaleLowerCase('es')
+    if (name.includes('queso')) allergens.add('dairy')
+    if (name.includes('huevo')) allergens.add('egg')
+    if (name.includes('atún') || name.includes('tilapia')) allergens.add('fish')
+  }
+
+  return [...allergens]
+}
 
 export function hasPilotRecipeDetail(option: PlateOption) {
-  return option.familyId === 'PIL-J05'
+  return Boolean(RECIPE_DETAILS[option.familyId])
 }
 
 export function RecipeDetailDialog({ option, language, context, onClose }: Props) {
@@ -74,6 +60,8 @@ export function RecipeDetailDialog({ option, language, context, onClose }: Props
 
   if (!option || !hasPilotRecipeDetail(option)) return null
 
+  const detail = RECIPE_DETAILS[option.familyId]
+  const allergens = optionAllergens(option)
   return (
     <div className={styles.backdrop} role="presentation" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose()
@@ -88,8 +76,8 @@ export function RecipeDetailDialog({ option, language, context, onClose }: Props
 
         <div className={styles.hero}>
           <Image
-            src="/images/recipes/tilapia-con-espinaca-v1.webp"
-            alt={es ? 'Tilapia dorada servida con espinaca salteada' : 'Golden tilapia served with sautéed spinach'}
+            src={detail.image}
+            alt={detail.imageAlt[language]}
             width={1280}
             height={853}
             sizes="(max-width: 760px) 100vw, 48vw"
@@ -121,7 +109,7 @@ export function RecipeDetailDialog({ option, language, context, onClose }: Props
             <section>
               <h3>{es ? 'Ingredientes' : 'Ingredients'}</h3>
               <ul className={styles.ingredients}>
-                {INGREDIENTS[option.band].map(item => <li key={item.es}>{item[language]}</li>)}
+                {detail.ingredients[option.band].map(item => <li key={item.es}>{item[language]}</li>)}
               </ul>
               {option.componentNames.length > 0 ? (
                 <div className={styles.components}>
@@ -134,7 +122,7 @@ export function RecipeDetailDialog({ option, language, context, onClose }: Props
             <section>
               <h3>{es ? 'Preparación' : 'Directions'}</h3>
               <ol className={styles.steps}>
-                {STEPS.map(item => <li key={item.es}>{item[language]}</li>)}
+                {detail.steps.map(item => <li key={item.es}>{item[language]}</li>)}
               </ol>
             </section>
           </div>
@@ -142,9 +130,11 @@ export function RecipeDetailDialog({ option, language, context, onClose }: Props
           <section className={styles.substitutions}>
             <div>
               <span>{es ? 'Sustituciones compatibles' : 'Compatible substitutions'}</span>
-              <ul>{SUBSTITUTIONS.map(item => <li key={item.es}>{item[language]}</li>)}</ul>
+              <ul>{detail.substitutions.map(item => <li key={item.es}>{item[language]}</li>)}</ul>
             </div>
-            <p><strong>{es ? 'Alérgeno:' : 'Allergen:'}</strong> {es ? 'pescado.' : 'fish.'} {es
+            <p><strong>{es ? 'Alérgenos:' : 'Allergens:'}</strong> {allergens.length > 0
+              ? allergens.map(item => ALLERGEN_LABEL[item][language]).join(', ')
+              : (es ? 'ninguno declarado en la receta base' : 'none declared in the base recipe')}. {es
               ? 'Si haces una sustitución, conserva la porción indicada.'
               : 'If you make a substitution, keep the indicated portion.'}</p>
           </section>

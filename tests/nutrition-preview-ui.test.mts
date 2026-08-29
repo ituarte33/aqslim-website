@@ -10,14 +10,16 @@ const DASHBOARD_PAGE = new URL('../app/dashboard/plan-preview/page.tsx', import.
 const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-client.tsx', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
 const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
+const RECIPE_DATA = new URL('../app/my-aqslim/plan/recipe-detail-data.ts', import.meta.url)
 const RECIPE_DIALOG_STYLES = new URL('../app/my-aqslim/plan/recipe-detail-dialog.module.css', import.meta.url)
 const MIDDLEWARE = new URL('../middleware.ts', import.meta.url)
 
 test('the client demo uses only the deterministic synthetic plan', async () => {
-  const [view, demo, recipeDialog, recipeStyles] = await Promise.all([
+  const [view, demo, recipeDialog, recipeData, recipeStyles] = await Promise.all([
     readFile(CLIENT_VIEW, 'utf8'),
     readFile(CLIENT_DEMO, 'utf8'),
     readFile(RECIPE_DIALOG, 'utf8'),
+    readFile(RECIPE_DATA, 'utf8'),
     readFile(RECIPE_DIALOG_STYLES, 'utf8'),
   ])
   assert.match(demo, /buildSyntheticPersonalizationPlan/)
@@ -37,7 +39,21 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.match(view, /Preview sintético · \$\{plan\.profile\.firstName\}/)
   assert.match(view, /Ver receta con foto/)
   assert.match(view, /<RecipeDetailDialog option=\{openRecipe\}/)
-  assert.match(recipeDialog, /tilapia-con-espinaca-v1\.webp/)
+  for (const image of [
+    'omelette-mexicana-v1.webp',
+    'atun-pepino-v1.webp',
+    'fajitas-pollo-v1.webp',
+    'bistec-mexicana-v1.webp',
+    'tilapia-con-espinaca-v1.webp',
+    'cerdo-nopales-v1.webp',
+    'pollo-coliflor-v1.webp',
+    'hamburguesa-plato-v1.webp',
+  ]) assert.match(recipeData, new RegExp(image.replace('.', '\\.')))
+  for (let family = 1; family <= 8; family += 1) {
+    assert.match(recipeData, new RegExp(`PIL-J0${family}`))
+  }
+  assert.match(recipeDialog, /RECIPE_DETAILS\[option\.familyId\]/)
+  assert.match(recipeDialog, /optionAllergens/)
   assert.match(recipeDialog, /Tu porción calculada/)
   assert.match(recipeDialog, /Ingredientes/)
   assert.match(recipeDialog, /Preparación/)
@@ -107,6 +123,6 @@ test('the guided plan keeps headings clear and cards readable on narrow screens'
   const styles = await readFile(PORTAL_STYLES, 'utf8')
   assert.match(styles, /\.choiceSection \{[^}]*padding-top: 6px;[^}]*scroll-margin-top: 170px;/)
   assert.match(styles, /@media \(max-width: 760px\) \{[\s\S]*?\.choiceList \{ grid-template-columns: 1fr; \}/)
-  assert.match(styles, /\.choiceCard \{ grid-template-columns: 45px 1fr; \}/)
+  assert.match(styles, /\.choiceCard \{[^}]*grid-template-columns: 45px 1fr;/)
   assert.match(styles, /\.mealTabs \{[^}]*position: static;[^}]*height: auto;[^}]*padding: 0;[^}]*background: transparent;/)
 })
