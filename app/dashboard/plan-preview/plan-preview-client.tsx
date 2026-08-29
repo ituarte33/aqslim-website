@@ -52,6 +52,10 @@ function blockedMessage(status: GuidedPlan['status'], es: boolean) {
     : 'The current library does not have enough compatible choices to complete this profile.'
 }
 
+function resetPreviewScroll() {
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+}
+
 export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
@@ -72,14 +76,27 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
   useEffect(() => {
     const previousScrollRestoration = window.history.scrollRestoration
     window.history.scrollRestoration = 'manual'
-    const frame = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    resetPreviewScroll()
+
+    let secondFrame = 0
+    const firstFrame = window.requestAnimationFrame(() => {
+      resetPreviewScroll()
+      secondFrame = window.requestAnimationFrame(resetPreviewScroll)
     })
+    const delayedReset = window.setTimeout(resetPreviewScroll, 120)
+
     return () => {
-      window.cancelAnimationFrame(frame)
+      window.cancelAnimationFrame(firstFrame)
+      window.cancelAnimationFrame(secondFrame)
+      window.clearTimeout(delayedReset)
       window.history.scrollRestoration = previousScrollRestoration
     }
   }, [])
+
+  function selectProfile(profileId: string) {
+    setSelectedProfileId(profileId)
+    window.requestAnimationFrame(resetPreviewScroll)
+  }
 
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang}>
@@ -131,7 +148,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
                   type="button"
                   className={active ? styles.profileOptionActive : undefined}
                   aria-pressed={active}
-                  onClick={() => setSelectedProfileId(item.profile.id)}
+                  onClick={() => selectProfile(item.profile.id)}
                 >
                   <span className={ready ? styles.profileReady : styles.profileBlocked} />
                   <strong>{item.profile.firstName}</strong>
