@@ -9,12 +9,16 @@ const REAL_PLAN = new URL('../app/my-aqslim/plan/page.tsx', import.meta.url)
 const DASHBOARD_PAGE = new URL('../app/dashboard/plan-preview/page.tsx', import.meta.url)
 const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-client.tsx', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
+const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
+const RECIPE_DIALOG_STYLES = new URL('../app/my-aqslim/plan/recipe-detail-dialog.module.css', import.meta.url)
 const MIDDLEWARE = new URL('../middleware.ts', import.meta.url)
 
 test('the client demo uses only the deterministic synthetic plan', async () => {
-  const [view, demo] = await Promise.all([
+  const [view, demo, recipeDialog, recipeStyles] = await Promise.all([
     readFile(CLIENT_VIEW, 'utf8'),
     readFile(CLIENT_DEMO, 'utf8'),
+    readFile(RECIPE_DIALOG, 'utf8'),
+    readFile(RECIPE_DIALOG_STYLES, 'utf8'),
   ])
   assert.match(demo, /buildSyntheticPersonalizationPlan/)
   assert.match(demo, /searchParams/)
@@ -31,6 +35,16 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.doesNotMatch(view, /Snack/)
   assert.match(view, /Vista de ejemplo/)
   assert.match(view, /Preview sintético · \$\{plan\.profile\.firstName\}/)
+  assert.match(view, /Ver receta con foto/)
+  assert.match(view, /<RecipeDetailDialog option=\{openRecipe\}/)
+  assert.match(recipeDialog, /tilapia-con-espinaca-v1\.webp/)
+  assert.match(recipeDialog, /Tu porción calculada/)
+  assert.match(recipeDialog, /Ingredientes/)
+  assert.match(recipeDialog, /Preparación/)
+  assert.match(recipeDialog, /Sustituciones compatibles/)
+  assert.match(recipeDialog, /role="dialog"/)
+  assert.match(recipeDialog, /event\.key === 'Escape'/)
+  assert.match(recipeStyles, /@media \(max-width: 760px\)/)
   assert.doesNotMatch(view, /disponible al conectar Preview|available after Preview connection/)
 })
 
@@ -74,6 +88,8 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /target="_blank"/)
   assert.match(client, /Vista de \$\{plan\.profile\.firstName\} no disponible/)
   assert.match(client, /<DashboardShell[^>]*isolatedPreview>/)
+  assert.match(client, /Ver receta con foto ↗/)
+  assert.match(client, /context="review"/)
   assert.match(shell, /const PREVIEW_NAV = \[/)
   assert.match(shell, /const visibleNav = isolatedPreview \? PREVIEW_NAV : NAV/)
   assert.match(shell, /Preview aislado/)

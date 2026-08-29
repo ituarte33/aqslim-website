@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { GuidedPlan, MealSlot } from '@/lib/nutrition/types'
+import type { GuidedPlan, MealSlot, PlateOption } from '@/lib/nutrition/types'
+import { hasPilotRecipeDetail, RecipeDetailDialog } from '@/app/my-aqslim/plan/recipe-detail-dialog'
 import { DashboardShell } from '../dashboard-shell'
 import styles from './plan-preview.module.css'
 
@@ -59,6 +60,7 @@ function resetPreviewScroll() {
 export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
+  const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const es = lang === 'es'
   const plan = useMemo(
     () => plans.find(item => item.profile.id === selectedProfileId) ?? plans[0],
@@ -213,6 +215,11 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
                         {option.componentNames.length > 0 ? (
                           <ul>{option.componentNames.map(component => <li key={component.es}>+ {component[lang]}</li>)}</ul>
                         ) : null}
+                        {hasPilotRecipeDetail(option) ? (
+                          <button type="button" className={styles.recipeReviewButton} onClick={() => setOpenRecipe(option)}>
+                            {es ? 'Ver receta con foto ↗' : 'View photo recipe ↗'}
+                          </button>
+                        ) : null}
                       </div>
                       <dl className={styles.macros}>
                         <div><dt>kcal</dt><dd>{option.totals.calories}</dd></div>
@@ -299,6 +306,8 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
             </div>
           </aside>
         </div>
+
+        <RecipeDetailDialog option={openRecipe} language={lang} context="review" onClose={() => setOpenRecipe(null)} />
       </div>
     </DashboardShell>
   )

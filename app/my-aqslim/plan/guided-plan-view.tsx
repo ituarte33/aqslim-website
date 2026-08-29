@@ -4,9 +4,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
 import type { PatientPortalData } from '@/lib/patient-portal'
-import type { GuidedPlan, MealSlot } from '@/lib/nutrition/types'
+import type { GuidedPlan, MealSlot, PlateOption } from '@/lib/nutrition/types'
 import { PortalShell } from '../portal-shell'
 import { usePortalLanguage } from '../use-portal-language'
+import { hasPilotRecipeDetail, RecipeDetailDialog } from './recipe-detail-dialog'
+import recipeStyles from './recipe-detail-dialog.module.css'
 import styles from '../portal.module.css'
 
 const SLOT_COPY: Record<MealSlot, { es: string; en: string }> = {
@@ -25,6 +27,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const [activeSlot, setActiveSlot] = useState<MealSlot>(plan.groups[0]?.slot ?? 'lunch')
   const [selected, setSelected] = useState<Partial<Record<MealSlot, string>>>({})
+  const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const es = language === 'es'
   const shellFirstName = demo ? (es ? 'Vista de ejemplo' : 'Example view') : data.firstName
   const group = plan.groups.find(item => item.slot === activeSlot) ?? plan.groups[0]
@@ -109,8 +112,15 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
                       <button type="button" onClick={() => choose(group.slot, option.id)}>
                         {isSelected ? (es ? 'Elegida ✓' : 'Chosen ✓') : (es ? 'Elijo ésta' : 'Choose this')}
                       </button>
-                      <span>{es ? 'Fácil de preparar' : 'Easy to prepare'}</span>
+                      <span>{hasPilotRecipeDetail(option)
+                        ? (es ? 'Receta ilustrada disponible' : 'Illustrated recipe available')
+                        : (es ? 'Ficha próximamente' : 'Recipe card coming soon')}</span>
                     </div>
+                    {hasPilotRecipeDetail(option) ? (
+                      <button type="button" className={recipeStyles.trigger} onClick={() => setOpenRecipe(option)}>
+                        {es ? 'Ver receta con foto' : 'View photo recipe'}
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               )
@@ -152,6 +162,8 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
           <span>{es ? `${chosenCount} de ${plan.groups.length} comidas elegidas` : `${chosenCount} of ${plan.groups.length} meals chosen`}</span>
         </div>
       </section>
+
+      <RecipeDetailDialog option={openRecipe} language={language} context="client" onClose={() => setOpenRecipe(null)} />
     </PortalShell>
   )
 }
