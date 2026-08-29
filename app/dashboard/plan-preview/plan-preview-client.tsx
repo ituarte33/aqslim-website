@@ -99,7 +99,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
   }
 
   return (
-    <DashboardShell user={user} lang={lang} setLang={setLang}>
+    <DashboardShell user={user} lang={lang} setLang={setLang} isolatedPreview>
       <div className={styles.page}>
         <header className={styles.intro}>
           <div>

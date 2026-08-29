@@ -10,6 +10,7 @@ type Props = {
   user: { firstName: string | null; lastName: string | null } | null
   lang: 'es' | 'en'
   setLang: (l: 'es' | 'en') => void
+  isolatedPreview?: boolean
   children: React.ReactNode
 }
 
@@ -23,9 +24,14 @@ const NAV = [
   { href: '/food-scanner', exact: false, es: '🍽 Mis Comidas', en: '🍽 My Meals' },
 ]
 
-export function DashboardShell({ user, lang, setLang, children }: Props) {
+const PREVIEW_NAV = [
+  { href: '/dashboard/plan-preview', exact: false, es: 'Planes Preview', en: 'Plan Preview' },
+]
+
+export function DashboardShell({ user, lang, setLang, isolatedPreview = false, children }: Props) {
   const pathname = usePathname()
   const [hovered, setHovered] = useState<string | null>(null)
+  const visibleNav = isolatedPreview ? PREVIEW_NAV : NAV
 
   function isActive(item: typeof NAV[0]) {
     return item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -55,19 +61,18 @@ export function DashboardShell({ user, lang, setLang, children }: Props) {
         background: 'rgba(10,10,10,0.95)', zIndex: 10,
         gap: 32,
       }}>
-        {/* Logo — links back to homepage */}
-        <Link href="/" style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
+        <Link href={isolatedPreview ? '/dashboard/plan-preview' : '/'} style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
           <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
             AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
             <span style={{ fontSize: pt.xs, color: '#9A9590', marginLeft: 10, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans }}>
-              Portal
+              {isolatedPreview ? (lang === 'es' ? 'Preview aislado' : 'Isolated Preview') : 'Portal'}
             </span>
           </span>
         </Link>
 
         {/* Nav links — using div to avoid global nav { position: fixed } in globals.css */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
-          {NAV.map(item => {
+          {visibleNav.map(item => {
             const active = isActive(item)
             const isHov = hovered === item.href
             return (

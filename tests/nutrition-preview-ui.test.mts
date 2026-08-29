@@ -9,6 +9,7 @@ const REAL_PLAN = new URL('../app/my-aqslim/plan/page.tsx', import.meta.url)
 const DASHBOARD_PAGE = new URL('../app/dashboard/plan-preview/page.tsx', import.meta.url)
 const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-client.tsx', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
+const MIDDLEWARE = new URL('../middleware.ts', import.meta.url)
 
 test('the client demo uses only the deterministic synthetic plan', async () => {
   const [view, demo] = await Promise.all([
@@ -39,10 +40,11 @@ test('the real client plan route remains connected to its existing portal data',
 })
 
 test('the Dashboard Preview is admin-only, review-first, and has no persistence path', async () => {
-  const [page, client, shell] = await Promise.all([
+  const [page, client, shell, middleware] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
     readFile(DASHBOARD_SHELL, 'utf8'),
+    readFile(MIDDLEWARE, 'utf8'),
   ])
   assert.match(page, /actor\.role !== 'admin'/)
   assert.match(page, /buildSyntheticPersonalizationPlans/)
@@ -71,6 +73,15 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /query: \{ profile: plan\.profile\.id \}/)
   assert.match(client, /target="_blank"/)
   assert.match(client, /Vista de \$\{plan\.profile\.firstName\} no disponible/)
+  assert.match(client, /<DashboardShell[^>]*isolatedPreview>/)
+  assert.match(shell, /const PREVIEW_NAV = \[/)
+  assert.match(shell, /const visibleNav = isolatedPreview \? PREVIEW_NAV : NAV/)
+  assert.match(shell, /Preview aislado/)
+  assert.match(middleware, /process\.env\.VERCEL_ENV === 'preview'/)
+  assert.match(middleware, /isOperationalRoute\(req\.nextUrl\.pathname\)/)
+  assert.match(middleware, /NextResponse\.redirect\(new URL\('\/dashboard\/plan-preview', req\.url\)\)/)
+  assert.match(middleware, /pathname\.startsWith\('\/dashboard\/'\)/)
+  assert.match(middleware, /pathname\.startsWith\('\/food-scanner\/'\)/)
   assert.match(shell, /es: 'Clientes', en: 'Clients'/)
   assert.doesNotMatch(client, /Constructor de planes/)
 })

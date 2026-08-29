@@ -15,7 +15,22 @@ const isPublicRoute = createRouteMatcher([
 
 const isPatientPortalRoute = createRouteMatcher(['/my-aqslim(.*)'])
 
+function isOperationalRoute(pathname: string) {
+  if (pathname === '/dashboard/plan-preview' || pathname.startsWith('/dashboard/plan-preview/')) {
+    return false
+  }
+
+  return pathname === '/dashboard'
+    || pathname.startsWith('/dashboard/')
+    || pathname === '/food-scanner'
+    || pathname.startsWith('/food-scanner/')
+}
+
 export default clerkMiddleware(async (auth, req) => {
+  if (process.env.VERCEL_ENV === 'preview' && isOperationalRoute(req.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL('/dashboard/plan-preview', req.url))
+  }
+
   if (isPatientPortalRoute(req) && !isPublicRoute(req)) {
     const { userId } = await auth()
     if (!userId) {
