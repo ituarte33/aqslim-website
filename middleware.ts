@@ -27,7 +27,10 @@ function isOperationalRoute(pathname: string) {
 }
 
 export default clerkMiddleware(async (auth, req) => {
-  if (process.env.VERCEL_ENV === 'preview' && isOperationalRoute(req.nextUrl.pathname)) {
+  const isRecipePreview = process.env.VERCEL_ENV === 'preview'
+    && process.env.VERCEL_GIT_COMMIT_REF === 'myaq-rec-001-preview-010'
+
+  if (isRecipePreview && isOperationalRoute(req.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/dashboard/plan-preview', req.url))
   }
 

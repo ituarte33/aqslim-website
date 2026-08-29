@@ -78,6 +78,7 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(shell, /const visibleNav = isolatedPreview \? PREVIEW_NAV : NAV/)
   assert.match(shell, /Preview aislado/)
   assert.match(middleware, /process\.env\.VERCEL_ENV === 'preview'/)
+  assert.match(middleware, /process\.env\.VERCEL_GIT_COMMIT_REF === 'myaq-rec-001-preview-010'/)
   assert.match(middleware, /isOperationalRoute\(req\.nextUrl\.pathname\)/)
   assert.match(middleware, /NextResponse\.redirect\(new URL\('\/dashboard\/plan-preview', req\.url\)\)/)
   assert.match(middleware, /pathname\.startsWith\('\/dashboard\/'\)/)
