@@ -146,7 +146,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización automática v0.2' : 'Automatic personalization test v0.2'}</span>
+              <span>{es ? 'Prueba de personalización automática v0.3' : 'Automatic personalization test v0.3'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -301,6 +301,16 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
             ) : null}
 
             <section>
+              <span>{es ? 'Cápsula semanal' : 'Weekly capsule'}</span>
+              <h2>{plan.groups.reduce((total, group) => total + group.options.length, 0)} {es ? 'recetas activas' : 'active recipes'}</h2>
+              <dl>
+                <div><dt>{es ? 'Horizonte' : 'Horizon'}</dt><dd>{es ? '7 días' : '7 days'}</dd></div>
+                <div><dt>{es ? 'Por horario' : 'Per meal slot'}</dt><dd>{es ? 'Máximo 3' : 'Maximum 3'}</dd></div>
+                <div><dt>{es ? 'Lista de compra' : 'Grocery list'}</dt><dd>{es ? 'Sólo usos repetidos' : 'Repeated uses only'}</dd></div>
+              </dl>
+            </section>
+
+            <section>
               <span>{es ? 'Sobre de compatibilidad' : 'Compatibility envelope'}</span>
               <h2>{plan.envelope.passes
                 ? (es ? `${combinationCount} de ${combinationCount} combinaciones compatibles` : `${combinationCount} of ${combinationCount} compatible combinations`)
@@ -318,6 +328,8 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
               <ul className={styles.ruleList}>
                 <li>{es ? 'Seguridad antes que preferencias' : 'Safety before preferences'}</li>
                 <li>{es ? 'Máximo 3 opciones por comida' : 'Maximum 3 choices per meal'}</li>
+                <li>{es ? 'Favoritas priorizadas; “No repetir” no equivale a alergia' : 'Favorites prioritized; “Do not repeat” is not an allergy'}</li>
+                <li>{es ? 'Ingredientes de compra utilizados en 2 o más comidas' : 'Grocery ingredients used in 2 or more meals'}</li>
                 <li>{es ? 'Máximo 2 complementos' : 'Maximum 2 complements'}</li>
                 <li>{es ? 'Sin repetición forzada de familias' : 'No forced family repetition'}</li>
                 <li>{es ? 'Sin techo artificial de 2,000 kcal' : 'No artificial 2,000 kcal ceiling'}</li>

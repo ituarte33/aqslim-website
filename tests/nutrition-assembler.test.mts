@@ -14,6 +14,12 @@ import {
 import { estimateEnergyTarget } from '../lib/nutrition/energy.ts'
 import type { NutritionProfile } from '../lib/nutrition/types.ts'
 import { planContainsBlockedFood, validateEveryCombination } from '../lib/nutrition/validation.ts'
+import {
+  buildShoppingList,
+  buildWeeklyRotation,
+  rotationFrequency,
+  weeklyRotationKey,
+} from '../lib/nutrition/weekly-capsule.ts'
 
 function build(profile: NutritionProfile) {
   return buildGuidedPlan({
@@ -119,6 +125,43 @@ test('the automatic personalization proof changes safely across four synthetic p
   assert.ok(highTargetPlan)
   assert.deepEqual(highTargetPlan.groups.map(group => group.options.length), [3, 3])
   assert.equal(highTargetPlan.envelope.passes, true)
+})
+
+test('the weekly capsule keeps at most three choices per meal and plans seven days', () => {
+  const sofia = SYNTHETIC_PERSONALIZATION_PROFILES.find(profile => profile.firstName === 'Sofía')
+  assert.ok(sofia)
+  const plan = build(sofia)
+  const rotation = buildWeeklyRotation(plan, {})
+
+  assert.equal(plan.groups.every(group => group.options.length <= 3), true)
+  assert.equal(rotation.length, 21)
+  for (const group of plan.groups) {
+    assert.equal(rotation.filter(entry => entry.slot === group.slot).length, 7)
+  }
+})
+
+test('favorites lead the rotation and do-not-repeat recipes leave the grocery list', () => {
+  const sofia = SYNTHETIC_PERSONALIZATION_PROFILES.find(profile => profile.firstName === 'Sofía')
+  assert.ok(sofia)
+  const plan = build(sofia)
+  const firstMeal = plan.groups.find(group => group.slot === 'first_meal')
+  assert.ok(firstMeal)
+  const favorite = firstMeal.options.find(option => option.familyId === 'PIL-J02')
+  const avoided = firstMeal.options.find(option => option.familyId === 'PIL-J05')
+  assert.ok(favorite)
+  assert.ok(avoided)
+
+  const rotation = buildWeeklyRotation(plan, {
+    [favorite.familyId]: 'favorite',
+    [avoided.familyId]: 'avoid',
+  })
+  const frequency = rotationFrequency(rotation)
+  const shoppingList = buildShoppingList(rotation)
+
+  assert.equal(rotation.some(entry => entry.option.familyId === avoided.familyId), false)
+  assert.equal(frequency[weeklyRotationKey('first_meal', favorite.id)], 4)
+  assert.equal(shoppingList.some(item => item.ingredient === 'tilapia'), false)
+  assert.equal(shoppingList.every(item => item.mealUses >= 2), true)
 })
 
 test('the Preview supports exactly two or three actual meals without forcing a snack', () => {

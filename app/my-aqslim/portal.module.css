@@ -591,9 +591,46 @@
 .choiceBody > p { margin: 7px 0 0; color: var(--portal-muted); font-size: 11px; line-height: 1.55; }
 .choiceBody ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
 .choiceBody li { border-radius: 999px; padding: 5px 8px; color: #c9c6bd; background: rgba(255,255,255,.055); font-size: 9px; }
+.choiceAvoided { border-style: dashed; opacity: .58; }
+.preferenceActions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 13px; }
+.preferenceActions button { min-height: 34px; border: 1px solid var(--portal-line); border-radius: 9px; padding: 6px; color: var(--portal-muted); background: rgba(255,255,255,.02); font-family: Montserrat, sans-serif; font-size: 8px; line-height: 1.25; cursor: pointer; }
+.preferenceActions button:hover { border-color: rgba(242,207,106,.48); color: var(--portal-text); }
+.preferenceActions button:focus-visible { outline: 2px solid var(--portal-gold-light); outline-offset: 2px; }
+.preferenceActions button:disabled { opacity: .36; cursor: not-allowed; }
+.preferenceActions .preferenceActive { border-color: rgba(242,207,106,.7); color: #fff0b5; background: rgba(212,167,44,.12); }
+.preferenceActions .preferenceAvoidActive { border-color: rgba(209,132,100,.55); color: #e8aa91; background: rgba(209,132,100,.08); }
 .choiceActions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .choiceActions button { min-height: 38px; border: 1px solid var(--portal-gold-light); border-radius: 10px; padding: 8px 14px; color: #17140d; background: linear-gradient(100deg, #ad7e18, #f2d77a, #b48622); font-family: Montserrat, sans-serif; font-size: 10px; font-weight: 600; cursor: pointer; }
+.choiceActions button:disabled { border-color: var(--portal-line); color: var(--portal-muted); background: rgba(255,255,255,.035); cursor: not-allowed; }
 .choiceActions span { color: var(--portal-muted); font-size: 9px; }
+
+.weeklyCapsule { display: grid; gap: 20px; }
+.weeklyCapsule > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: start; }
+.weeklyCapsule h2, .shoppingList h2 { margin: 0; font-family: 'Playfair Display', serif; font-size: 27px; font-weight: 400; line-height: 1.25; }
+.weeklyCapsule header p:last-child { max-width: 590px; margin: 8px 0 0; color: var(--portal-muted); font-size: 11px; line-height: 1.65; }
+.capsuleMetrics { display: grid; grid-template-columns: repeat(2, minmax(84px, 1fr)); gap: 8px; margin: 0; }
+.capsuleMetrics div { border: 1px solid rgba(212,167,44,.24); border-radius: 12px; padding: 11px; background: rgba(212,167,44,.04); text-align: center; }
+.capsuleMetrics dt { color: var(--portal-muted); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.capsuleMetrics dd { margin: 5px 0 0; color: var(--portal-gold-light); font-family: 'Playfair Display', serif; font-size: 23px; }
+.rotationGroups { display: grid; gap: 10px; }
+.rotationGroups > section { border: 1px solid var(--portal-line); border-radius: 13px; padding: 14px; background: rgba(255,255,255,.016); }
+.rotationGroups h3, .shoppingGroups h3 { margin: 0 0 9px; color: var(--portal-gold-light); font-size: 9px; font-weight: 500; letter-spacing: .09em; text-transform: uppercase; }
+.rotationGroups ul, .shoppingGroups ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.rotationGroups li, .shoppingGroups li { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--portal-text); font-size: 10px; }
+.rotationGroups li b, .shoppingGroups li b { flex: 0 0 auto; color: var(--portal-muted); font-size: 8px; font-weight: 500; }
+.rotationGroups .rotationExcluded { color: var(--portal-muted); text-decoration: line-through; }
+.rotationGroups .rotationExcluded b { color: #d99a7f; text-decoration: none; }
+.capsuleActions { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }
+.capsuleActions .goldButton { border: 0; cursor: pointer; }
+.capsuleActions > span { color: var(--portal-muted); font-size: 9px; }
+
+.shoppingList { display: grid; gap: 18px; border-color: rgba(212,167,44,.34); }
+.shoppingList > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
+.shoppingList > header > span { color: var(--portal-muted); font-size: 9px; }
+.shoppingGroups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.shoppingGroups > section { border: 1px solid var(--portal-line); border-radius: 13px; padding: 15px; background: rgba(255,255,255,.016); }
+.shoppingGroups li + li { padding-top: 7px; border-top: 1px solid rgba(255,255,255,.055); }
+.shoppingNotice { margin: 0; border-top: 1px solid var(--portal-line); padding-top: 13px; color: var(--portal-muted); font-size: 9px; line-height: 1.6; }
 
 .guidedFreedom { display: grid; gap: 13px; }
 .guidedFreedom h2 { margin: 0; font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 400; }
@@ -685,6 +722,9 @@
   .guidedPhase { align-items: flex-start; flex-direction: column; }
   .guidedPhase .outlineAction { width: 100%; }
   .choiceCard { padding: 14px; }
+  .weeklyCapsule > header, .shoppingGroups { grid-template-columns: 1fr; }
+  .capsuleMetrics { width: 100%; }
+  .shoppingList > header { align-items: flex-start; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

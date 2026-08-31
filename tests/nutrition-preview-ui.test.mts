@@ -12,15 +12,17 @@ const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.m
 const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
 const RECIPE_DATA = new URL('../app/my-aqslim/plan/recipe-detail-data.ts', import.meta.url)
 const RECIPE_DIALOG_STYLES = new URL('../app/my-aqslim/plan/recipe-detail-dialog.module.css', import.meta.url)
+const WEEKLY_CAPSULE = new URL('../lib/nutrition/weekly-capsule.ts', import.meta.url)
 const MIDDLEWARE = new URL('../middleware.ts', import.meta.url)
 
 test('the client demo uses only the deterministic synthetic plan', async () => {
-  const [view, demo, recipeDialog, recipeData, recipeStyles] = await Promise.all([
+  const [view, demo, recipeDialog, recipeData, recipeStyles, weeklyCapsule] = await Promise.all([
     readFile(CLIENT_VIEW, 'utf8'),
     readFile(CLIENT_DEMO, 'utf8'),
     readFile(RECIPE_DIALOG, 'utf8'),
     readFile(RECIPE_DATA, 'utf8'),
     readFile(RECIPE_DIALOG_STYLES, 'utf8'),
+    readFile(WEEKLY_CAPSULE, 'utf8'),
   ])
   assert.match(demo, /buildSyntheticPersonalizationPlan/)
   assert.match(demo, /searchParams/)
@@ -39,6 +41,18 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.match(view, /Preview sintético · \$\{plan\.profile\.firstName\}/)
   assert.match(view, /Ver receta con foto/)
   assert.match(view, /<RecipeDetailDialog option=\{openRecipe\}/)
+  assert.match(view, /Tus opciones de esta semana/)
+  assert.match(view, /Favorita/)
+  assert.match(view, /Me gusta/)
+  assert.match(view, /No repetir/)
+  assert.match(view, /Cápsula semanal/)
+  assert.match(view, /Confirmar rotación y preparar lista/)
+  assert.match(view, /Lista de supermercado/)
+  assert.match(view, /las preferencias todavía no se guardan/)
+  assert.doesNotMatch(view, /localStorage|sessionStorage|fetch\(/)
+  assert.match(weeklyCapsule, /WEEK_LENGTH_DAYS = 7/)
+  assert.match(weeklyCapsule, /mealUses >= 2/)
+  assert.match(weeklyCapsule, /preferences\[option\.familyId\] !== 'avoid'/)
   for (const image of [
     'omelette-mexicana-v1.webp',
     'atun-pepino-v1.webp',
@@ -88,12 +102,15 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /Validación automática/)
   assert.match(client, /Pendiente de revisión humana/)
   assert.match(client, /combinaciones compatibles/)
-  assert.match(client, /Prueba de personalización automática v0\.2/)
+  assert.match(client, /Prueba de personalización automática v0\.3/)
   assert.match(client, /Cálculo energético sintético/)
   assert.match(client, /Mantenimiento estimado/)
   assert.match(client, /Déficit aplicado/)
   assert.match(client, /Sin techo artificial de 2,000 kcal/)
   assert.match(client, /de 3 opciones disponibles/)
+  assert.match(client, /Cápsula semanal/)
+  assert.match(client, /Sólo usos repetidos/)
+  assert.match(client, /No repetir” no equivale a alergia/)
   assert.match(client, /Cambia el perfil; AQ Buddy recalcula/)
   assert.match(client, /setSelectedProfileId/)
   assert.match(client, /Exclusión estricta/)
@@ -130,4 +147,7 @@ test('the guided plan keeps headings clear and cards readable on narrow screens'
   assert.match(styles, /@media \(max-width: 760px\) \{[\s\S]*?\.choiceList \{ grid-template-columns: 1fr; \}/)
   assert.match(styles, /\.choiceCard \{[^}]*grid-template-columns: 45px 1fr;/)
   assert.match(styles, /\.mealTabs \{[^}]*position: static;[^}]*height: auto;[^}]*padding: 0;[^}]*background: transparent;/)
+  assert.match(styles, /\.preferenceActions \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
+  assert.match(styles, /\.shoppingGroups \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  assert.match(styles, /@media \(max-width: 600px\) \{[\s\S]*?\.weeklyCapsule > header, \.shoppingGroups \{ grid-template-columns: 1fr; \}/)
 })
