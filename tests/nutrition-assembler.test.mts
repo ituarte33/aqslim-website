@@ -11,6 +11,7 @@ import {
   SYNTHETIC_GUIDED_PROFILE,
   SYNTHETIC_PERSONALIZATION_PROFILES,
 } from '../lib/nutrition/fixtures.ts'
+import { estimateEnergyTarget } from '../lib/nutrition/energy.ts'
 import type { NutritionProfile } from '../lib/nutrition/types.ts'
 import { planContainsBlockedFood, validateEveryCombination } from '../lib/nutrition/validation.ts'
 
@@ -62,27 +63,37 @@ test('disliked food is not reintroduced by a high preference score', () => {
   assert.equal(planContainsBlockedFood(plan, 'ground beef'), false)
 })
 
-test('2,000 kcal remains blocked with the synthetic pilot library', () => {
-  const plan = build({ ...SYNTHETIC_GUIDED_PROFILE, calorieTarget: 2_000 })
-  assert.equal(plan.status, 'blocked_high_target')
-  assert.equal(plan.groups.length, 0)
-  assert.equal(plan.envelope.passes, false)
+test('a high-weight profile uses maintenance minus deficit instead of a 2,000 kcal ceiling', () => {
+  const marco = SYNTHETIC_PERSONALIZATION_PROFILES.find(profile => profile.firstName === 'Marco')
+  assert.ok(marco)
+  const estimate = estimateEnergyTarget(marco.energyInputs)
+  const plan = build(marco)
+
+  assert.equal(marco.energyInputs.currentWeightKg, 172.4)
+  assert.equal(estimate.maintenanceCalories, 3_038)
+  assert.equal(estimate.targetCalories, 2_400)
+  assert.equal(estimate.appliedDeficitCalories, 638)
+  assert.equal(plan.status, 'ready_for_review')
+  assert.deepEqual(plan.groups.map(group => group.options.length), [3, 3])
+  assert.equal(planContainsBlockedFood(plan, 'fish'), false)
+  assert.ok(plan.envelope.minProteinG >= estimate.proteinFloorG)
+  assert.ok(plan.envelope.maxProteinG <= estimate.proteinCeilingG)
+  assert.deepEqual(validateEveryCombination(plan), [])
 })
 
-test('the approved synthetic target matrix is deterministic', () => {
-  const matrix: Array<{ calories: number; slots: NutritionProfile['mealSlots']; expected: string }> = [
-    { calories: 1_200, slots: ['first_meal', 'lunch', 'dinner'], expected: 'ready_for_review' },
-    { calories: 1_400, slots: ['first_meal', 'lunch', 'dinner'], expected: 'ready_for_review' },
-    { calories: 1_600, slots: ['lunch', 'dinner'], expected: 'ready_for_review' },
-    { calories: 1_800, slots: ['first_meal', 'lunch', 'dinner'], expected: 'ready_for_review' },
-    { calories: 2_000, slots: ['lunch', 'dinner'], expected: 'blocked_high_target' },
-  ]
+test('tampered targets and excessive requested deficits stop for safety review', () => {
+  const tampered = build({ ...SYNTHETIC_GUIDED_PROFILE, calorieTarget: 2_000 })
+  assert.equal(tampered.status, 'blocked_safety_review')
+  assert.equal(tampered.groups.length, 0)
 
-  for (const item of matrix) {
-    const plan = build({ ...SYNTHETIC_GUIDED_PROFILE, calorieTarget: item.calories, mealSlots: item.slots })
-    assert.equal(plan.status, item.expected, `${item.calories} kcal`)
-    if (item.expected === 'ready_for_review') assert.deepEqual(validateEveryCombination(plan), [])
-  }
+  const energyInputs = { ...SYNTHETIC_GUIDED_PROFILE.energyInputs, requestedDeficitCalories: 900 }
+  const excessiveDeficit = build({
+    ...SYNTHETIC_GUIDED_PROFILE,
+    energyInputs,
+    calorieTarget: estimateEnergyTarget(energyInputs).targetCalories,
+  })
+  assert.equal(excessiveDeficit.status, 'blocked_safety_review')
+  assert.equal(excessiveDeficit.groups.length, 0)
 })
 
 test('the automatic personalization proof changes safely across four synthetic profiles', () => {
@@ -93,7 +104,7 @@ test('the automatic personalization proof changes safely across four synthetic p
       ['Elena', 1_400, 3, 'ready_for_review'],
       ['Rom', 1_600, 2, 'ready_for_review'],
       ['Sofía', 1_800, 3, 'ready_for_review'],
-      ['Marco', 2_000, 2, 'blocked_high_target'],
+      ['Marco', 2_400, 2, 'ready_for_review'],
     ],
   )
 
@@ -101,11 +112,13 @@ test('the automatic personalization proof changes safely across four synthetic p
   assert.ok(dairyFreePlan)
   assert.equal(planContainsBlockedFood(dairyFreePlan, 'dairy'), false)
   assert.equal(planContainsBlockedFood(dairyFreePlan, 'oaxaca cheese'), false)
+  assert.equal(dairyFreePlan.groups[0].slot, 'first_meal')
+  assert.equal(dairyFreePlan.groups[0].options.length, 3)
 
-  const blockedPlan = plans.find(plan => plan.profile.firstName === 'Marco')
-  assert.ok(blockedPlan)
-  assert.equal(blockedPlan.groups.length, 0)
-  assert.equal(blockedPlan.envelope.passes, false)
+  const highTargetPlan = plans.find(plan => plan.profile.firstName === 'Marco')
+  assert.ok(highTargetPlan)
+  assert.deepEqual(highTargetPlan.groups.map(group => group.options.length), [3, 3])
+  assert.equal(highTargetPlan.envelope.passes, true)
 })
 
 test('the Preview supports exactly two or three actual meals without forcing a snack', () => {
@@ -113,10 +126,8 @@ test('the Preview supports exactly two or three actual meals without forcing a s
   assert.equal(invalid.status, 'blocked_profile')
 
   const threeMealProfile: NutritionProfile = {
-    ...SYNTHETIC_GUIDED_PROFILE,
+    ...SYNTHETIC_PERSONALIZATION_PROFILES[0],
     id: 'SYN-JING-THREE-001',
-    calorieTarget: 1_400,
-    mealSlots: ['first_meal', 'lunch', 'dinner'],
   }
   const plan = build(threeMealProfile)
   assert.equal(plan.groups.length, 3)

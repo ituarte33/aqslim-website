@@ -7,6 +7,7 @@ import type {
   PortionBand,
   RecipeVariant,
 } from './types'
+import { estimateEnergyTarget } from './energy.ts'
 
 const text = (es: string, en: string): LocalizedText => ({ es, en })
 const totals = (calories: number, proteinG: number, fatG: number, netCarbsG: number): NutritionTotals => ({
@@ -62,6 +63,7 @@ function recipe({
 
 const FIRST: readonly MealSlot[] = ['first_meal']
 const FIRST_OR_LUNCH: readonly MealSlot[] = ['first_meal', 'lunch']
+const FIRST_OR_MAIN: readonly MealSlot[] = ['first_meal', 'lunch', 'dinner']
 const MAIN: readonly MealSlot[] = ['lunch', 'dinner']
 
 export const JING_RECIPE_VARIANTS: readonly RecipeVariant[] = [
@@ -108,34 +110,52 @@ export const JING_RECIPE_VARIANTS: readonly RecipeVariant[] = [
     nutrition: totals(574, 78.9, 23.3, 6.2),
   }),
   recipe({
+    id: 'PIL-J03-H', familyId: 'PIL-J03', name: text('Fajitas de pollo', 'Chicken fajitas'),
+    portion: text('2½ palmas de pollo con pimiento y cebolla', '2½ palms chicken with bell pepper and onion'),
+    slots: MAIN, band: 'H', conditional: true, minutes: 24, ingredients: ['chicken', 'bell pepper', 'onion', 'olive oil'],
+    nutrition: totals(822, 78.9, 51.3, 6.2),
+  }),
+  recipe({
     id: 'PIL-J04-E', familyId: 'PIL-J04', name: text('Bistec a la mexicana', 'Mexican-style steak'),
     portion: text('1½ palmas de bistec con tomate, cebolla y chile', '1½ palms steak with tomato, onion, and chile'),
-    slots: MAIN, band: 'E', minutes: 24, ingredients: ['sirloin', 'tomato', 'onion', 'jalapeño', 'olive oil'],
+    slots: FIRST_OR_MAIN, band: 'E', minutes: 24, ingredients: ['sirloin', 'tomato', 'onion', 'jalapeño', 'olive oil'],
     nutrition: totals(384, 44.8, 19.7, 3.7),
   }),
   recipe({
     id: 'PIL-J04-M', familyId: 'PIL-J04', name: text('Bistec a la mexicana', 'Mexican-style steak'),
     portion: text('2½ palmas de bistec con tomate, cebolla y chile', '2½ palms steak with tomato, onion, and chile'),
-    slots: MAIN, band: 'M', conditional: true, minutes: 24, ingredients: ['sirloin', 'tomato', 'onion', 'jalapeño', 'olive oil'],
+    slots: FIRST_OR_MAIN, band: 'M', conditional: true, minutes: 24, ingredients: ['sirloin', 'tomato', 'onion', 'jalapeño', 'olive oil'],
     nutrition: totals(676, 74.1, 38.4, 3.7),
+  }),
+  recipe({
+    id: 'PIL-J04-H', familyId: 'PIL-J04', name: text('Bistec a la mexicana', 'Mexican-style steak'),
+    portion: text('2½ palmas de bistec con tomate, cebolla y chile', '2½ palms steak with tomato, onion, and chile'),
+    slots: MAIN, band: 'H', conditional: true, minutes: 26, ingredients: ['sirloin', 'tomato', 'onion', 'jalapeño', 'olive oil'],
+    nutrition: totals(924, 74.1, 66.4, 3.7),
   }),
   recipe({
     id: 'PIL-J05-L', familyId: 'PIL-J05', name: text('Tilapia con espinaca', 'Tilapia with spinach'),
     portion: text('1½ palmas de tilapia con espinaca', '1½ palms tilapia with spinach'),
-    slots: MAIN, band: 'L', minutes: 20, ingredients: ['tilapia', 'spinach', 'olive oil'],
+    slots: FIRST_OR_MAIN, band: 'L', minutes: 20, ingredients: ['tilapia', 'spinach', 'olive oil'],
     allergens: ['fish'], nutrition: totals(283, 47, 9.9, 1.3),
   }),
   recipe({
     id: 'PIL-J05-E', familyId: 'PIL-J05', name: text('Tilapia con espinaca', 'Tilapia with spinach'),
     portion: text('2 palmas de tilapia con espinaca', '2 palms tilapia with spinach'),
-    slots: MAIN, band: 'E', minutes: 20, ingredients: ['tilapia', 'spinach', 'olive oil'],
+    slots: FIRST_OR_MAIN, band: 'E', minutes: 20, ingredients: ['tilapia', 'spinach', 'olive oil'],
     allergens: ['fish'], nutrition: totals(473, 67.9, 22, 1.3),
   }),
   recipe({
     id: 'PIL-J05-M', familyId: 'PIL-J05', name: text('Tilapia con espinaca', 'Tilapia with spinach'),
     portion: text('3 palmas de tilapia con espinaca', '3 palms tilapia with spinach'),
-    slots: MAIN, band: 'M', conditional: true, minutes: 20, ingredients: ['tilapia', 'spinach', 'olive oil'],
+    slots: FIRST_OR_MAIN, band: 'M', conditional: true, minutes: 20, ingredients: ['tilapia', 'spinach', 'olive oil'],
     allergens: ['fish'], nutrition: totals(580, 91.5, 23.4, 1.3),
+  }),
+  recipe({
+    id: 'PIL-J05-H', familyId: 'PIL-J05', name: text('Tilapia con espinaca', 'Tilapia with spinach'),
+    portion: text('2½ palmas de tilapia con espinaca', '2½ palms tilapia with spinach'),
+    slots: MAIN, band: 'H', conditional: true, minutes: 22, ingredients: ['tilapia', 'spinach', 'olive oil'],
+    allergens: ['fish'], nutrition: totals(780, 78.4, 49.8, 1.3),
   }),
   recipe({
     id: 'PIL-J06-L', familyId: 'PIL-J06', name: text('Cerdo con nopales', 'Pork with nopales'),
@@ -156,6 +176,12 @@ export const JING_RECIPE_VARIANTS: readonly RecipeVariant[] = [
     nutrition: totals(587, 71.2, 29.3, 3.4),
   }),
   recipe({
+    id: 'PIL-J06-H', familyId: 'PIL-J06', name: text('Cerdo con nopales', 'Pork with nopales'),
+    portion: text('2½ palmas de cerdo con 1½ tazas de nopales', '2½ palms pork with 1½ cups nopales'),
+    slots: MAIN, band: 'H', conditional: true, minutes: 27, ingredients: ['pork', 'nopales', 'olive oil'],
+    nutrition: totals(835, 71.2, 57.3, 5),
+  }),
+  recipe({
     id: 'PIL-J07-L', familyId: 'PIL-J07', name: text('Pollo con coliflor', 'Chicken with cauliflower'),
     portion: text('1½ palmas de pollo con coliflor dorada', '1½ palms chicken with browned cauliflower'),
     slots: MAIN, band: 'L', minutes: 24, ingredients: ['chicken', 'cauliflower', 'olive oil'],
@@ -174,6 +200,12 @@ export const JING_RECIPE_VARIANTS: readonly RecipeVariant[] = [
     nutrition: totals(594, 81, 24.2, 6),
   }),
   recipe({
+    id: 'PIL-J07-H', familyId: 'PIL-J07', name: text('Pollo con coliflor', 'Chicken with cauliflower'),
+    portion: text('2½ palmas de pollo con 3 tazas de coliflor dorada', '2½ palms chicken with 3 cups browned cauliflower'),
+    slots: MAIN, band: 'H', conditional: true, minutes: 27, ingredients: ['chicken', 'cauliflower', 'olive oil'],
+    nutrition: totals(842, 81, 52.2, 8),
+  }),
+  recipe({
     id: 'PIL-J08-E', familyId: 'PIL-J08', name: text('Hamburguesa al plato', 'Bunless burger plate'),
     portion: text('1½ palmas de carne con lechuga y tomate', '1½ palms beef with lettuce and tomato'),
     slots: MAIN, band: 'E', minutes: 20, ingredients: ['ground beef', 'romaine', 'tomato'],
@@ -184,6 +216,12 @@ export const JING_RECIPE_VARIANTS: readonly RecipeVariant[] = [
     portion: text('2½ palmas de carne con lechuga y tomate', '2½ palms beef with lettuce and tomato'),
     slots: MAIN, band: 'M', conditional: true, minutes: 20, ingredients: ['ground beef', 'romaine', 'tomato'],
     nutrition: totals(704, 66.7, 43.9, 4.8),
+  }),
+  recipe({
+    id: 'PIL-J08-H', familyId: 'PIL-J08', name: text('Hamburguesa al plato', 'Bunless burger plate'),
+    portion: text('2½ palmas de carne con lechuga, tomate y pepino', '2½ palms beef with lettuce, tomato, and cucumber'),
+    slots: MAIN, band: 'H', conditional: true, minutes: 23, ingredients: ['ground beef', 'romaine', 'tomato', 'cucumber', 'olive oil'],
+    nutrition: totals(952, 66.7, 71.9, 5),
   }),
 ]
 
@@ -251,14 +289,19 @@ export const JING_COMPLETION_COMPONENTS: readonly CompletionComponent[] = [
     totals: totals(45, 9.5, 0.5, 0),
   }),
   component({
-    id: 'CT-J07-TSP', automatic: true, kind: 'fat', name: text('Aceite para cocción', 'Cooking oil'),
+    id: 'CT-J07-TSP', automatic: true, kind: 'fat', name: text('1 cucharadita adicional de aceite', '1 additional teaspoon oil'),
     portion: text('1 cucharadita', '1 teaspoon'), compatibleFamilies: ['PIL-J01', 'PIL-J02', ...ALL_MAIN_FAMILIES],
     ingredients: ['olive oil'], allergens: [], totals: totals(44, 0, 5, 0),
   }),
   component({
-    id: 'CT-J07-TBSP', automatic: true, kind: 'fat', name: text('Aceite para cocción o aderezo', 'Cooking oil or dressing'),
+    id: 'CT-J07-TBSP', automatic: true, kind: 'fat', name: text('1 cucharada adicional de aceite', '1 additional tablespoon oil'),
     portion: text('1 cucharada', '1 tablespoon'), compatibleFamilies: ['PIL-J01', 'PIL-J02', ...ALL_MAIN_FAMILIES],
     ingredients: ['olive oil'], allergens: [], totals: totals(124, 0, 14, 0),
+  }),
+  component({
+    id: 'CT-J07-2TBSP', automatic: true, kind: 'fat', name: text('2 cucharadas adicionales de aceite', '2 additional tablespoons oil'),
+    portion: text('2 cucharadas medidas', '2 measured tablespoons'), compatibleFamilies: ['PIL-J01', 'PIL-J02', ...ALL_MAIN_FAMILIES],
+    ingredients: ['olive oil'], allergens: [], totals: totals(248, 0, 28, 0),
   }),
   component({
     id: 'CT-J08', automatic: false, kind: 'fat', name: text('Aderezo cremoso medido', 'Measured creamy dressing'),
@@ -267,55 +310,71 @@ export const JING_COMPLETION_COMPONENTS: readonly CompletionComponent[] = [
   }),
 ]
 
-export const SYNTHETIC_GUIDED_PROFILE: NutritionProfile = {
+function calculatedProfile(value: Omit<NutritionProfile, 'calorieTarget'>): NutritionProfile {
+  return { ...value, calorieTarget: estimateEnergyTarget(value.energyInputs).targetCalories }
+}
+
+export const SYNTHETIC_GUIDED_PROFILE: NutritionProfile = calculatedProfile({
   id: 'SYN-JING-ROM-001',
   firstName: 'Rom',
   language: 'es',
   phase: 'Jing',
-  calorieTarget: 1_600,
+  energyInputs: {
+    ageYears: 60, equationSex: 'male', heightCm: 175, currentWeightKg: 110, goalWeightKg: 84,
+    activityLevel: 'sedentary', requestedDeficitCalories: 650,
+  },
   mealSlots: ['lunch', 'dinner'],
   preferredFoods: ['sirloin', 'ground beef', 'nopales', 'chicken'],
   dislikedFoods: [],
   excludedFoods: [],
   safetyReviewRequired: false,
-}
+})
 
 export const SYNTHETIC_PERSONALIZATION_PROFILES: readonly NutritionProfile[] = [
-  {
+  calculatedProfile({
     id: 'SYN-JING-ELENA-1400',
     firstName: 'Elena',
     language: 'es',
     phase: 'Jing',
-    calorieTarget: 1_400,
+    energyInputs: {
+      ageYears: 50, equationSex: 'female', heightCm: 163, currentWeightKg: 105, goalWeightKg: 75,
+      activityLevel: 'sedentary', requestedDeficitCalories: 600,
+    },
     mealSlots: ['first_meal', 'lunch', 'dinner'],
     preferredFoods: ['egg', 'tilapia', 'spinach'],
     dislikedFoods: ['pork'],
     excludedFoods: [],
     safetyReviewRequired: false,
-  },
+  }),
   SYNTHETIC_GUIDED_PROFILE,
-  {
+  calculatedProfile({
     id: 'SYN-JING-SOFIA-1800',
     firstName: 'Sofía',
     language: 'es',
     phase: 'Jing',
-    calorieTarget: 1_800,
+    energyInputs: {
+      ageYears: 40, equationSex: 'female', heightCm: 168, currentWeightKg: 126, goalWeightKg: 82,
+      activityLevel: 'sedentary', requestedDeficitCalories: 550,
+    },
     mealSlots: ['first_meal', 'lunch', 'dinner'],
     preferredFoods: ['chicken', 'tilapia', 'spinach'],
     dislikedFoods: ['pork'],
     excludedFoods: ['dairy'],
     safetyReviewRequired: false,
-  },
-  {
-    id: 'SYN-JING-MARCO-2000',
+  }),
+  calculatedProfile({
+    id: 'SYN-JING-MARCO-2400',
     firstName: 'Marco',
     language: 'es',
     phase: 'Jing',
-    calorieTarget: 2_000,
+    energyInputs: {
+      ageYears: 62, equationSex: 'male', heightCm: 178, currentWeightKg: 172.4, goalWeightKg: 109,
+      activityLevel: 'sedentary', requestedDeficitCalories: 600,
+    },
     mealSlots: ['lunch', 'dinner'],
     preferredFoods: ['chicken', 'sirloin'],
     dislikedFoods: ['fish'],
     excludedFoods: [],
     safetyReviewRequired: false,
-  },
+  }),
 ]

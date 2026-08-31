@@ -9,6 +9,7 @@ import type {
   PlateOption,
   RecipeVariant,
 } from './types'
+import { estimateEnergyTarget } from './energy.ts'
 
 export const JING_OPERATIONAL_CARB_CEILING_G = 18
 export const ENERGY_TOLERANCE = 0.10
@@ -116,7 +117,7 @@ export function buildCandidatePlates({
   for (const recipe of recipes) {
     if (recipe.status !== 'approved' || !recipe.active || recipe.phase !== profile.phase) continue
     if (!recipe.slots.includes(slot)) continue
-    if (hasAny(recipe.ingredients, blocked) || hasAny(recipe.allergens, exclusions)) continue
+    if (hasAny(recipe.ingredients, blocked) || hasAny(recipe.allergens, blocked)) continue
 
     const compatibleComponents = allowedComponents(recipe.familyId, components, blocked)
     for (const completion of componentCombinations(compatibleComponents)) {
@@ -172,12 +173,16 @@ function bestPerFamily(candidates: readonly PlateOption[]) {
 function selectOptions(
   candidates: readonly PlateOption[],
   usedFamilies: ReadonlySet<string>,
+  proteinCeilingG: number,
 ) {
   return bestPerFamily(candidates)
     .toSorted((left, right) => {
       const leftPenalty = usedFamilies.has(left.familyId) ? 200 : 0
       const rightPenalty = usedFamilies.has(right.familyId) ? 200 : 0
-      return (right.preferenceScore - rightPenalty) - (left.preferenceScore - leftPenalty)
+      const leftProteinPenalty = left.totals.proteinG > proteinCeilingG ? 500 : 0
+      const rightProteinPenalty = right.totals.proteinG > proteinCeilingG ? 500 : 0
+      return (right.preferenceScore - rightPenalty - rightProteinPenalty)
+        - (left.preferenceScore - leftPenalty - leftProteinPenalty)
         || left.id.localeCompare(right.id)
     })
     .slice(0, MAX_OPTIONS_PER_GROUP)
@@ -197,6 +202,12 @@ function envelopeForGroups(
   const maxNetCarbsG = complete
     ? Math.round(groups.reduce((sum, group) => sum + Math.max(...group.options.map(option => option.totals.netCarbsG)), 0) * 10) / 10
     : 0
+  const minProteinG = complete
+    ? Math.round(groups.reduce((sum, group) => sum + Math.min(...group.options.map(option => option.totals.proteinG)), 0) * 10) / 10
+    : 0
+  const maxProteinG = complete
+    ? Math.round(groups.reduce((sum, group) => sum + Math.max(...group.options.map(option => option.totals.proteinG)), 0) * 10) / 10
+    : 0
   const calorieFloor = Math.round(calorieTarget * (1 - ENERGY_TOLERANCE))
   const calorieCeiling = Math.round(calorieTarget * (1 + ENERGY_TOLERANCE))
 
@@ -204,6 +215,8 @@ function envelopeForGroups(
     minCalories,
     maxCalories,
     maxNetCarbsG,
+    minProteinG,
+    maxProteinG,
     calorieFloor,
     calorieCeiling,
     carbCeilingG: JING_OPERATIONAL_CARB_CEILING_G,
@@ -229,6 +242,8 @@ function emptyEnvelope(calorieTarget: number): CompatibilityEnvelope {
     minCalories: 0,
     maxCalories: 0,
     maxNetCarbsG: 0,
+    minProteinG: 0,
+    maxProteinG: 0,
     calorieFloor: Math.round(calorieTarget * (1 - ENERGY_TOLERANCE)),
     calorieCeiling: Math.round(calorieTarget * (1 + ENERGY_TOLERANCE)),
     carbCeilingG: JING_OPERATIONAL_CARB_CEILING_G,
@@ -246,10 +261,12 @@ export function buildGuidedPlan({
   components: readonly CompletionComponent[]
 }): GuidedPlan {
   const id = `SYN-PLAN-${profile.id}`
+  const energyEstimate = estimateEnergyTarget(profile.energyInputs)
   const base = {
     id,
     source: 'synthetic_preview' as const,
     profile,
+    energyEstimate,
     requiresHumanReview: true as const,
   }
 
@@ -263,13 +280,25 @@ export function buildGuidedPlan({
     }
   }
 
-  if (profile.calorieTarget >= 2_000) {
+  if (
+    energyEstimate.reviewRequired
+    || profile.calorieTarget !== energyEstimate.targetCalories
+    || profile.safetyReviewRequired
+  ) {
     return {
       ...base,
-      status: 'blocked_high_target',
+      status: 'blocked_safety_review',
       groups: [],
       envelope: emptyEnvelope(profile.calorieTarget),
-      reasons: ['The approved pilot library cannot automatically cover a 2,000 kcal target.'],
+      reasons: [
+        ...energyEstimate.reasons,
+        ...(profile.calorieTarget !== energyEstimate.targetCalories
+          ? ['The displayed calorie target does not match the calculated maintenance-minus-deficit target.']
+          : []),
+        ...(profile.safetyReviewRequired
+          ? ['The synthetic profile is marked for human safety review.']
+          : []),
+      ],
     }
   }
 
@@ -296,7 +325,11 @@ export function buildGuidedPlan({
       recipes,
       components,
     })
-    const options = selectOptions(candidates, usedFamilies)
+    const options = selectOptions(
+      candidates,
+      usedFamilies,
+      energyEstimate.proteinCeilingG * configuration.weights[index],
+    )
     options.forEach(option => usedFamilies.add(option.familyId))
     return { slot, targetCalories, carbBudgetG, options }
   })
@@ -313,10 +346,13 @@ export function buildGuidedPlan({
     reasons.push('At least one meal has fewer than three equivalent options.')
   }
   if (groups.some(group => group.options.some(option => option.conditional))) {
-    reasons.push('At least one choice contains a conditional M portion and requires human review.')
+    reasons.push('At least one choice contains a conditional higher-energy portion and requires human review.')
   }
   if (profile.safetyReviewRequired) {
     reasons.push('The synthetic profile is marked for human safety review.')
+  }
+  if (envelope.minProteinG < energyEstimate.proteinFloorG || envelope.maxProteinG > energyEstimate.proteinCeilingG) {
+    reasons.push('At least one daily combination falls outside the goal-weight protein review range.')
   }
 
   return {

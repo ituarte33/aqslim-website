@@ -38,10 +38,10 @@ function foodList(values: readonly string[], lang: 'es' | 'en') {
 }
 
 function blockedMessage(status: GuidedPlan['status'], es: boolean) {
-  if (status === 'blocked_high_target') {
+  if (status === 'blocked_safety_review') {
     return es
-      ? 'La biblioteca piloto todavía no cubre automáticamente una meta de 2,000 kcal. AQ Buddy detuvo la generación para revisión humana.'
-      : 'The pilot library does not yet cover a 2,000 kcal target automatically. AQ Buddy stopped generation for human review.'
+      ? 'Los datos energéticos o una señal de seguridad requieren revisión humana antes de generar opciones.'
+      : 'The energy inputs or a safety signal require human review before generating choices.'
   }
   if (status === 'blocked_profile') {
     return es
@@ -51,6 +51,19 @@ function blockedMessage(status: GuidedPlan['status'], es: boolean) {
   return es
     ? 'La biblioteca actual no tiene suficientes opciones compatibles para completar este perfil.'
     : 'The current library does not have enough compatible choices to complete this profile.'
+}
+
+function pounds(kilograms: number) {
+  return Math.round(kilograms * 2.20462)
+}
+
+function activityLabel(activity: GuidedPlan['profile']['energyInputs']['activityLevel'], es: boolean) {
+  const labels = {
+    sedentary: es ? 'Actividad baja' : 'Low activity',
+    light: es ? 'Actividad ligera' : 'Light activity',
+    moderate: es ? 'Actividad moderada' : 'Moderate activity',
+  }
+  return labels[activity]
 }
 
 function resetPreviewScroll() {
@@ -133,7 +146,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización automática v0.1' : 'Automatic personalization test v0.1'}</span>
+              <span>{es ? 'Prueba de personalización automática v0.2' : 'Automatic personalization test v0.2'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -154,7 +167,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
                 >
                   <span className={ready ? styles.profileReady : styles.profileBlocked} />
                   <strong>{item.profile.firstName}</strong>
-                  <small>{item.profile.calorieTarget.toLocaleString()} kcal · {item.profile.mealSlots.length} {es ? 'comidas' : 'meals'}</small>
+                  <small>{item.profile.calorieTarget.toLocaleString()} kcal {es ? 'calculadas' : 'calculated'} · {item.profile.mealSlots.length} {es ? 'comidas' : 'meals'}</small>
                   <b>{ready ? (es ? 'Generado' : 'Generated') : (es ? 'Detenido' : 'Stopped')}</b>
                 </button>
               )
@@ -199,7 +212,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
                     <span>{SLOT_LABEL[group.slot][lang]}</span>
                     <h2>{Math.round(group.targetCalories)} kcal objetivo</h2>
                   </div>
-                  <b>{group.options.length}/3 {es ? 'opciones' : 'choices'}</b>
+                  <b>{group.options.length} {es ? 'de 3 opciones disponibles' : 'of 3 choices available'}</b>
                 </header>
 
                 <div className={styles.optionList}>
@@ -267,10 +280,22 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
               </div>
             </div>
 
+            <section>
+              <span>{es ? 'Cálculo energético sintético' : 'Synthetic energy calculation'}</span>
+              <h2>{plan.profile.calorieTarget.toLocaleString()} kcal</h2>
+              <dl>
+                <div><dt>{es ? 'Datos utilizados' : 'Inputs used'}</dt><dd>{plan.profile.energyInputs.ageYears} {es ? 'años' : 'years'} · {pounds(plan.profile.energyInputs.currentWeightKg)} lb · {plan.profile.energyInputs.heightCm} cm</dd></div>
+                <div><dt>{es ? 'Actividad' : 'Activity'}</dt><dd>{activityLabel(plan.profile.energyInputs.activityLevel, es)}</dd></div>
+                <div><dt>{es ? 'Mantenimiento estimado' : 'Estimated maintenance'}</dt><dd>{plan.energyEstimate.maintenanceCalories.toLocaleString()} kcal</dd></div>
+                <div><dt>{es ? 'Déficit aplicado' : 'Applied deficit'}</dt><dd>{plan.energyEstimate.appliedDeficitCalories} kcal · {plan.energyEstimate.deficitPercent}%</dd></div>
+                <div><dt>{es ? 'Proteína para revisión' : 'Protein review range'}</dt><dd>{plan.energyEstimate.proteinFloorG}–{plan.energyEstimate.proteinCeilingG} g/día</dd></div>
+              </dl>
+            </section>
+
             {coverageGap ? (
               <div className={styles.coverageNote}>
                 <span>{es ? 'Cobertura piloto' : 'Pilot coverage'}</span>
-                <strong>{SLOT_LABEL[coverageGap.slot][lang]}: {coverageGap.options.length}/3 {es ? 'opciones' : 'choices'}</strong>
+                <strong>{SLOT_LABEL[coverageGap.slot][lang]}: {coverageGap.options.length} {es ? 'de 3 opciones disponibles' : 'of 3 choices available'}</strong>
                 <p>{es ? 'La prueba muestra la limitación; no inventa una tercera opción.' : 'The test shows the limitation; it does not invent a third choice.'}</p>
               </div>
             ) : null}
@@ -284,6 +309,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
                 <div><dt>{es ? 'Energía posible' : 'Possible energy'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal` : '—'}</dd></div>
                 <div><dt>{es ? 'Rango permitido' : 'Allowed range'}</dt><dd>{plan.envelope.calorieFloor}–{plan.envelope.calorieCeiling} kcal</dd></div>
                 <div><dt>{es ? 'Máximo de carbos' : 'Maximum carbs'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.maxNetCarbsG}/${plan.envelope.carbCeilingG} g` : `—/${plan.envelope.carbCeilingG} g`}</dd></div>
+                <div><dt>{es ? 'Proteína posible' : 'Possible protein'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.minProteinG}–${plan.envelope.maxProteinG} g` : '—'}</dd></div>
               </dl>
             </section>
 
@@ -294,6 +320,8 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
                 <li>{es ? 'Máximo 3 opciones por comida' : 'Maximum 3 choices per meal'}</li>
                 <li>{es ? 'Máximo 2 complementos' : 'Maximum 2 complements'}</li>
                 <li>{es ? 'Sin repetición forzada de familias' : 'No forced family repetition'}</li>
+                <li>{es ? 'Sin techo artificial de 2,000 kcal' : 'No artificial 2,000 kcal ceiling'}</li>
+                <li>{es ? 'Déficit controlado de 500–750 kcal' : 'Controlled 500–750 kcal deficit'}</li>
               </ul>
             </section>
 

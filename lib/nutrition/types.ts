@@ -1,7 +1,32 @@
 export type NutritionPhase = 'Jing' | 'Qi' | 'Xue' | 'Yang Sheng'
 
 export type MealSlot = 'first_meal' | 'lunch' | 'dinner'
-export type PortionBand = 'L' | 'E' | 'M'
+export type PortionBand = 'L' | 'E' | 'M' | 'H'
+
+export type EnergyEquationSex = 'female' | 'male'
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate'
+
+export type EnergyInputs = {
+  ageYears: number
+  equationSex: EnergyEquationSex
+  heightCm: number
+  currentWeightKg: number
+  goalWeightKg: number
+  activityLevel: ActivityLevel
+  requestedDeficitCalories: number
+}
+
+export type EnergyEstimate = {
+  restingCalories: number
+  maintenanceCalories: number
+  targetCalories: number
+  appliedDeficitCalories: number
+  deficitPercent: number
+  proteinFloorG: number
+  proteinCeilingG: number
+  reviewRequired: boolean
+  reasons: readonly string[]
+}
 
 export type NutritionTotals = {
   calories: number
@@ -54,6 +79,7 @@ export type NutritionProfile = {
   language: 'es' | 'en'
   phase: NutritionPhase
   calorieTarget: number
+  energyInputs: EnergyInputs
   mealSlots: readonly MealSlot[]
   preferredFoods: readonly string[]
   dislikedFoods: readonly string[]
@@ -90,6 +116,8 @@ export type CompatibilityEnvelope = {
   minCalories: number
   maxCalories: number
   maxNetCarbsG: number
+  minProteinG: number
+  maxProteinG: number
   calorieFloor: number
   calorieCeiling: number
   carbCeilingG: number
@@ -99,13 +127,14 @@ export type CompatibilityEnvelope = {
 export type GuidedPlanStatus =
   | 'ready_for_review'
   | 'insufficient_library'
-  | 'blocked_high_target'
+  | 'blocked_safety_review'
   | 'blocked_profile'
 
 export type GuidedPlan = {
   id: string
   source: 'synthetic_preview'
   profile: NutritionProfile
+  energyEstimate: EnergyEstimate
   status: GuidedPlanStatus
   requiresHumanReview: true
   groups: readonly ChoiceGroup[]

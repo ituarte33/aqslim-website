@@ -88,7 +88,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
               <p className={styles.eyebrow}>{SLOT_COPY[group.slot][language]}</p>
               <h2>{es ? '¿Qué se te antoja?' : 'What sounds good?'}</h2>
             </div>
-            <span>{group.options.length}/3</span>
+            <span>{group.options.length} {es ? 'de 3 opciones disponibles' : 'of 3 choices available'}</span>
           </div>
 
           <div className={styles.choiceList}>
