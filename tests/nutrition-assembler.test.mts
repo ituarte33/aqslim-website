@@ -15,8 +15,10 @@ import { estimateEnergyTarget } from '../lib/nutrition/energy.ts'
 import type { NutritionProfile } from '../lib/nutrition/types.ts'
 import { planContainsBlockedFood, validateEveryCombination } from '../lib/nutrition/validation.ts'
 import {
+  APPROXIMATE_PALM_OUNCES,
   buildShoppingList,
   buildWeeklyRotation,
+  formatShoppingQuantity,
   rotationFrequency,
   weeklyRotationKey,
 } from '../lib/nutrition/weekly-capsule.ts'
@@ -162,6 +164,26 @@ test('favorites lead the rotation and do-not-repeat recipes leave the grocery li
   assert.equal(frequency[weeklyRotationKey('first_meal', favorite.id)], 4)
   assert.equal(shoppingList.some(item => item.ingredient === 'tilapia'), false)
   assert.equal(shoppingList.every(item => item.mealUses >= 2), true)
+})
+
+test('the grocery list converts the approved household portions into rounded purchase quantities', () => {
+  const sofia = SYNTHETIC_PERSONALIZATION_PROFILES.find(profile => profile.firstName === 'Sofía')
+  assert.ok(sofia)
+  const plan = build(sofia)
+  const rotation = buildWeeklyRotation(plan, { 'PIL-J04': 'favorite', 'PIL-J05': 'avoid' })
+  const shoppingList = buildShoppingList(rotation)
+  const item = (ingredient: string) => shoppingList.find(entry => entry.ingredient === ingredient)
+
+  assert.equal(APPROXIMATE_PALM_OUNCES, 4)
+  assert.equal(formatShoppingQuantity(item('sirloin')!, 'es'), '≈ 4.25 lb')
+  assert.equal(formatShoppingQuantity(item('tuna')!, 'es'), '8 latas')
+  assert.equal(formatShoppingQuantity(item('egg')!, 'es'), '18 huevos · paquete de 18')
+  assert.equal(formatShoppingQuantity(item('chicken')!, 'es'), '≈ 1.25 lb')
+  assert.equal(formatShoppingQuantity(item('ground beef')!, 'es'), '≈ 1.25 lb')
+  assert.equal(formatShoppingQuantity(item('cauliflower')!, 'es'), '2 cabezas medianas')
+  assert.equal(formatShoppingQuantity(item('romaine')!, 'es'), '2 corazones de lechuga')
+  assert.equal(shoppingList.length, 13)
+  assert.equal(shoppingList.every(entry => entry.quantity > 0), true)
 })
 
 test('the Preview supports exactly two or three actual meals without forcing a snack', () => {

@@ -49,9 +49,15 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.match(view, /Confirmar rotación y preparar lista/)
   assert.match(view, /Lista de supermercado/)
   assert.match(view, /las preferencias todavía no se guardan/)
+  assert.match(view, /formatShoppingQuantity\(item, language\)/)
+  assert.match(view, /1 palma se estima como 4 oz/)
   assert.doesNotMatch(view, /localStorage|sessionStorage|fetch\(/)
   assert.match(weeklyCapsule, /WEEK_LENGTH_DAYS = 7/)
   assert.match(weeklyCapsule, /mealUses >= 2/)
+  assert.match(weeklyCapsule, /APPROXIMATE_PALM_OUNCES = 4/)
+  assert.match(weeklyCapsule, /ShoppingUnit/)
+  assert.match(weeklyCapsule, /rounded\(item\.quantity, 6\)/)
+  assert.match(weeklyCapsule, /paquete de \$\{eggs\}/)
   assert.match(weeklyCapsule, /preferences\[option\.familyId\] !== 'avoid'/)
   for (const image of [
     'omelette-mexicana-v1.webp',
@@ -150,4 +156,5 @@ test('the guided plan keeps headings clear and cards readable on narrow screens'
   assert.match(styles, /\.preferenceActions \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
   assert.match(styles, /\.shoppingGroups \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
   assert.match(styles, /@media \(max-width: 600px\) \{[\s\S]*?\.weeklyCapsule > header, \.shoppingGroups \{ grid-template-columns: 1fr; \}/)
+  assert.match(styles, /@media \(min-width: 980px\) \{[\s\S]*?\.portal \{ padding-bottom: 148px; \}/)
 })

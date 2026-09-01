@@ -8,6 +8,7 @@ import type { GuidedPlan, MealSlot, PlateOption } from '@/lib/nutrition/types'
 import {
   buildShoppingList,
   buildWeeklyRotation,
+  formatShoppingQuantity,
   rotationFrequency,
   weeklyRotationKey,
   type RecipePreference,
@@ -279,8 +280,11 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
                   <h3>{SHOPPING_CATEGORY_COPY[category][language]}</h3>
                   <ul>{items.map(item => (
                     <li key={item.ingredient}>
-                      <span>{item.label[language]}</span>
-                      <b>{es ? `para ${item.mealUses} comidas` : `for ${item.mealUses} meals`}</b>
+                      <span>
+                        {item.label[language]}
+                        <small>{es ? `utilizado en ${item.mealUses} comidas` : `used in ${item.mealUses} meals`}</small>
+                      </span>
+                      <b>{formatShoppingQuantity(item, language)}</b>
                     </li>
                   ))}</ul>
                 </section>
@@ -288,8 +292,8 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
             })}
           </div>
           <p className={styles.shoppingNotice}>{es
-            ? 'Esta primera lista agrupa por número de preparaciones. Las cantidades de compra se añadirán después de validar equivalencias domésticas de cada porción.'
-            : 'This first list groups by number of preparations. Purchase quantities will be added after validating household equivalents for each portion.'}</p>
+            ? 'Cantidades de compra aproximadas, redondeadas hacia arriba. Para proteínas, 1 palma se estima como 4 oz; revisa la despensa antes de comprar aceites y especias.'
+            : 'Approximate purchase quantities, rounded up. For proteins, 1 palm is estimated as 4 oz; check the pantry before buying oils and spices.'}</p>
         </section>
       ) : null}
 
