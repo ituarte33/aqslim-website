@@ -334,6 +334,7 @@ export function buildGuidedPlan({
     return { slot, targetCalories, carbBudgetG, options }
   })
   const envelope = envelopeForGroups(groups, profile.calorieTarget)
+  const hasThreeChoicesPerMeal = groups.every(group => group.options.length === MAX_OPTIONS_PER_GROUP)
   const reasons: string[] = []
 
   if (groups.some(group => group.options.length === 0)) {
@@ -357,7 +358,7 @@ export function buildGuidedPlan({
 
   return {
     ...base,
-    status: envelope.passes ? 'ready_for_review' : 'insufficient_library',
+    status: envelope.passes && hasThreeChoicesPerMeal ? 'ready_for_review' : 'insufficient_library',
     groups,
     envelope,
     reasons,

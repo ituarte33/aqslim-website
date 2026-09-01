@@ -2,10 +2,19 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { GuidedPlan, MealSlot, PlateOption } from '@/lib/nutrition/types'
+import { buildGuidedPlan } from '@/lib/nutrition/assembler'
+import type {
+  CompletionComponent,
+  GuidedPlan,
+  MealSlot,
+  NutritionProfile,
+  PlateOption,
+  RecipeVariant,
+} from '@/lib/nutrition/types'
 import { hasPilotRecipeDetail, RecipeDetailDialog } from '@/app/my-aqslim/plan/recipe-detail-dialog'
 import { DashboardShell } from '../dashboard-shell'
 import styles from './plan-preview.module.css'
+import { SyntheticQuestionnaire } from './synthetic-questionnaire'
 
 const SLOT_LABEL: Record<MealSlot, { es: string; en: string }> = {
   first_meal: { es: 'Primera comida', en: 'First meal' },
@@ -29,6 +38,8 @@ const FOOD_LABEL: Record<string, { es: string; en: string }> = {
 type Props = {
   user: { firstName: string | null; lastName: string | null } | null
   plans: readonly GuidedPlan[]
+  recipes: readonly RecipeVariant[]
+  components: readonly CompletionComponent[]
   recipeVariantCount: number
   componentCount: number
 }
@@ -70,14 +81,19 @@ function resetPreviewScroll() {
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
 }
 
-export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCount }: Props) {
+export function PlanPreviewClient({ user, plans, recipes, components, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
+  const [questionnairePlan, setQuestionnairePlan] = useState<GuidedPlan | null>(null)
   const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const es = lang === 'es'
+  const availablePlans = useMemo(
+    () => questionnairePlan ? [questionnairePlan, ...plans] : plans,
+    [plans, questionnairePlan],
+  )
   const plan = useMemo(
-    () => plans.find(item => item.profile.id === selectedProfileId) ?? plans[0],
-    [plans, selectedProfileId],
+    () => availablePlans.find(item => item.profile.id === selectedProfileId) ?? availablePlans[0],
+    [availablePlans, selectedProfileId],
   )
   const combinationCount = useMemo(
     () => plan.groups.length > 0
@@ -86,6 +102,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
     [plan.groups],
   )
   const generationPassed = plan.status === 'ready_for_review'
+  const isQuestionnairePlan = plan.profile.id === 'SYN-JING-QUESTIONNAIRE-DRAFT'
   const coverageGap = plan.groups.find(group => group.options.length < 3)
 
   useEffect(() => {
@@ -113,6 +130,13 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
     window.requestAnimationFrame(resetPreviewScroll)
   }
 
+  function generateQuestionnairePlan(profile: NutritionProfile) {
+    const generatedPlan = buildGuidedPlan({ profile, recipes, components })
+    setQuestionnairePlan(generatedPlan)
+    setSelectedProfileId(profile.id)
+    window.requestAnimationFrame(resetPreviewScroll)
+  }
+
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang} isolatedPreview>
       <div className={styles.page}>
@@ -126,7 +150,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
           </div>
           <div className={styles.headerActions}>
             <span className={styles.syntheticBadge}>{es ? 'Datos sintéticos' : 'Synthetic data'}</span>
-            {generationPassed ? (
+            {generationPassed && !isQuestionnairePlan ? (
               <Link
                 href={{ pathname: '/my-aqslim/demo/plan', query: { profile: plan.profile.id } }}
                 className={styles.previewLink}
@@ -135,6 +159,10 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
               >
                 {es ? `Abrir vista de ${plan.profile.firstName} ↗` : `Open ${plan.profile.firstName}’s view ↗`}
               </Link>
+            ) : isQuestionnairePlan ? (
+              <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
+                {es ? 'Vista temporal sólo en Dashboard' : 'Temporary Dashboard view only'}
+              </span>
             ) : (
               <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
                 {es ? `Vista de ${plan.profile.firstName} no disponible` : `${plan.profile.firstName}’s view unavailable`}
@@ -143,10 +171,12 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
           </div>
         </header>
 
+        <SyntheticQuestionnaire lang={lang} onGenerate={generateQuestionnairePlan} />
+
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización automática v0.3' : 'Automatic personalization test v0.3'}</span>
+              <span>{es ? 'Prueba de personalización automática v0.4' : 'Automatic personalization test v0.4'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -154,7 +184,7 @@ export function PlanPreviewClient({ user, plans, recipeVariantCount, componentCo
               : 'These fictional profiles verify that phase, meal count, preferences, and exclusions change the result without building every plan by hand.'}</p>
           </div>
           <div className={styles.profileOptions}>
-            {plans.map(item => {
+            {availablePlans.map(item => {
               const active = item.profile.id === plan.profile.id
               const ready = item.status === 'ready_for_review'
               return (

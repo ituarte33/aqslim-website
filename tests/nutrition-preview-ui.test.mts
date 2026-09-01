@@ -8,6 +8,8 @@ const CLIENT_DEMO = new URL('../app/my-aqslim/demo/plan/page.tsx', import.meta.u
 const REAL_PLAN = new URL('../app/my-aqslim/plan/page.tsx', import.meta.url)
 const DASHBOARD_PAGE = new URL('../app/dashboard/plan-preview/page.tsx', import.meta.url)
 const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-client.tsx', import.meta.url)
+const SYNTHETIC_QUESTIONNAIRE = new URL('../app/dashboard/plan-preview/synthetic-questionnaire.tsx', import.meta.url)
+const QUESTIONNAIRE_PROFILE = new URL('../lib/nutrition/questionnaire-profile.ts', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
 const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
 const RECIPE_DATA = new URL('../app/my-aqslim/plan/recipe-detail-data.ts', import.meta.url)
@@ -98,9 +100,11 @@ test('the real client plan route remains connected to its existing portal data',
 })
 
 test('the Dashboard Preview is admin-only, review-first, and has no persistence path', async () => {
-  const [page, client, shell, middleware] = await Promise.all([
+  const [page, client, questionnaire, questionnaireProfile, shell, middleware] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
+    readFile(SYNTHETIC_QUESTIONNAIRE, 'utf8'),
+    readFile(QUESTIONNAIRE_PROFILE, 'utf8'),
     readFile(DASHBOARD_SHELL, 'utf8'),
     readFile(MIDDLEWARE, 'utf8'),
   ])
@@ -116,7 +120,10 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /Validación automática/)
   assert.match(client, /Pendiente de revisión humana/)
   assert.match(client, /combinaciones compatibles/)
-  assert.match(client, /Prueba de personalización automática v0\.3/)
+  assert.match(client, /Prueba de personalización automática v0\.4/)
+  assert.match(client, /<SyntheticQuestionnaire lang=\{lang\} onGenerate=\{generateQuestionnairePlan\}/)
+  assert.match(client, /buildGuidedPlan\(\{ profile, recipes, components \}\)/)
+  assert.match(client, /Vista temporal sólo en Dashboard/)
   assert.match(client, /Cálculo energético sintético/)
   assert.match(client, /Mantenimiento estimado/)
   assert.match(client, /Déficit aplicado/)
@@ -153,6 +160,15 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(middleware, /pathname\.startsWith\('\/food-scanner\/'\)/)
   assert.match(shell, /es: 'Clientes', en: 'Clients'/)
   assert.doesNotMatch(client, /Constructor de planes/)
+  assert.match(questionnaire, /Cuestionario sintético v0\.1/)
+  assert.match(questionnaire, /No escribas nombres, diagnósticos ni medicamentos/)
+  assert.match(questionnaire, /Nada se guarda ni se publica/)
+  assert.match(questionnaire, /Sí · detener para revisión/)
+  assert.match(questionnaire, /Generar opciones con AQ Buddy/)
+  assert.doesNotMatch(questionnaire, /fetch\(|airtable|localStorage|sessionStorage/i)
+  assert.doesNotMatch(questionnaireProfile, /fetch\(|airtable|localStorage|sessionStorage/i)
+  assert.match(questionnaireProfile, /CONTROLLED_DEFICIT_CALORIES = 500/)
+  assert.match(questionnaireProfile, /safetyReviewRequired: answers\.medicationReview === 'required'/)
 })
 
 test('the guided plan keeps headings clear and cards readable on narrow screens', async () => {

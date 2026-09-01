@@ -14,6 +14,8 @@ export default async function PlanPreviewPage() {
     <PlanPreviewClient
       user={user ? { firstName: user.firstName, lastName: user.lastName } : null}
       plans={buildSyntheticPersonalizationPlans()}
+      recipes={JING_RECIPE_VARIANTS}
+      components={JING_COMPLETION_COMPONENTS}
       recipeVariantCount={JING_RECIPE_VARIANTS.length}
       componentCount={JING_COMPLETION_COMPONENTS.length}
     />
