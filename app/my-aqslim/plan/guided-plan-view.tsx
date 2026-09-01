@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import type { GuidedPlan, MealSlot, PlateOption } from '@/lib/nutrition/types'
 import {
@@ -16,6 +16,7 @@ import {
   type RecipePreferenceMap,
   type ShoppingCategory,
 } from '@/lib/nutrition/weekly-capsule'
+import { loadRecipePreferences, saveRecipePreferences } from '@/lib/nutrition/recipe-preference-storage'
 import { PortalShell } from '../portal-shell'
 import { usePortalLanguage } from '../use-portal-language'
 import { hasPilotRecipeDetail, RecipeDetailDialog } from './recipe-detail-dialog'
@@ -58,6 +59,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const [activeSlot, setActiveSlot] = useState<MealSlot>(plan.groups[0]?.slot ?? 'lunch')
   const [selected, setSelected] = useState<Partial<Record<MealSlot, string>>>({})
   const [preferences, setPreferences] = useState<RecipePreferenceMap>({})
+  const [preferenceStorageStatus, setPreferenceStorageStatus] = useState<'loading' | 'ready' | 'unavailable'>(demo ? 'loading' : 'ready')
   const [calendarRotation, setCalendarRotation] = useState<ReturnType<typeof buildWeeklyRotation> | null>(null)
   const [calendarNotice, setCalendarNotice] = useState<{ from: number; to: number } | null>(null)
   const [showShoppingList, setShowShoppingList] = useState(false)
@@ -67,6 +69,10 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const group = plan.groups.find(item => item.slot === activeSlot) ?? plan.groups[0]
   const chosenCount = Object.keys(selected).length
   const guidePath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
+  const preferenceFamilyIds = useMemo(
+    () => [...new Set(plan.groups.flatMap(item => item.options.map(option => option.familyId)))],
+    [plan],
+  )
   const automaticRotation = useMemo(() => buildWeeklyRotation(plan, preferences), [plan, preferences])
   const weeklyRotation = calendarRotation ?? automaticRotation
   const frequency = useMemo(() => rotationFrequency(weeklyRotation), [weeklyRotation])
@@ -75,6 +81,19 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
     (total, item) => total + item.options.filter(option => preferences[option.familyId] !== 'avoid').length,
     0,
   )
+
+  useEffect(() => {
+    if (!demo) return
+
+    setPreferenceStorageStatus('loading')
+    const restored = loadRecipePreferences(window.localStorage, plan.profile.id, preferenceFamilyIds)
+    setPreferences(restored)
+    setSelected({})
+    setCalendarRotation(null)
+    setCalendarNotice(null)
+    setShowShoppingList(false)
+    setPreferenceStorageStatus('ready')
+  }, [demo, plan.profile.id, preferenceFamilyIds])
 
   function choose(slot: MealSlot, optionId: string) {
     setSelected(current => ({ ...current, [slot]: optionId }))
@@ -93,22 +112,25 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
     setCalendarRotation(null)
     setCalendarNotice(null)
     setShowShoppingList(false)
-    setPreferences(current => {
-      const currentValue = current[familyId]
-      const nextValue = currentValue === preference ? undefined : preference
-      const wouldEmptyAGroup = plan.groups.some(item => item.options.every(option => (
-        option.familyId === familyId || current[option.familyId] === 'avoid'
-      )))
+    const currentValue = preferences[familyId]
+    const nextValue = currentValue === preference ? undefined : preference
+    const wouldEmptyAGroup = plan.groups.some(item => item.options.every(option => (
+      option.familyId === familyId || preferences[option.familyId] === 'avoid'
+    )))
 
-      if (nextValue === 'avoid' && currentValue !== 'avoid' && wouldEmptyAGroup) return current
+    if (nextValue === 'avoid' && currentValue !== 'avoid' && wouldEmptyAGroup) return
 
-      const next = { ...current }
-      if (nextValue) next[familyId] = nextValue
-      else delete next[familyId]
-      return next
-    })
+    const next = { ...preferences }
+    if (nextValue) next[familyId] = nextValue
+    else delete next[familyId]
+    setPreferences(next)
 
-    if (preference === 'avoid' && preferences[familyId] !== 'avoid') {
+    if (demo && preferenceStorageStatus !== 'loading') {
+      const saved = saveRecipePreferences(window.localStorage, plan.profile.id, next)
+      setPreferenceStorageStatus(saved ? 'ready' : 'unavailable')
+    }
+
+    if (nextValue === 'avoid') {
       setSelected(current => {
         const next = { ...current }
         for (const [slot, optionId] of Object.entries(current) as Array<[MealSlot, string]>) {
@@ -204,19 +226,21 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
                         type="button"
                         aria-pressed={preference === 'favorite'}
                         className={preference === 'favorite' ? styles.preferenceActive : undefined}
+                        disabled={preferenceStorageStatus === 'loading'}
                         onClick={() => rateOption(option.familyId, 'favorite')}
                       >♡ {es ? 'Favorita' : 'Favorite'}</button>
                       <button
                         type="button"
                         aria-pressed={preference === 'liked'}
                         className={preference === 'liked' ? styles.preferenceActive : undefined}
+                        disabled={preferenceStorageStatus === 'loading'}
                         onClick={() => rateOption(option.familyId, 'liked')}
                       >✓ {es ? 'Me gusta' : 'I like it'}</button>
                       <button
                         type="button"
                         aria-pressed={preference === 'avoid'}
                         className={preference === 'avoid' ? styles.preferenceAvoidActive : undefined}
-                        disabled={cannotAvoid}
+                        disabled={cannotAvoid || preferenceStorageStatus === 'loading'}
                         onClick={() => rateOption(option.familyId, 'avoid')}
                       >− {es ? 'No repetir' : 'Do not repeat'}</button>
                     </div>
@@ -330,7 +354,11 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
               ? (es ? 'Ocultar lista' : 'Hide list')
               : (es ? 'Confirmar rotación y preparar lista' : 'Confirm rotation and prepare list')}
           </button>
-          <span>{es ? 'Preview sintético: las preferencias todavía no se guardan.' : 'Synthetic Preview: preferences are not saved yet.'}</span>
+          <span>{preferenceStorageStatus === 'unavailable'
+            ? (es ? 'Este navegador bloqueó el guardado; la selección durará sólo en esta pestaña.' : 'This browser blocked storage; the selection will last only in this tab.')
+            : (es
+              ? `Preview sintético: preferencias guardadas en este navegador sólo para ${plan.profile.firstName}.`
+              : `Synthetic Preview: preferences saved in this browser only for ${plan.profile.firstName}.`)}</span>
         </div>
       </section>
 
