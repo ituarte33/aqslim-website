@@ -48,7 +48,9 @@ test('a 380 lb synthetic profile receives maintenance minus 500 without a 2,000 
   })
 
   assert.equal(plan.profile.energyInputs.requestedDeficitCalories, 500)
-  assert.ok(plan.profile.calorieTarget > 2_000)
+  assert.equal(plan.energyEstimate.maintenanceCalories, 3_050)
+  assert.equal(plan.profile.calorieTarget, 2_550)
+  assert.equal(plan.energyEstimate.appliedDeficitCalories, 500)
   assert.equal(plan.energyEstimate.maintenanceCalories - plan.profile.calorieTarget, plan.energyEstimate.appliedDeficitCalories)
   assert.equal(plan.status, 'ready_for_review')
   assert.deepEqual(plan.groups.map(group => group.options.length), [3, 3])

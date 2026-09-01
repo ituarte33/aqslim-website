@@ -14,6 +14,13 @@ function roundedHundred(value: number) {
   return Math.round(value / 100) * 100
 }
 
+function targetWithinControlledDeficit(maintenanceCalories: number, requestedDeficitCalories: number) {
+  const roundedTarget = roundedHundred(maintenanceCalories - requestedDeficitCalories)
+  const highestAllowedTarget = maintenanceCalories - MIN_STANDARD_DEFICIT
+  const lowestAllowedTarget = maintenanceCalories - MAX_STANDARD_DEFICIT
+  return Math.min(highestAllowedTarget, Math.max(lowestAllowedTarget, roundedTarget))
+}
+
 export function estimateEnergyTarget(inputs: EnergyInputs): EnergyEstimate {
   const reasons: string[] = []
   const validInputs = Number.isFinite(inputs.ageYears)
@@ -39,7 +46,7 @@ export function estimateEnergyTarget(inputs: EnergyInputs): EnergyEstimate {
     10 * inputs.currentWeightKg + 6.25 * inputs.heightCm - 5 * inputs.ageYears + sexOffset,
   )
   const maintenanceCalories = Math.round(restingCalories * ACTIVITY_FACTOR[inputs.activityLevel])
-  const targetCalories = roundedHundred(maintenanceCalories - inputs.requestedDeficitCalories)
+  const targetCalories = targetWithinControlledDeficit(maintenanceCalories, inputs.requestedDeficitCalories)
   const appliedDeficitCalories = maintenanceCalories - targetCalories
   const deficitPercent = Math.round((appliedDeficitCalories / maintenanceCalories) * 1_000) / 10
 

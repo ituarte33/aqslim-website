@@ -105,6 +105,23 @@ test('tampered targets and excessive requested deficits stop for safety review',
   assert.equal(excessiveDeficit.groups.length, 0)
 })
 
+test('rounding never moves an approved energy deficit outside the 500–750 kcal range', () => {
+  const estimate = estimateEnergyTarget({
+    ageYears: 60,
+    equationSex: 'male',
+    heightCm: 178,
+    currentWeightKg: 172.4,
+    goalWeightKg: 108.9,
+    activityLevel: 'sedentary',
+    requestedDeficitCalories: 500,
+  })
+
+  assert.equal(estimate.maintenanceCalories, 3_050)
+  assert.equal(estimate.targetCalories, 2_550)
+  assert.equal(estimate.appliedDeficitCalories, 500)
+  assert.equal(estimate.reviewRequired, false)
+})
+
 test('the automatic personalization proof changes safely across four synthetic profiles', () => {
   const plans = SYNTHETIC_PERSONALIZATION_PROFILES.map(build)
   assert.deepEqual(
