@@ -49,28 +49,43 @@ const DAY_COPY = [
   { es: 'Domingo', en: 'Sunday' },
 ] as const
 
-type Props = {
+type ViewProps = {
   data: PatientPortalData
   plan: GuidedPlan
   demo?: boolean
   demoProfiles?: readonly DemoProfileOption[]
 }
 
-export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: Props) {
-  const [language] = usePortalLanguage(data.language, data.clienteId)
+type ExperienceProps = {
+  plan: GuidedPlan
+  language: 'es' | 'en'
+  demo?: boolean
+  demoProfiles?: readonly DemoProfileOption[]
+  guidePath: string
+  persistPreferences?: boolean
+  showGuideActions?: boolean
+}
+
+export function GuidedPlanExperience({
+  plan,
+  language,
+  demo = false,
+  demoProfiles = [],
+  guidePath,
+  persistPreferences = false,
+  showGuideActions = true,
+}: ExperienceProps) {
   const [activeSlot, setActiveSlot] = useState<MealSlot>(plan.groups[0]?.slot ?? 'lunch')
   const [selected, setSelected] = useState<Partial<Record<MealSlot, string>>>({})
   const [preferences, setPreferences] = useState<RecipePreferenceMap>({})
-  const [preferenceStorageStatus, setPreferenceStorageStatus] = useState<'loading' | 'ready' | 'unavailable'>(demo ? 'loading' : 'ready')
+  const [preferenceStorageStatus, setPreferenceStorageStatus] = useState<'loading' | 'ready' | 'unavailable'>(persistPreferences ? 'loading' : 'ready')
   const [calendarRotation, setCalendarRotation] = useState<ReturnType<typeof buildWeeklyRotation> | null>(null)
   const [calendarNotice, setCalendarNotice] = useState<{ from: number; to: number } | null>(null)
   const [showShoppingList, setShowShoppingList] = useState(false)
   const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const es = language === 'es'
-  const shellFirstName = demo ? (es ? 'Vista de ejemplo' : 'Example view') : data.firstName
   const group = plan.groups.find(item => item.slot === activeSlot) ?? plan.groups[0]
   const chosenCount = Object.keys(selected).length
-  const guidePath = demoProfilePath(demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials', demo, plan.profile.id)
   const preferenceFamilyIds = useMemo(
     () => [...new Set(plan.groups.flatMap(item => item.options.map(option => option.familyId)))],
     [plan],
@@ -85,7 +100,10 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
   )
 
   useEffect(() => {
-    if (!demo) return
+    if (!persistPreferences) {
+      setPreferenceStorageStatus('ready')
+      return
+    }
 
     setPreferenceStorageStatus('loading')
     const restored = loadRecipePreferences(window.localStorage, plan.profile.id, preferenceFamilyIds)
@@ -95,7 +113,7 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
     setCalendarNotice(null)
     setShowShoppingList(false)
     setPreferenceStorageStatus('ready')
-  }, [demo, plan.profile.id, preferenceFamilyIds])
+  }, [persistPreferences, plan.profile.id, preferenceFamilyIds])
 
   function choose(slot: MealSlot, optionId: string) {
     setSelected(current => ({ ...current, [slot]: optionId }))
@@ -127,7 +145,7 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
     else delete next[familyId]
     setPreferences(next)
 
-    if (demo && preferenceStorageStatus !== 'loading') {
+    if (persistPreferences && preferenceStorageStatus !== 'loading') {
       const saved = saveRecipePreferences(window.localStorage, plan.profile.id, next)
       setPreferenceStorageStatus(saved ? 'ready' : 'unavailable')
     }
@@ -152,7 +170,7 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
   }
 
   return (
-    <PortalShell firstName={shellFirstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={plan.profile.id}>
+    <>
       <section className={styles.guidedIntro}>
         <div>
           <p className={styles.eyebrow}>{es ? 'Libertad guiada' : 'Guided freedom'}</p>
@@ -189,7 +207,9 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
           <h2>{plan.profile.phase}</h2>
           <span>{es ? 'Opciones muy bajas en carbohidratos' : 'Very-low-carbohydrate choices'}</span>
         </div>
-        <Link href={guidePath} className={styles.outlineAction}>{es ? 'Ver mi guía Jing' : 'View my Jing guide'}</Link>
+        {showGuideActions ? (
+          <Link href={guidePath} className={styles.outlineAction}>{es ? 'Ver mi guía Jing' : 'View my Jing guide'}</Link>
+        ) : null}
       </section>
 
       <nav className={styles.mealTabs} aria-label={es ? 'Comidas de hoy' : 'Today’s meals'}>
@@ -375,7 +395,11 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
               ? (es ? 'Ocultar lista' : 'Hide list')
               : (es ? 'Confirmar rotación y preparar lista' : 'Confirm rotation and prepare list')}
           </button>
-          <span>{preferenceStorageStatus === 'unavailable'
+          <span>{!persistPreferences
+            ? (es
+              ? 'Vista temporal: las preferencias desaparecen al cerrar esta experiencia.'
+              : 'Temporary view: preferences disappear when you close this experience.')
+            : preferenceStorageStatus === 'unavailable'
             ? (es ? 'Este navegador bloqueó el guardado; la selección durará sólo en esta pestaña.' : 'This browser blocked storage; the selection will last only in this tab.')
             : (es
               ? `Preview sintético: preferencias guardadas en este navegador sólo para ${plan.profile.firstName}.`
@@ -427,7 +451,9 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
             ? 'Si hoy no quieres una receta, usa tu guía. Después podrás registrar tu comida con foto o texto.'
             : 'If you do not want a recipe today, use your guide. You can then log your meal by photo or text.'}</p>
         </div>
-        <Link href={guidePath} className={styles.goldButton}>{es ? 'Quiero decidir con mi lista' : 'Choose from my list'}</Link>
+        {showGuideActions ? (
+          <Link href={guidePath} className={styles.goldButton}>{es ? 'Quiero decidir con mi lista' : 'Choose from my list'}</Link>
+        ) : null}
       </section>
 
       <details className={styles.guidedDetails}>
@@ -454,6 +480,25 @@ export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: 
       </section>
 
       <RecipeDetailDialog option={openRecipe} language={language} context="client" onClose={() => setOpenRecipe(null)} />
+    </>
+  )
+}
+
+export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: ViewProps) {
+  const [language] = usePortalLanguage(data.language, data.clienteId)
+  const shellFirstName = demo ? (language === 'es' ? 'Vista de ejemplo' : 'Example view') : data.firstName
+  const guidePath = demoProfilePath(demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials', demo, plan.profile.id)
+
+  return (
+    <PortalShell firstName={shellFirstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={plan.profile.id}>
+      <GuidedPlanExperience
+        plan={plan}
+        language={language}
+        demo={demo}
+        demoProfiles={demoProfiles}
+        guidePath={guidePath}
+        persistPreferences={demo}
+      />
     </PortalShell>
   )
 }

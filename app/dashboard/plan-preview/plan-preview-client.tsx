@@ -11,6 +11,7 @@ import type {
   PlateOption,
   RecipeVariant,
 } from '@/lib/nutrition/types'
+import { GuidedPlanExperience } from '@/app/my-aqslim/plan/guided-plan-view'
 import { hasPilotRecipeDetail, RecipeDetailDialog } from '@/app/my-aqslim/plan/recipe-detail-dialog'
 import { DashboardShell } from '../dashboard-shell'
 import styles from './plan-preview.module.css'
@@ -86,6 +87,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
   const [questionnairePlan, setQuestionnairePlan] = useState<GuidedPlan | null>(null)
   const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
+  const [showTemporaryExperience, setShowTemporaryExperience] = useState(false)
   const es = lang === 'es'
   const availablePlans = useMemo(
     () => questionnairePlan ? [questionnairePlan, ...plans] : plans,
@@ -125,13 +127,31 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
     }
   }, [])
 
+  useEffect(() => {
+    if (!showTemporaryExperience) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowTemporaryExperience(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [showTemporaryExperience])
+
   function selectProfile(profileId: string) {
+    setShowTemporaryExperience(false)
     setSelectedProfileId(profileId)
     window.requestAnimationFrame(resetPreviewScroll)
   }
 
   function generateQuestionnairePlan(profile: NutritionProfile) {
     const generatedPlan = buildGuidedPlan({ profile, recipes, components })
+    setShowTemporaryExperience(false)
     setQuestionnairePlan(generatedPlan)
     setSelectedProfileId(profile.id)
     window.requestAnimationFrame(resetPreviewScroll)
@@ -159,9 +179,17 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
               >
                 {es ? `Abrir vista de ${plan.profile.firstName} ↗` : `Open ${plan.profile.firstName}’s view ↗`}
               </Link>
+            ) : generationPassed && isQuestionnairePlan ? (
+              <button
+                type="button"
+                className={`${styles.previewLink} ${styles.previewLinkButton}`}
+                onClick={() => setShowTemporaryExperience(true)}
+              >
+                {es ? 'Abrir experiencia temporal ↗' : 'Open temporary experience ↗'}
+              </button>
             ) : isQuestionnairePlan ? (
               <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
-                {es ? 'Vista temporal sólo en Dashboard' : 'Temporary Dashboard view only'}
+                {es ? 'Experiencia temporal no disponible' : 'Temporary experience unavailable'}
               </span>
             ) : (
               <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
@@ -379,6 +407,29 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
 
         <RecipeDetailDialog option={openRecipe} language={lang} context="review" onClose={() => setOpenRecipe(null)} />
       </div>
+
+      {showTemporaryExperience && generationPassed && isQuestionnairePlan ? (
+        <div className={styles.temporaryExperienceOverlay} role="dialog" aria-modal="true" aria-labelledby="temporary-experience-title">
+          <header className={styles.temporaryExperienceHeader}>
+            <div>
+              <span>{es ? 'Preview sintético · sin guardar' : 'Synthetic Preview · not saved'}</span>
+              <strong id="temporary-experience-title">{es ? 'Experiencia temporal del cliente' : 'Temporary client experience'}</strong>
+            </div>
+            <button type="button" onClick={() => setShowTemporaryExperience(false)} aria-label={es ? 'Cerrar experiencia temporal' : 'Close temporary experience'}>
+              ×
+            </button>
+          </header>
+          <main className={styles.temporaryExperienceBody}>
+            <GuidedPlanExperience
+              plan={plan}
+              language={lang}
+              guidePath="/my-aqslim/demo/materials"
+              persistPreferences={false}
+              showGuideActions={false}
+            />
+          </main>
+        </div>
+      ) : null}
     </DashboardShell>
   )
 }
