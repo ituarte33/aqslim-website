@@ -12,6 +12,11 @@ export type WeeklyRotationEntry = {
   option: PlateOption
 }
 
+export type WeeklyRotationSwapResult = {
+  rotation: WeeklyRotationEntry[]
+  swappedDayIndex: number | null
+}
+
 export type ShoppingCategory = 'protein' | 'produce' | 'refrigerated' | 'pantry'
 export type ShoppingUnit = 'ounce' | 'can' | 'egg' | 'bag_5oz' | 'head' | 'heart' | 'piece' | 'cup' | 'tablespoon' | 'pantry_check'
 
@@ -173,6 +178,47 @@ export function rotationFrequency(rotation: readonly WeeklyRotationEntry[]) {
 
 export function weeklyRotationKey(slot: MealSlot, optionId: string) {
   return `${slot}:${optionId}`
+}
+
+export function swapWeeklyRotationEntry(
+  rotation: readonly WeeklyRotationEntry[],
+  dayIndex: number,
+  slot: MealSlot,
+): WeeklyRotationSwapResult {
+  const currentIndex = rotation.findIndex(entry => entry.dayIndex === dayIndex && entry.slot === slot)
+  if (currentIndex < 0) return { rotation: [...rotation], swappedDayIndex: null }
+
+  const current = rotation[currentIndex]
+  const activeOptions = [...new Map(
+    rotation
+      .filter(entry => entry.slot === slot)
+      .map(entry => [entry.option.id, entry.option]),
+  ).values()].toSorted((left, right) => left.id.localeCompare(right.id))
+  const currentOptionIndex = activeOptions.findIndex(option => option.id === current.option.id)
+  const nextOption = activeOptions[(currentOptionIndex + 1) % activeOptions.length]
+  if (!nextOption || nextOption.id === current.option.id) {
+    return { rotation: [...rotation], swappedDayIndex: null }
+  }
+
+  const partner = rotation
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.slot === slot && entry.option.id === nextOption.id)
+    .toSorted((left, right) => {
+      const leftDistance = (left.entry.dayIndex - dayIndex + WEEK_LENGTH_DAYS) % WEEK_LENGTH_DAYS
+      const rightDistance = (right.entry.dayIndex - dayIndex + WEEK_LENGTH_DAYS) % WEEK_LENGTH_DAYS
+      return leftDistance - rightDistance
+    })[0]
+
+  if (!partner) return { rotation: [...rotation], swappedDayIndex: null }
+
+  return {
+    rotation: rotation.map((entry, index) => {
+      if (index === currentIndex) return { ...entry, option: partner.entry.option }
+      if (index === partner.index) return { ...entry, option: current.option }
+      return entry
+    }),
+    swappedDayIndex: partner.entry.dayIndex,
+  }
 }
 
 function optionRequirements(option: PlateOption) {

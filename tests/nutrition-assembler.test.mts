@@ -20,6 +20,7 @@ import {
   buildWeeklyRotation,
   formatShoppingQuantity,
   rotationFrequency,
+  swapWeeklyRotationEntry,
   weeklyRotationKey,
 } from '../lib/nutrition/weekly-capsule.ts'
 
@@ -164,6 +165,46 @@ test('favorites lead the rotation and do-not-repeat recipes leave the grocery li
   assert.equal(frequency[weeklyRotationKey('first_meal', favorite.id)], 4)
   assert.equal(shoppingList.some(item => item.ingredient === 'tilapia'), false)
   assert.equal(shoppingList.every(item => item.mealUses >= 2), true)
+})
+
+test('changing one calendar meal swaps days without changing frequencies or groceries', () => {
+  const sofia = SYNTHETIC_PERSONALIZATION_PROFILES.find(profile => profile.firstName === 'Sofía')
+  assert.ok(sofia)
+  const plan = build(sofia)
+  const rotation = buildWeeklyRotation(plan, { 'PIL-J04': 'favorite' })
+  const monday = rotation.find(entry => entry.dayIndex === 0 && entry.slot === 'first_meal')
+  assert.ok(monday)
+  const beforeFrequency = rotationFrequency(rotation)
+  const beforeShopping = buildShoppingList(rotation)
+
+  const result = swapWeeklyRotationEntry(rotation, monday.dayIndex, monday.slot)
+  const changedMonday = result.rotation.find(entry => entry.dayIndex === 0 && entry.slot === 'first_meal')
+  assert.notEqual(result.swappedDayIndex, null)
+  assert.ok(changedMonday)
+  assert.notEqual(changedMonday.option.id, monday.option.id)
+  assert.deepEqual(rotationFrequency(result.rotation), beforeFrequency)
+  assert.deepEqual(buildShoppingList(result.rotation), beforeShopping)
+
+  const secondResult = swapWeeklyRotationEntry(result.rotation, monday.dayIndex, monday.slot)
+  const secondMonday = secondResult.rotation.find(entry => entry.dayIndex === 0 && entry.slot === 'first_meal')
+  assert.ok(secondMonday)
+  assert.notEqual(secondMonday.option.id, changedMonday.option.id)
+  assert.notEqual(secondMonday.option.id, monday.option.id)
+  assert.deepEqual(rotationFrequency(secondResult.rotation), beforeFrequency)
+  assert.deepEqual(buildShoppingList(secondResult.rotation), beforeShopping)
+})
+
+test('a calendar meal cannot change when its slot has only one compatible recipe', () => {
+  const option = SYNTHETIC_PERSONALIZATION_PROFILES[0]
+  const plan = build(option)
+  assert.equal(plan.status, 'ready_for_review')
+  if (plan.status !== 'ready_for_review') return
+  const only = plan.groups[0].options[0]
+  const rotation = Array.from({ length: 7 }, (_, dayIndex) => ({ dayIndex, slot: plan.groups[0].slot, option: only }))
+  const result = swapWeeklyRotationEntry(rotation, 0, plan.groups[0].slot)
+
+  assert.equal(result.swappedDayIndex, null)
+  assert.deepEqual(result.rotation, rotation)
 })
 
 test('the grocery list converts the approved household portions into rounded purchase quantities', () => {

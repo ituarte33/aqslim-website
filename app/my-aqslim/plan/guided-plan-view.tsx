@@ -10,6 +10,7 @@ import {
   buildWeeklyRotation,
   formatShoppingQuantity,
   rotationFrequency,
+  swapWeeklyRotationEntry,
   weeklyRotationKey,
   type RecipePreference,
   type RecipePreferenceMap,
@@ -36,6 +37,16 @@ const SHOPPING_CATEGORY_COPY: Record<ShoppingCategory, { es: string; en: string 
 
 const SHOPPING_CATEGORIES: readonly ShoppingCategory[] = ['protein', 'produce', 'refrigerated', 'pantry']
 
+const DAY_COPY = [
+  { es: 'Lunes', en: 'Monday' },
+  { es: 'Martes', en: 'Tuesday' },
+  { es: 'Miércoles', en: 'Wednesday' },
+  { es: 'Jueves', en: 'Thursday' },
+  { es: 'Viernes', en: 'Friday' },
+  { es: 'Sábado', en: 'Saturday' },
+  { es: 'Domingo', en: 'Sunday' },
+] as const
+
 type Props = {
   data: PatientPortalData
   plan: GuidedPlan
@@ -47,6 +58,8 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const [activeSlot, setActiveSlot] = useState<MealSlot>(plan.groups[0]?.slot ?? 'lunch')
   const [selected, setSelected] = useState<Partial<Record<MealSlot, string>>>({})
   const [preferences, setPreferences] = useState<RecipePreferenceMap>({})
+  const [calendarRotation, setCalendarRotation] = useState<ReturnType<typeof buildWeeklyRotation> | null>(null)
+  const [calendarNotice, setCalendarNotice] = useState<{ from: number; to: number } | null>(null)
   const [showShoppingList, setShowShoppingList] = useState(false)
   const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const es = language === 'es'
@@ -54,7 +67,8 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const group = plan.groups.find(item => item.slot === activeSlot) ?? plan.groups[0]
   const chosenCount = Object.keys(selected).length
   const guidePath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
-  const weeklyRotation = useMemo(() => buildWeeklyRotation(plan, preferences), [plan, preferences])
+  const automaticRotation = useMemo(() => buildWeeklyRotation(plan, preferences), [plan, preferences])
+  const weeklyRotation = calendarRotation ?? automaticRotation
   const frequency = useMemo(() => rotationFrequency(weeklyRotation), [weeklyRotation])
   const shoppingList = useMemo(() => buildShoppingList(weeklyRotation), [weeklyRotation])
   const activeRecipeCount = plan.groups.reduce(
@@ -76,6 +90,9 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   }
 
   function rateOption(familyId: string, preference: RecipePreference) {
+    setCalendarRotation(null)
+    setCalendarNotice(null)
+    setShowShoppingList(false)
     setPreferences(current => {
       const currentValue = current[familyId]
       const nextValue = currentValue === preference ? undefined : preference
@@ -101,6 +118,13 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
         return next
       })
     }
+  }
+
+  function changeCalendarMeal(dayIndex: number, slot: MealSlot) {
+    const result = swapWeeklyRotationEntry(weeklyRotation, dayIndex, slot)
+    if (result.swappedDayIndex === null) return
+    setCalendarRotation(result.rotation)
+    setCalendarNotice({ from: dayIndex, to: result.swappedDayIndex })
   }
 
   return (
@@ -250,6 +274,55 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
             </section>
           ))}
         </div>
+
+        <section className={styles.weeklyCalendar} aria-labelledby="weekly-calendar-title">
+          <header>
+            <div>
+              <p className={styles.eyebrow}>{es ? 'Calendario de siete días' : 'Seven-day calendar'}</p>
+              <h3 id="weekly-calendar-title">{es ? 'Tu semana, comida por comida' : 'Your week, meal by meal'}</h3>
+            </div>
+            <span>{es ? 'Compra protegida' : 'Grocery plan protected'}</span>
+          </header>
+          <p className={styles.calendarExplanation}>{es
+            ? '“Cambiar” intercambia dos días con recetas ya activas. La variedad y las cantidades de compra permanecen iguales.'
+            : '“Change” swaps two days using recipes already active. Variety and grocery quantities remain the same.'}</p>
+          {calendarNotice ? (
+            <p className={styles.calendarNotice} role="status" aria-live="polite">{es
+              ? `Listo: ${DAY_COPY[calendarNotice.from].es} y ${DAY_COPY[calendarNotice.to].es} intercambiaron esa comida. Tu lista no cambió.`
+              : `Done: ${DAY_COPY[calendarNotice.from].en} and ${DAY_COPY[calendarNotice.to].en} swapped that meal. Your list did not change.`}</p>
+          ) : null}
+          <div className={styles.calendarGrid}>
+            {DAY_COPY.map((day, dayIndex) => {
+              const entries = weeklyRotation.filter(entry => entry.dayIndex === dayIndex)
+              return (
+                <article key={day.es} className={styles.calendarDay}>
+                  <header><small>{es ? `Día ${dayIndex + 1}` : `Day ${dayIndex + 1}`}</small><h4>{day[language]}</h4></header>
+                  <ul>{entries.map(entry => {
+                    const hasAlternative = weeklyRotation.some(candidate => (
+                      candidate.slot === entry.slot && candidate.option.id !== entry.option.id
+                    ))
+                    return (
+                      <li key={entry.slot}>
+                        <div>
+                          <span>{SLOT_COPY[entry.slot][language]}</span>
+                          <b>{entry.option.name[language]}</b>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!hasAlternative}
+                          onClick={() => changeCalendarMeal(dayIndex, entry.slot)}
+                          aria-label={es
+                            ? `Cambiar ${entry.option.name.es} del ${day.es}`
+                            : `Change ${entry.option.name.en} on ${day.en}`}
+                        >↻ {es ? 'Cambiar' : 'Change'}</button>
+                      </li>
+                    )
+                  })}</ul>
+                </article>
+              )
+            })}
+          </div>
+        </section>
 
         <div className={styles.capsuleActions}>
           <button type="button" className={styles.goldButton} onClick={() => setShowShoppingList(value => !value)}>

@@ -620,6 +620,27 @@
 .rotationGroups li b, .shoppingGroups li b { flex: 0 0 auto; color: var(--portal-muted); font-size: 8px; font-weight: 500; }
 .rotationGroups .rotationExcluded { color: var(--portal-muted); text-decoration: line-through; }
 .rotationGroups .rotationExcluded b { color: #d99a7f; text-decoration: none; }
+.weeklyCalendar { display: grid; gap: 12px; border-top: 1px solid var(--portal-line); padding-top: 19px; }
+.weeklyCalendar > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.weeklyCalendar h3 { margin: 0; font-family: 'Playfair Display', serif; font-size: 23px; font-weight: 400; }
+.weeklyCalendar > header > span { border: 1px solid rgba(158,208,108,.3); border-radius: 999px; padding: 6px 9px; color: #acd77f; background: rgba(158,208,108,.055); font-size: 8px; }
+.calendarExplanation { max-width: 660px; margin: 0; color: var(--portal-muted); font-size: 9px; line-height: 1.6; }
+.calendarNotice { margin: 0; border-left: 2px solid #9ed06c; padding: 8px 11px; color: #d7ebc1; background: rgba(158,208,108,.055); font-size: 9px; line-height: 1.5; }
+.calendarGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.calendarDay { border: 1px solid var(--portal-line); border-radius: 13px; padding: 13px; background: rgba(255,255,255,.016); }
+.calendarDay > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.055); padding-bottom: 9px; }
+.calendarDay > header small { color: var(--portal-muted); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.calendarDay h4 { margin: 0; color: var(--portal-gold-light); font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 400; }
+.calendarDay ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.calendarDay li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 10px 0; }
+.calendarDay li + li { border-top: 1px solid rgba(255,255,255,.045); }
+.calendarDay li div { display: grid; gap: 3px; min-width: 0; }
+.calendarDay li span { color: var(--portal-muted); font-size: 7px; letter-spacing: .06em; text-transform: uppercase; }
+.calendarDay li b { overflow: hidden; color: var(--portal-text); font-size: 9px; font-weight: 500; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.calendarDay button { border: 1px solid rgba(212,167,44,.34); border-radius: 8px; padding: 6px 8px; color: var(--portal-gold-light); background: rgba(212,167,44,.04); font-family: Montserrat, sans-serif; font-size: 7px; cursor: pointer; }
+.calendarDay button:hover { border-color: var(--portal-gold-light); }
+.calendarDay button:focus-visible { outline: 2px solid var(--portal-gold-light); outline-offset: 2px; }
+.calendarDay button:disabled { border-color: var(--portal-line); color: var(--portal-muted); cursor: not-allowed; opacity: .45; }
 .capsuleActions { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }
 .capsuleActions .goldButton { border: 0; cursor: pointer; }
 .capsuleActions > span { color: var(--portal-muted); font-size: 9px; }
@@ -669,6 +690,7 @@
   .mealHub { grid-template-columns: 1fr 1.25fr; align-items: center; }
   .choiceList { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .choiceCard { grid-template-columns: 1fr; align-content: start; }
+  .calendarGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .choiceActions { margin-top: auto; padding-top: 14px; flex-wrap: wrap; }
   .guidedFreedom { grid-template-columns: 1fr auto; align-items: center; }
 }
@@ -683,6 +705,7 @@
   .phaseSeal { flex-basis: 150px; width: 150px; height: 150px; }
   .buddyPanel { grid-template-columns: 150px 1fr; }
   .buddyPanel > img { width: 165px; height: 165px; }
+  .calendarGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -726,6 +749,8 @@
   .guidedPhase .outlineAction { width: 100%; }
   .choiceCard { padding: 14px; }
   .weeklyCapsule > header, .shoppingGroups { grid-template-columns: 1fr; }
+  .weeklyCalendar > header { align-items: flex-start; flex-direction: column; }
+  .calendarGrid { grid-template-columns: 1fr; }
   .capsuleMetrics { width: 100%; }
   .shoppingList > header { align-items: flex-start; flex-direction: column; }
 }
