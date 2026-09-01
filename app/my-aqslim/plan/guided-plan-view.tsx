@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import type { PatientPortalData } from '@/lib/patient-portal'
+import { demoProfilePath, type DemoProfileOption } from '@/lib/demo-profile-route'
 import type { GuidedPlan, MealSlot, PlateOption } from '@/lib/nutrition/types'
 import {
   buildShoppingList,
@@ -52,9 +53,10 @@ type Props = {
   data: PatientPortalData
   plan: GuidedPlan
   demo?: boolean
+  demoProfiles?: readonly DemoProfileOption[]
 }
 
-export function GuidedPlanView({ data, plan, demo = false }: Props) {
+export function GuidedPlanView({ data, plan, demo = false, demoProfiles = [] }: Props) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const [activeSlot, setActiveSlot] = useState<MealSlot>(plan.groups[0]?.slot ?? 'lunch')
   const [selected, setSelected] = useState<Partial<Record<MealSlot, string>>>({})
@@ -68,7 +70,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   const shellFirstName = demo ? (es ? 'Vista de ejemplo' : 'Example view') : data.firstName
   const group = plan.groups.find(item => item.slot === activeSlot) ?? plan.groups[0]
   const chosenCount = Object.keys(selected).length
-  const guidePath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
+  const guidePath = demoProfilePath(demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials', demo, plan.profile.id)
   const preferenceFamilyIds = useMemo(
     () => [...new Set(plan.groups.flatMap(item => item.options.map(option => option.familyId)))],
     [plan],
@@ -150,7 +152,7 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
   }
 
   return (
-    <PortalShell firstName={shellFirstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={shellFirstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={plan.profile.id}>
       <section className={styles.guidedIntro}>
         <div>
           <p className={styles.eyebrow}>{es ? 'Libertad guiada' : 'Guided freedom'}</p>
@@ -159,7 +161,26 @@ export function GuidedPlanView({ data, plan, demo = false }: Props) {
             ? 'Marca tus favoritas y las que no deseas repetir. AQ Buddy mantiene una cápsula pequeña y compatible.'
             : 'Mark your favorites and the choices you do not want repeated. AQ Buddy keeps a small compatible capsule.'}</p>
         </div>
-        <span className={styles.syntheticBadge}>{es ? `Preview sintético · ${plan.profile.firstName}` : `Synthetic Preview · ${plan.profile.firstName}`}</span>
+        <div className={styles.syntheticControls}>
+          <span className={styles.syntheticBadge}>{es ? `Preview sintético · ${plan.profile.firstName}` : `Synthetic Preview · ${plan.profile.firstName}`}</span>
+          {demo && demoProfiles.length > 0 ? (
+            <nav className={styles.profileSwitcher} aria-label={es ? 'Cambiar perfil sintético' : 'Change synthetic profile'}>
+              <span>{es ? 'Probar otro perfil' : 'Try another profile'}</span>
+              <div>
+                {demoProfiles.map(profile => (
+                  <Link
+                    key={profile.id}
+                    href={demoProfilePath('/my-aqslim/demo/plan', true, profile.id)}
+                    aria-current={profile.id === plan.profile.id ? 'page' : undefined}
+                  >
+                    <strong>{profile.firstName}</strong>
+                    <small>{profile.calorieTarget.toLocaleString(es ? 'es-MX' : 'en-US')} kcal</small>
+                  </Link>
+                ))}
+              </div>
+            </nav>
+          ) : null}
+        </div>
       </section>
 
       <section className={`${styles.panel} ${styles.guidedPhase}`}>

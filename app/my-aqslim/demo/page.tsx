@@ -1,10 +1,17 @@
 import { redirect } from 'next/navigation'
 import { getRole } from '@/lib/auth'
-import { demoPatientPortalData } from '@/lib/patient-portal-demo'
+import { firstProfileParam } from '@/lib/demo-profile-route'
+import { buildSyntheticDemoContext } from '@/lib/patient-portal-demo'
 import { MyAqslimHomeView } from '../home-view'
 
-export default async function MyAqslimDemoPage() {
-  if (await getRole() !== 'admin') redirect('/my-aqslim')
+type Props = {
+  searchParams: Promise<{ profile?: string | string[] }>
+}
 
-  return <MyAqslimHomeView data={demoPatientPortalData} demo />
+export default async function MyAqslimDemoPage({ searchParams }: Props) {
+  if (await getRole() !== 'admin') redirect('/my-aqslim')
+  const params = await searchParams
+  const { data, plan } = buildSyntheticDemoContext(firstProfileParam(params.profile))
+
+  return <MyAqslimHomeView data={data} demo demoProfileId={plan.profile.id} />
 }

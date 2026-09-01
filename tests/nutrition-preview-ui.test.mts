@@ -24,10 +24,10 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
     readFile(RECIPE_DIALOG_STYLES, 'utf8'),
     readFile(WEEKLY_CAPSULE, 'utf8'),
   ])
-  assert.match(demo, /buildSyntheticPersonalizationPlan/)
+  assert.match(demo, /buildSyntheticDemoContext/)
   assert.match(demo, /searchParams/)
   assert.match(demo, /plan\.status !== 'ready_for_review'/)
-  assert.match(demo, /firstName: plan\.profile\.firstName/)
+  assert.match(demo, /demoProfiles/)
   assert.match(demo, /process\.env\.VERCEL_ENV === 'preview'/)
   assert.match(demo, /!isVercelPreview && await getRole\(\) !== 'admin'/)
   assert.doesNotMatch(demo, /airtable/i)
@@ -39,6 +39,7 @@ test('the client demo uses only the deterministic synthetic plan', async () => {
   assert.doesNotMatch(view, /Snack/)
   assert.match(view, /Vista de ejemplo/)
   assert.match(view, /Preview sintético · \$\{plan\.profile\.firstName\}/)
+  assert.match(view, /Probar otro perfil/)
   assert.match(view, /Ver receta con foto/)
   assert.match(view, /<RecipeDetailDialog option=\{openRecipe\}/)
   assert.match(view, /Tus opciones de esta semana/)

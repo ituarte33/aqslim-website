@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
+import { demoProfilePath } from '@/lib/demo-profile-route'
 import { CalendarIcon, ChevronIcon, MaterialsIcon } from './portal-icons'
 import { PortalShell } from './portal-shell'
 import { usePortalLanguage } from './use-portal-language'
@@ -30,9 +31,10 @@ function capitalize(value: string) {
 type HomeViewProps = {
   data: PatientPortalData
   demo?: boolean
+  demoProfileId?: string
 }
 
-export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
+export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeViewProps) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const today = new Intl.DateTimeFormat(es ? 'es-MX' : 'en-US', {
@@ -50,7 +52,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
   const planTitle = isFast36Hypocaloric ? 'FAST 36' : plan
 
   return (
-    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={demoProfileId}>
       <section className={styles.welcome}>
         <p>{es ? `Hola, ${data.firstName}` : `Hello, ${data.firstName}`}</p>
         <span>{capitalize(today)}</span>
@@ -69,7 +71,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
               ? `${es ? 'Semana' : 'Week'} ${data.weekInPhase}`
               : (es ? 'Semana por confirmar' : 'Week to be confirmed')}
           </p>
-          <Link href={demo ? '/my-aqslim/demo/plan' : '/my-aqslim/plan'} className={styles.phaseLinkText}>{es ? 'Ver mi plan' : 'View my plan'} <ChevronIcon /></Link>
+          <Link href={demoProfilePath(demo ? '/my-aqslim/demo/plan' : '/my-aqslim/plan', demo, demoProfileId)} className={styles.phaseLinkText}>{es ? 'Ver mi plan' : 'View my plan'} <ChevronIcon /></Link>
         </div>
         <div className={styles.phaseSeal} aria-hidden="true">
           <span>{planTitle.slice(0, 1).toUpperCase()}</span>
@@ -121,7 +123,7 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
         </div>
       </section>
 
-      <Link href={demo ? '/my-aqslim/demo/progress' : '/my-aqslim/progress'} className={`${styles.panel} ${styles.progressSummary}`}>
+      <Link href={demoProfilePath(demo ? '/my-aqslim/demo/progress' : '/my-aqslim/progress', demo, demoProfileId)} className={`${styles.panel} ${styles.progressSummary}`}>
         <div>
           <p className={styles.eyebrow}>{es ? 'Tu progreso' : 'Your progress'}</p>
           <div className={styles.weightRow}>
@@ -148,11 +150,11 @@ export function MyAqslimHomeView({ data, demo = false }: HomeViewProps) {
         <div>
           <p className={styles.eyebrow}>AQ Buddy</p>
           <h2>{es ? '¿Cómo puedo ayudarte hoy?' : 'How can I help you today?'}</h2>
-          <Link href={demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'} className={styles.goldButton}>{es ? 'Hablar con AQ Buddy' : 'Talk to AQ Buddy'}</Link>
+          <Link href={demoProfilePath(demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy', demo, demoProfileId)} className={styles.goldButton}>{es ? 'Hablar con AQ Buddy' : 'Talk to AQ Buddy'}</Link>
         </div>
       </section>
 
-      <Link href={demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'} className={styles.materialsPreviewLink}>
+      <Link href={demoProfilePath(demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials', demo, demoProfileId)} className={styles.materialsPreviewLink}>
       <section className={styles.materialsPreview}>
         <div className={styles.sectionHeading}>
           <h2>{es ? 'Tus materiales' : 'Your materials'}</h2>

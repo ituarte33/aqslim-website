@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
+import { demoProfilePath } from '@/lib/demo-profile-route'
 import {
   BuddyIcon,
   BuildingIcon,
@@ -41,9 +42,10 @@ function formatSource(source: string | undefined, language: 'es' | 'en', demo: b
 type ProgressViewProps = {
   data: PatientPortalData
   demo?: boolean
+  demoProfileId?: string
 }
 
-export function ProgressView({ data, demo = false }: ProgressViewProps) {
+export function ProgressView({ data, demo = false, demoProfileId }: ProgressViewProps) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const first = data.measurements[0] ?? null
@@ -58,7 +60,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
     : 0
 
   return (
-    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={demoProfileId}>
       <section className={styles.progressHeader}>
         <div>
           <h1>{es ? 'Mi Progreso' : 'My Progress'}</h1>
@@ -126,7 +128,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
           <a href="#historial"><ProgressIcon /><span>{es ? 'Ver historial de mediciones' : 'View measurement history'}</span></a>
           <a href="#tendencia"><ProgressIcon /><span>{es ? 'Ver tendencia detallada' : 'View detailed trend'}</span></a>
           <span><CalendarIcon /><span>{es ? 'Próxima revisión' : 'Next review'}<b>{formatDate(data.nextReview, language, false)}</b></span></span>
-          <Link href={demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'} className={styles.buddyAction}><BuddyIcon /><span>{es ? 'Pregúntale a AQ Buddy' : 'Ask AQ Buddy'}</span></Link>
+          <Link href={demoProfilePath(demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy', demo, demoProfileId)} className={styles.buddyAction}><BuddyIcon /><span>{es ? 'Pregúntale a AQ Buddy' : 'Ask AQ Buddy'}</span></Link>
         </div>
       </section>
 
@@ -162,7 +164,7 @@ export function ProgressView({ data, demo = false }: ProgressViewProps) {
       <div className={styles.dataNotice}>
         <InfoIcon />
         <p>{es ? 'La información mostrada proviene de fuentes autorizadas de AQSLIM.' : 'The information shown comes from authorized AQSLIM sources.'}</p>
-        <Link href={demo ? '/my-aqslim/demo' : '/my-aqslim'}>{es ? 'Volver al inicio' : 'Back home'}</Link>
+        <Link href={demoProfilePath(demo ? '/my-aqslim/demo' : '/my-aqslim', demo, demoProfileId)}>{es ? 'Volver al inicio' : 'Back home'}</Link>
       </div>
     </PortalShell>
   )
