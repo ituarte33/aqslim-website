@@ -501,9 +501,13 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   <small>{es ? 'Publicación' : 'Publishing'}</small>
                   <strong className={publication.published && isQuestionnairePlan ? styles.publishedStatus : styles.reviewStatus}>
                     {hasUnpublishedDraft && isQuestionnairePlan
-                      ? (es
-                        ? `Borrador v${publication.draft?.version} · publicada v${publication.published?.version ?? '—'} sigue activa`
-                        : `Draft v${publication.draft?.version} · published v${publication.published?.version ?? '—'} remains active`)
+                      ? publication.published
+                        ? (es
+                          ? `Borrador v${publication.draft?.version} · publicada v${publication.published.version} sigue activa`
+                          : `Draft v${publication.draft?.version} · published v${publication.published.version} remains active`)
+                        : (es
+                          ? `Borrador v${publication.draft?.version} · sin versión publicada`
+                          : `Draft v${publication.draft?.version} · no published version`)
                       : publication.published && isQuestionnairePlan
                         ? (es ? `Publicada en simulación · v${publication.published.version}` : `Published in simulation · v${publication.published.version}`)
                         : publication.draft && isQuestionnairePlan
@@ -578,9 +582,13 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 <div className={styles.publicationHeading}>
                   <span>{es ? 'Flujo de publicación sintético' : 'Synthetic publishing workflow'}</span>
                   <strong>{hasUnpublishedDraft
-                    ? (es
-                      ? `Borrador v${publication.draft?.version} · publicada v${publication.published?.version ?? '—'} activa`
-                      : `Draft v${publication.draft?.version} · published v${publication.published?.version ?? '—'} active`)
+                    ? publication.published
+                      ? (es
+                        ? `Borrador v${publication.draft?.version} · publicada v${publication.published.version} activa`
+                        : `Draft v${publication.draft?.version} · published v${publication.published.version} active`)
+                      : (es
+                        ? `Borrador v${publication.draft?.version} · sin versión publicada`
+                        : `Draft v${publication.draft?.version} · no published version`)
                     : publication.published
                       ? (es ? `Publicado v${publication.published.version}` : `Published v${publication.published.version}`)
                       : publication.draft
