@@ -5,13 +5,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { buildGuidedPlan } from '@/lib/nutrition/assembler'
 import {
   canPublishSyntheticDraft,
+  compareSyntheticPlans,
   confirmSyntheticReview,
   createSyntheticPublicationState,
   publishSyntheticDraft,
   saveSyntheticDraft,
   SYNTHETIC_REVIEWER,
 } from '@/lib/nutrition/synthetic-publication'
-import type { SyntheticPlanSnapshot } from '@/lib/nutrition/synthetic-publication'
+import type {
+  SyntheticPlanComparison,
+  SyntheticPlanSnapshot,
+  SyntheticProfileChange,
+} from '@/lib/nutrition/synthetic-publication'
 import type {
   CompletionComponent,
   GuidedPlan,
@@ -199,6 +204,123 @@ function planStopExplanation(plan: GuidedPlan, lang: 'es' | 'en'): PlanStopExpla
   }
 }
 
+const PROFILE_CHANGE_LABEL: Record<SyntheticProfileChange['field'], { es: string; en: string }> = {
+  phase: { es: 'Fase', en: 'Phase' },
+  calorieTarget: { es: 'Meta calórica', en: 'Calorie target' },
+  mealSlots: { es: 'Horarios', en: 'Meal slots' },
+  preferredFoods: { es: 'Prioriza', en: 'Prioritizes' },
+  dislikedFoods: { es: 'No le gusta', en: 'Dislikes' },
+  excludedFoods: { es: 'Exclusión estricta', en: 'Strict exclusion' },
+  ageYears: { es: 'Edad', en: 'Age' },
+  heightCm: { es: 'Estatura', en: 'Height' },
+  currentWeightKg: { es: 'Peso actual', en: 'Current weight' },
+  goalWeightKg: { es: 'Peso meta', en: 'Goal weight' },
+  activityLevel: { es: 'Actividad', en: 'Activity' },
+}
+
+function profileChangeValue(change: SyntheticProfileChange, value: string, lang: 'es' | 'en') {
+  const es = lang === 'es'
+  if (change.field === 'calorieTarget') return `${Number(value).toLocaleString(es ? 'es-MX' : 'en-US')} kcal`
+  if (change.field === 'heightCm') return `${value} cm`
+  if (change.field === 'currentWeightKg' || change.field === 'goalWeightKg') return `${value} kg`
+  if (change.field === 'ageYears') return es ? `${value} años` : `${value} years`
+  if (change.field === 'activityLevel') {
+    const labels: Record<string, { es: string; en: string }> = {
+      sedentary: { es: 'Actividad baja', en: 'Low activity' },
+      light: { es: 'Actividad ligera', en: 'Light activity' },
+      moderate: { es: 'Actividad moderada', en: 'Moderate activity' },
+    }
+    return labels[value]?.[lang] ?? value
+  }
+  const values = value ? value.split(', ').filter(Boolean) : []
+  if (change.field === 'mealSlots') {
+    return values.map(slot => SLOT_LABEL[slot as MealSlot]?.[lang] ?? slot).join(', ') || (es ? 'Ninguno' : 'None')
+  }
+  if (change.field === 'preferredFoods' || change.field === 'dislikedFoods' || change.field === 'excludedFoods') {
+    return values.map(food => FOOD_LABEL[food]?.[lang] ?? food).join(', ') || (es ? 'Ninguno' : 'None')
+  }
+  return value || (es ? 'Ninguno' : 'None')
+}
+
+function VersionComparison({
+  beforeVersion,
+  afterVersion,
+  comparison,
+  lang,
+}: {
+  beforeVersion: number
+  afterVersion: number
+  comparison: SyntheticPlanComparison
+  lang: 'es' | 'en'
+}) {
+  const es = lang === 'es'
+
+  return (
+    <section className={styles.versionComparison} aria-live="polite" data-testid="synthetic-version-comparison">
+      <header>
+        <div>
+          <span>{es ? 'Comparación de versiones' : 'Version comparison'}</span>
+          <strong>v{beforeVersion} → v{afterVersion}</strong>
+        </div>
+        <b className={comparison.clientDeliveryChanged ? styles.comparisonChanged : styles.comparisonUnchanged}>
+          {comparison.clientDeliveryChanged
+            ? (es ? 'Cambios visibles' : 'Visible changes')
+            : (es ? 'Sin cambios visibles' : 'No visible changes')}
+        </b>
+      </header>
+      {!comparison.clientDeliveryChanged ? (
+        <p className={styles.comparisonWarning}>{es
+          ? 'El perfil cambió, pero el cliente recibiría las mismas recetas, porciones, complementos y macros. Esta versión no puede publicarse.'
+          : 'The profile changed, but the client would receive the same recipes, portions, complements, and macros. This version cannot be published.'}</p>
+      ) : null}
+      <div className={styles.comparisonColumns}>
+        <div>
+          <h4>{es ? 'Perfil y reglas' : 'Profile and rules'}</h4>
+          {comparison.profileChanges.length > 0 ? (
+            <ul>{comparison.profileChanges.map(change => (
+              <li key={change.field}>
+                <strong>{PROFILE_CHANGE_LABEL[change.field][lang]}</strong>
+                <span>{profileChangeValue(change, change.before, lang)} → {profileChangeValue(change, change.after, lang)}</span>
+              </li>
+            ))}</ul>
+          ) : <p>{es ? 'Sin cambios de perfil.' : 'No profile changes.'}</p>}
+        </div>
+        <div>
+          <h4>{es ? 'Recetas y orden' : 'Recipes and order'}</h4>
+          {comparison.recipeChanges.length > 0 ? (
+            <ul>{comparison.recipeChanges.map(change => (
+              <li key={`${change.type}-${change.slot}-${change.familyId}`}>
+                <strong>{change.name[lang]}</strong>
+                <span>{SLOT_LABEL[change.slot][lang]} · {change.type === 'added'
+                  ? (es ? `añadida en posición ${change.afterPosition}` : `added at position ${change.afterPosition}`)
+                  : change.type === 'removed'
+                    ? (es ? `retirada de posición ${change.beforePosition}` : `removed from position ${change.beforePosition}`)
+                    : (es
+                      ? `posición ${change.beforePosition} → ${change.afterPosition}`
+                      : `position ${change.beforePosition} → ${change.afterPosition}`)}</span>
+              </li>
+            ))}</ul>
+          ) : <p>{es ? 'Mismas recetas y mismo orden.' : 'Same recipes in the same order.'}</p>}
+        </div>
+        <div>
+          <h4>{es ? 'Porciones, complementos y calorías' : 'Portions, complements, and calories'}</h4>
+          {comparison.detailChanges.length > 0 ? (
+            <ul>{comparison.detailChanges.map(change => (
+              <li key={`${change.slot}-${change.familyId}`}>
+                <strong>{change.name[lang]} · {SLOT_LABEL[change.slot][lang]}</strong>
+                {change.portion ? <span>{es ? 'Porción' : 'Portion'}: {change.portion.before[lang]} → {change.portion.after[lang]}</span> : null}
+                {change.components ? <span>{es ? 'Complementos' : 'Complements'}: {change.components.before.map(item => item[lang]).join(', ') || '—'} → {change.components.after.map(item => item[lang]).join(', ') || '—'}</span> : null}
+                {change.calories ? <span>{es ? 'Calorías' : 'Calories'}: {change.calories.before} → {change.calories.after} kcal</span> : null}
+                {change.macros ? <span>{es ? 'Macros' : 'Macros'}: {change.macros.before.proteinG} g P / {change.macros.before.netCarbsG} g CN / {change.macros.before.fatG} g G → {change.macros.after.proteinG} g P / {change.macros.after.netCarbsG} g CN / {change.macros.after.fatG} g G</span> : null}
+              </li>
+            ))}</ul>
+          ) : <p>{es ? 'Sin cambios en porciones, complementos o calorías.' : 'No changes to portions, complements, or calories.'}</p>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function PlanPreviewClient({ user, plans, recipes, components, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
@@ -208,6 +330,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [experienceMode, setExperienceMode] = useState<'draft' | 'published'>('draft')
   const [experienceSnapshot, setExperienceSnapshot] = useState<SyntheticPlanSnapshot | null>(null)
   const [publication, setPublication] = useState(createSyntheticPublicationState)
+  const [showVersionComparison, setShowVersionComparison] = useState(false)
   const es = lang === 'es'
   const availablePlans = useMemo(
     () => questionnairePlan ? [questionnairePlan, ...plans] : plans,
@@ -228,6 +351,24 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const draftMatchesCurrentPlan = publication.draft?.plan === plan
   const hasUnpublishedDraft = Boolean(
     publication.draft && publication.published?.version !== publication.draft.version,
+  )
+  const comparisonPair = useMemo(() => {
+    if (hasUnpublishedDraft && publication.published && publication.draft) {
+      return { before: publication.published, after: publication.draft }
+    }
+    const history = publication.publishedVersions
+    if (history.length < 2) return null
+    return { before: history[history.length - 2], after: history[history.length - 1] }
+  }, [hasUnpublishedDraft, publication.draft, publication.published, publication.publishedVersions])
+  const versionComparison = useMemo(
+    () => comparisonPair ? compareSyntheticPlans(comparisonPair.before.plan, comparisonPair.after.plan) : null,
+    [comparisonPair],
+  )
+  const draftHasNoVisibleChanges = Boolean(
+    hasUnpublishedDraft
+    && comparisonPair?.after === publication.draft
+    && versionComparison
+    && !versionComparison.clientDeliveryChanged,
   )
   const reviewConfirmed = Boolean(
     draftMatchesCurrentPlan
@@ -284,6 +425,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
     setShowTemporaryExperience(false)
     setExperienceSnapshot(null)
     setExperienceMode('draft')
+    setShowVersionComparison(false)
     setQuestionnairePlan(generatedPlan)
     setSelectedProfileId(profile.id)
     window.requestAnimationFrame(resetPreviewScroll)
@@ -303,12 +445,14 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
     setPublication(current => saveSyntheticDraft(current, plan))
     setExperienceSnapshot(null)
     setExperienceMode('draft')
+    setShowVersionComparison(true)
   }
 
   function publishCurrentSyntheticDraft() {
     setPublication(current => publishSyntheticDraft(current))
     setExperienceSnapshot(null)
     setExperienceMode('published')
+    setShowVersionComparison(true)
   }
 
   return (
@@ -372,7 +516,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización y publicación v0.6' : 'Personalization and publishing test v0.6'}</span>
+              <span>{es ? 'Prueba de personalización y publicación v0.7' : 'Personalization and publishing test v0.7'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -599,6 +743,30 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   <div><dt>{es ? 'Cliente vinculado' : 'Linked client'}</dt><dd>{publication.client.displayName}</dd></div>
                   <div><dt>ID sintético</dt><dd>{publication.client.id}</dd></div>
                 </dl>
+                {comparisonPair && versionComparison ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.comparisonToggle}
+                      aria-expanded={showVersionComparison}
+                      onClick={() => setShowVersionComparison(value => !value)}
+                    >
+                      {showVersionComparison
+                        ? (es ? 'Ocultar comparación' : 'Hide comparison')
+                        : (es
+                          ? `Comparar v${comparisonPair.before.version} con v${comparisonPair.after.version}`
+                          : `Compare v${comparisonPair.before.version} with v${comparisonPair.after.version}`)}
+                    </button>
+                    {showVersionComparison ? (
+                      <VersionComparison
+                        beforeVersion={comparisonPair.before.version}
+                        afterVersion={comparisonPair.after.version}
+                        comparison={versionComparison}
+                        lang={lang}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
                 {stopExplanation ? (
                   <div className={styles.publicationBlocker} role="status" aria-live="polite" id="synthetic-publication-blocker">
                     <strong>{stopExplanation.heading}</strong>
@@ -618,14 +786,16 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                     : draftMatchesCurrentPlan
                       ? (es ? `Plan guardado como borrador v${publication.draft?.version}` : `Plan saved as draft v${publication.draft?.version}`)
                       : publication.draft
-                        ? (es ? `Guardar plan como borrador v${publication.draft.version + 1}` : `Save plan as draft v${publication.draft.version + 1}`)
+                        ? (es
+                          ? `Guardar plan como borrador v${(publication.published?.version ?? 0) + 1}`
+                          : `Save plan as draft v${(publication.published?.version ?? 0) + 1}`)
                         : (es ? 'Guardar plan como borrador v1' : 'Save plan as draft v1')}
                 </button>
                 <label className={styles.reviewConfirmation}>
                   <input
                     type="checkbox"
                     checked={reviewConfirmed}
-                    disabled={!hasUnpublishedDraft || !draftMatchesCurrentPlan}
+                    disabled={!hasUnpublishedDraft || !draftMatchesCurrentPlan || draftHasNoVisibleChanges}
                     onChange={event => setPublication(current => confirmSyntheticReview(current, event.target.checked))}
                   />
                   <span>{es
@@ -642,6 +812,8 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                     ? (publication.published
                       ? (es ? `Publicar v${publication.draft?.version} y reemplazar v${publication.published.version}` : `Publish v${publication.draft?.version} and replace v${publication.published.version}`)
                       : (es ? 'Simular aprobación y publicación' : 'Simulate approval and publishing'))
+                    : draftHasNoVisibleChanges
+                      ? (es ? 'Sin cambios visibles para publicar' : 'No visible changes to publish')
                     : publication.published && !hasUnpublishedDraft
                       ? (es ? `Versión v${publication.published.version} publicada` : `Version v${publication.published.version} published`)
                       : (es ? 'Revisión humana requerida' : 'Human review required')}

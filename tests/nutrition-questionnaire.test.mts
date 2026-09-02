@@ -8,8 +8,10 @@ import {
 } from '../lib/nutrition/questionnaire-profile.ts'
 import {
   canPublishSyntheticDraft,
+  compareSyntheticPlans,
   confirmSyntheticReview,
   createSyntheticPublicationState,
+  hasSameSyntheticClientDelivery,
   publishSyntheticDraft,
   saveSyntheticDraft,
   SYNTHETIC_CLIENT,
@@ -202,4 +204,80 @@ test('saving an unchanged plan does not create a duplicate synthetic version', (
   const firstDraft = saveSyntheticDraft(createSyntheticPublicationState(), plan)
 
   assert.equal(saveSyntheticDraft(firstDraft, plan), firstDraft)
+})
+
+test('profile-only changes are visible in comparison but cannot publish an identical client delivery', () => {
+  const plan = generate(BASE)
+  const firstPublished = publishSyntheticDraft(
+    confirmSyntheticReview(saveSyntheticDraft(createSyntheticPublicationState(), plan), true),
+  )
+  const profileOnlyPlan = {
+    ...plan,
+    profile: {
+      ...plan.profile,
+      preferredFoods: [...plan.profile.preferredFoods, 'egg'],
+    },
+  }
+  const secondDraft = saveSyntheticDraft(firstPublished, profileOnlyPlan)
+  const comparison = compareSyntheticPlans(plan, profileOnlyPlan)
+
+  assert.equal(secondDraft.draft?.version, 2)
+  assert.equal(comparison.clientDeliveryChanged, false)
+  assert.equal(comparison.profileChanges.some(change => change.field === 'preferredFoods'), true)
+  assert.equal(comparison.recipeChanges.length, 0)
+  assert.equal(comparison.detailChanges.length, 0)
+  assert.equal(hasSameSyntheticClientDelivery(plan, profileOnlyPlan), true)
+  assert.equal(confirmSyntheticReview(secondDraft, true), secondDraft)
+  assert.equal(canPublishSyntheticDraft(secondDraft), false)
+  assert.equal(publishSyntheticDraft(secondDraft), secondDraft)
+})
+
+test('a changed client delivery compares recipes and keeps the next unpublished draft version stable', () => {
+  const firstPlan = generate(BASE)
+  const secondPlan = generate({ ...BASE, mealCount: 2 })
+  const firstPublished = publishSyntheticDraft(
+    confirmSyntheticReview(saveSyntheticDraft(createSyntheticPublicationState(), firstPlan), true),
+  )
+  const profileOnlyPlan = {
+    ...firstPlan,
+    profile: { ...firstPlan.profile, preferredFoods: ['egg'] },
+  }
+  const unchangedDeliveryDraft = saveSyntheticDraft(firstPublished, profileOnlyPlan)
+  const changedDeliveryDraft = saveSyntheticDraft(unchangedDeliveryDraft, secondPlan)
+  const comparison = compareSyntheticPlans(firstPlan, secondPlan)
+
+  assert.equal(unchangedDeliveryDraft.draft?.version, 2)
+  assert.equal(changedDeliveryDraft.draft?.version, 2)
+  assert.equal(comparison.clientDeliveryChanged, true)
+  assert.equal(comparison.profileChanges.some(change => change.field === 'mealSlots'), true)
+  assert.equal(comparison.recipeChanges.length > 0, true)
+  assert.equal(hasSameSyntheticClientDelivery(firstPlan, secondPlan), false)
+  assert.equal(canPublishSyntheticDraft(confirmSyntheticReview(changedDeliveryDraft, true)), true)
+})
+
+test('the comparison explains macro changes inside an otherwise matching recipe', () => {
+  const firstPlan = generate(BASE)
+  const firstGroup = firstPlan.groups[0]
+  const firstOption = firstGroup.options[0]
+  const revisedPlan = {
+    ...firstPlan,
+    groups: [
+      {
+        ...firstGroup,
+        options: [
+          {
+            ...firstOption,
+            totals: { ...firstOption.totals, proteinG: firstOption.totals.proteinG + 1 },
+          },
+          ...firstGroup.options.slice(1),
+        ],
+      },
+      ...firstPlan.groups.slice(1),
+    ],
+  }
+  const comparison = compareSyntheticPlans(firstPlan, revisedPlan)
+
+  assert.equal(comparison.clientDeliveryChanged, true)
+  assert.equal(comparison.detailChanges.length, 1)
+  assert.equal(comparison.detailChanges[0]?.macros?.after.proteinG, firstOption.totals.proteinG + 1)
 })

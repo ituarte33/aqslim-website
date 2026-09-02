@@ -152,6 +152,23 @@
 .workflowIdentity div { display: grid; grid-template-columns: 1fr auto; gap: 10px; border: 0; padding: 0; }
 .workflowIdentity dt { color: #8e989d; font-size: 8px; }
 .workflowIdentity dd { overflow: hidden; margin: 0; color: #bce6fb; font-size: 8px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.comparisonToggle { border: 1px solid rgba(95,174,219,.38); color: #bce6fb; background: rgba(43,138,191,.055); }
+.versionComparison { display: grid; gap: 11px; border: 1px solid rgba(95,174,219,.24); border-radius: 11px; padding: 11px; background: rgba(7,16,20,.5); }
+.versionComparison > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.versionComparison > header > div { display: grid; gap: 3px; }
+.versionComparison > header span { color: #8e989d; font-size: 7px; letter-spacing: .08em; text-transform: uppercase; }
+.versionComparison > header strong { color: #e8e1d7; font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 400; }
+.versionComparison > header b { border: 1px solid; border-radius: 999px; padding: 5px 7px; font-size: 7px; font-weight: 500; white-space: nowrap; }
+.comparisonChanged { border-color: rgba(112,188,95,.36) !important; color: #bde4b4; background: rgba(75,139,62,.06); }
+.comparisonUnchanged { border-color: rgba(209,132,100,.42) !important; color: #f0b9a2; background: rgba(135,75,54,.09); }
+.versionComparison .comparisonWarning { margin: 0; border-left: 2px solid #d18464; padding: 7px 8px; color: #e1b19e; background: rgba(135,75,54,.07); font-size: 8px; line-height: 1.5; }
+.comparisonColumns { display: grid; gap: 9px; }
+.comparisonColumns > div { display: grid; gap: 6px; border-top: 1px solid rgba(255,255,255,.07); padding-top: 8px; }
+.comparisonColumns h4 { margin: 0; color: #d8bb68; font-size: 8px; font-weight: 500; letter-spacing: .04em; }
+.comparisonColumns ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.comparisonColumns li { display: grid; gap: 2px; }
+.comparisonColumns li strong { color: #ddd5cb; font-size: 8px; font-weight: 500; }
+.comparisonColumns li span, .comparisonColumns p { margin: 0; color: #8f8982; font-size: 7px; line-height: 1.45; }
 .publicationBlocker { display: grid; gap: 8px; border: 1px solid rgba(209,132,100,.38); border-radius: 11px; padding: 12px; background: rgba(135,75,54,.09); }
 .publicationBlocker > strong { color: #f0b9a2; font-size: 9px; font-weight: 500; line-height: 1.5; }
 .publicationBlocker ul { display: grid; gap: 5px; margin: 0; padding-left: 16px; color: #cba89a; font-size: 8px; line-height: 1.5; }
