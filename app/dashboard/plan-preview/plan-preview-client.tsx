@@ -3,6 +3,13 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { buildGuidedPlan } from '@/lib/nutrition/assembler'
+import {
+  canPublishSyntheticDraft,
+  confirmSyntheticReview,
+  createSyntheticPublicationState,
+  publishSyntheticDraft,
+  saveSyntheticDraft,
+} from '@/lib/nutrition/synthetic-publication'
 import type {
   CompletionComponent,
   GuidedPlan,
@@ -88,6 +95,8 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [questionnairePlan, setQuestionnairePlan] = useState<GuidedPlan | null>(null)
   const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const [showTemporaryExperience, setShowTemporaryExperience] = useState(false)
+  const [experienceMode, setExperienceMode] = useState<'draft' | 'published'>('draft')
+  const [publication, setPublication] = useState(createSyntheticPublicationState)
   const es = lang === 'es'
   const availablePlans = useMemo(
     () => questionnairePlan ? [questionnairePlan, ...plans] : plans,
@@ -105,6 +114,10 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   )
   const generationPassed = plan.status === 'ready_for_review'
   const isQuestionnairePlan = plan.profile.id === 'SYN-JING-QUESTIONNAIRE-DRAFT'
+  const draftMatchesCurrentPlan = publication.draft?.plan === plan
+  const experienceSnapshot = experienceMode === 'published'
+    ? publication.published
+    : publication.draft
   const coverageGap = plan.groups.find(group => group.options.length < 3)
 
   useEffect(() => {
@@ -152,9 +165,25 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   function generateQuestionnairePlan(profile: NutritionProfile) {
     const generatedPlan = buildGuidedPlan({ profile, recipes, components })
     setShowTemporaryExperience(false)
+    setExperienceMode('draft')
+    setPublication(createSyntheticPublicationState())
     setQuestionnairePlan(generatedPlan)
     setSelectedProfileId(profile.id)
     window.requestAnimationFrame(resetPreviewScroll)
+  }
+
+  function openSyntheticExperience(mode: 'draft' | 'published') {
+    setExperienceMode(mode)
+    setShowTemporaryExperience(true)
+  }
+
+  function saveCurrentSyntheticDraft() {
+    setPublication(current => saveSyntheticDraft(current, plan))
+  }
+
+  function publishCurrentSyntheticDraft() {
+    setPublication(current => publishSyntheticDraft(current))
+    setExperienceMode('published')
   }
 
   return (
@@ -179,17 +208,31 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
               >
                 {es ? `Abrir vista de ${plan.profile.firstName} ↗` : `Open ${plan.profile.firstName}’s view ↗`}
               </Link>
-            ) : generationPassed && isQuestionnairePlan ? (
+            ) : generationPassed && isQuestionnairePlan && publication.published ? (
               <button
                 type="button"
                 className={`${styles.previewLink} ${styles.previewLinkButton}`}
-                onClick={() => setShowTemporaryExperience(true)}
+                onClick={() => openSyntheticExperience('published')}
               >
-                {es ? 'Abrir experiencia temporal ↗' : 'Open temporary experience ↗'}
+                {es
+                  ? `Abrir versión publicada v${publication.published.version} ↗`
+                  : `Open published version v${publication.published.version} ↗`}
+              </button>
+            ) : generationPassed && isQuestionnairePlan && publication.draft ? (
+              <button
+                type="button"
+                className={`${styles.previewLink} ${styles.previewLinkButton}`}
+                onClick={() => openSyntheticExperience('draft')}
+              >
+                {es
+                  ? `Revisar borrador v${publication.draft.version} ↗`
+                  : `Review draft v${publication.draft.version} ↗`}
               </button>
             ) : isQuestionnairePlan ? (
               <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
-                {es ? 'Experiencia temporal no disponible' : 'Temporary experience unavailable'}
+                {generationPassed
+                  ? (es ? 'Guarda el borrador para abrirlo' : 'Save the draft to open it')
+                  : (es ? 'Experiencia temporal no disponible' : 'Temporary experience unavailable')}
               </span>
             ) : (
               <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
@@ -204,7 +247,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización automática v0.4' : 'Automatic personalization test v0.4'}</span>
+              <span>{es ? 'Prueba de personalización y publicación v0.5' : 'Personalization and publishing test v0.5'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -331,9 +374,15 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 <span className={`${styles.statusDot} ${styles.reviewDot}`} />
                 <div>
                   <small>{es ? 'Publicación' : 'Publishing'}</small>
-                  <strong className={styles.reviewStatus}>{generationPassed
-                    ? (es ? 'Pendiente de revisión humana' : 'Pending human review')
-                    : (es ? 'No disponible' : 'Unavailable')}</strong>
+                  <strong className={publication.published && isQuestionnairePlan ? styles.publishedStatus : styles.reviewStatus}>
+                    {publication.published && isQuestionnairePlan
+                      ? (es ? `Publicada en simulación · v${publication.published.version}` : `Published in simulation · v${publication.published.version}`)
+                      : publication.draft && isQuestionnairePlan
+                        ? (es ? `Borrador v${publication.draft.version} · revisión pendiente` : `Draft v${publication.draft.version} · review pending`)
+                        : generationPassed
+                          ? (es ? 'Pendiente de revisión humana' : 'Pending human review')
+                          : (es ? 'No disponible' : 'Unavailable')}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -395,25 +444,80 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
               </ul>
             </section>
 
-            <div className={styles.disabledActions}>
-              <button type="button" disabled>{es ? 'Guardar borrador' : 'Save draft'}</button>
-              <button type="button" disabled>{es ? 'Aprobar y publicar' : 'Approve and publish'}</button>
-              <p>{es
-                ? 'Controles desconectados: esta etapa no escribe en Airtable ni publica a usuarios.'
-                : 'Disconnected controls: this stage neither writes to Airtable nor publishes to users.'}</p>
-            </div>
+            {isQuestionnairePlan ? (
+              <div className={styles.publicationActions} data-testid="synthetic-publication-controls">
+                <div className={styles.publicationHeading}>
+                  <span>{es ? 'Flujo de publicación sintético' : 'Synthetic publishing workflow'}</span>
+                  <strong>{publication.published
+                    ? (es ? `Publicado v${publication.published.version}` : `Published v${publication.published.version}`)
+                    : publication.draft
+                      ? (es ? `Borrador v${publication.draft.version}` : `Draft v${publication.draft.version}`)
+                      : (es ? 'Sin guardar' : 'Not saved')}</strong>
+                </div>
+                <button
+                  type="button"
+                  className={styles.draftAction}
+                  disabled={!generationPassed || Boolean(publication.published)}
+                  onClick={saveCurrentSyntheticDraft}
+                >
+                  {publication.draft
+                    ? (es ? 'Actualizar borrador' : 'Update draft')
+                    : (es ? 'Guardar borrador sintético' : 'Save synthetic draft')}
+                </button>
+                <label className={styles.reviewConfirmation}>
+                  <input
+                    type="checkbox"
+                    checked={publication.reviewConfirmed}
+                    disabled={!publication.draft || Boolean(publication.published) || !draftMatchesCurrentPlan}
+                    onChange={event => setPublication(current => confirmSyntheticReview(current, event.target.checked))}
+                  />
+                  <span>{es
+                    ? 'Confirmo que revisé calorías, exclusiones y la señal de medicamentos.'
+                    : 'I confirm that I reviewed calories, exclusions, and the medication flag.'}</span>
+                </label>
+                <button
+                  type="button"
+                  className={styles.publishAction}
+                  disabled={!canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
+                  onClick={publishCurrentSyntheticDraft}
+                >
+                  {publication.published
+                    ? (es ? `Versión v${publication.published.version} publicada` : `Version v${publication.published.version} published`)
+                    : (es ? 'Simular aprobación y publicación' : 'Simulate approval and publishing')}
+                </button>
+                <p>{es
+                  ? 'Simulación en memoria: no escribe en Airtable, no llega a clientes y se reinicia al refrescar.'
+                  : 'In-memory simulation: it does not write to Airtable, reach clients, and resets on refresh.'}</p>
+              </div>
+            ) : (
+              <div className={styles.disabledActions}>
+                <button type="button" disabled>{es ? 'Guardar borrador' : 'Save draft'}</button>
+                <button type="button" disabled>{es ? 'Aprobar y publicar' : 'Approve and publish'}</button>
+                <p>{es
+                  ? 'Controles desconectados: esta etapa no escribe en Airtable ni publica a usuarios.'
+                  : 'Disconnected controls: this stage neither writes to Airtable nor publishes to users.'}</p>
+              </div>
+            )}
           </aside>
         </div>
 
         <RecipeDetailDialog option={openRecipe} language={lang} context="review" onClose={() => setOpenRecipe(null)} />
       </div>
 
-      {showTemporaryExperience && generationPassed && isQuestionnairePlan ? (
+      {showTemporaryExperience && isQuestionnairePlan && experienceSnapshot ? (
         <div className={styles.temporaryExperienceOverlay} role="dialog" aria-modal="true" aria-labelledby="temporary-experience-title">
           <header className={styles.temporaryExperienceHeader}>
             <div>
-              <span>{es ? 'Preview sintético · sin guardar' : 'Synthetic Preview · not saved'}</span>
-              <strong id="temporary-experience-title">{es ? 'Experiencia temporal del cliente' : 'Temporary client experience'}</strong>
+              <span>{experienceMode === 'published'
+                ? (es
+                  ? `Versión publicada simulada · v${experienceSnapshot.version}`
+                  : `Simulated published version · v${experienceSnapshot.version}`)
+                : (es
+                  ? `Vista previa del borrador · v${experienceSnapshot.version}`
+                  : `Draft preview · v${experienceSnapshot.version}`)}</span>
+              <strong id="temporary-experience-title">{experienceMode === 'published'
+                ? (es ? 'Así recibiría el cliente esta versión' : 'How the client would receive this version')
+                : (es ? 'Revisión del borrador antes de publicar' : 'Draft review before publishing')}</strong>
             </div>
             <button type="button" onClick={() => setShowTemporaryExperience(false)} aria-label={es ? 'Cerrar experiencia temporal' : 'Close temporary experience'}>
               ×
@@ -421,7 +525,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
           </header>
           <main className={styles.temporaryExperienceBody}>
             <GuidedPlanExperience
-              plan={plan}
+              plan={experienceSnapshot.plan}
               language={lang}
               guidePath="/my-aqslim/demo/materials"
               persistPreferences={false}

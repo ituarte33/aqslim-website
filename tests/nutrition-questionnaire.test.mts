@@ -6,6 +6,13 @@ import {
   buildSyntheticQuestionnaireProfile,
   type SyntheticQuestionnaireAnswers,
 } from '../lib/nutrition/questionnaire-profile.ts'
+import {
+  canPublishSyntheticDraft,
+  confirmSyntheticReview,
+  createSyntheticPublicationState,
+  publishSyntheticDraft,
+  saveSyntheticDraft,
+} from '../lib/nutrition/synthetic-publication.ts'
 import { planContainsBlockedFood, validateEveryCombination } from '../lib/nutrition/validation.ts'
 
 const BASE: SyntheticQuestionnaireAnswers = {
@@ -106,4 +113,37 @@ test('an incomplete three-choice library remains stopped for review', () => {
 
   assert.equal(plan.groups.some(group => group.options.length < 3), true)
   assert.equal(plan.status, 'insufficient_library')
+})
+
+test('a synthetic plan cannot publish before a ready draft and explicit human review', () => {
+  const readyPlan = generate(BASE)
+  const blockedPlan = generate({ ...BASE, medicationReview: 'required' })
+  const empty = createSyntheticPublicationState()
+
+  assert.equal(saveSyntheticDraft(empty, blockedPlan), empty)
+  const drafted = saveSyntheticDraft(empty, readyPlan)
+  assert.equal(drafted.draft?.version, 1)
+  assert.equal(drafted.published, null)
+  assert.equal(canPublishSyntheticDraft(drafted), false)
+  assert.equal(publishSyntheticDraft(drafted), drafted)
+
+  const reviewed = confirmSyntheticReview(drafted, true)
+  assert.equal(canPublishSyntheticDraft(reviewed), true)
+  const published = publishSyntheticDraft(reviewed)
+  assert.equal(published.published?.version, 1)
+  assert.equal(published.published?.plan, readyPlan)
+})
+
+test('the published synthetic snapshot remains frozen when a newer draft is created', () => {
+  const firstPlan = generate(BASE)
+  const revisedPlan = generate({ ...BASE, mealCount: 2 })
+  const firstDraft = saveSyntheticDraft(createSyntheticPublicationState(), firstPlan)
+  const firstPublished = publishSyntheticDraft(confirmSyntheticReview(firstDraft, true))
+  const revisedDraft = saveSyntheticDraft(firstPublished, revisedPlan)
+
+  assert.equal(revisedDraft.draft?.version, 2)
+  assert.equal(revisedDraft.draft?.plan, revisedPlan)
+  assert.equal(revisedDraft.published?.version, 1)
+  assert.equal(revisedDraft.published?.plan, firstPlan)
+  assert.equal(revisedDraft.reviewConfirmed, false)
 })

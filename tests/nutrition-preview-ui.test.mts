@@ -10,6 +10,7 @@ const DASHBOARD_PAGE = new URL('../app/dashboard/plan-preview/page.tsx', import.
 const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-client.tsx', import.meta.url)
 const SYNTHETIC_QUESTIONNAIRE = new URL('../app/dashboard/plan-preview/synthetic-questionnaire.tsx', import.meta.url)
 const QUESTIONNAIRE_PROFILE = new URL('../lib/nutrition/questionnaire-profile.ts', import.meta.url)
+const SYNTHETIC_PUBLICATION = new URL('../lib/nutrition/synthetic-publication.ts', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
 const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
 const RECIPE_DATA = new URL('../app/my-aqslim/plan/recipe-detail-data.ts', import.meta.url)
@@ -103,11 +104,12 @@ test('the real client plan route remains connected to its existing portal data',
 })
 
 test('the Dashboard Preview is admin-only, review-first, and has no persistence path', async () => {
-  const [page, client, questionnaire, questionnaireProfile, shell, middleware] = await Promise.all([
+  const [page, client, questionnaire, questionnaireProfile, syntheticPublication, shell, middleware] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
     readFile(SYNTHETIC_QUESTIONNAIRE, 'utf8'),
     readFile(QUESTIONNAIRE_PROFILE, 'utf8'),
+    readFile(SYNTHETIC_PUBLICATION, 'utf8'),
     readFile(DASHBOARD_SHELL, 'utf8'),
     readFile(MIDDLEWARE, 'utf8'),
   ])
@@ -123,16 +125,22 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /Validación automática/)
   assert.match(client, /Pendiente de revisión humana/)
   assert.match(client, /combinaciones compatibles/)
-  assert.match(client, /Prueba de personalización automática v0\.4/)
+  assert.match(client, /Prueba de personalización y publicación v0\.5/)
   assert.match(client, /<SyntheticQuestionnaire lang=\{lang\} onGenerate=\{generateQuestionnairePlan\}/)
   assert.match(client, /buildGuidedPlan\(\{ profile, recipes, components \}\)/)
-  assert.match(client, /Abrir experiencia temporal ↗/)
+  assert.match(client, /Revisar borrador v\$\{publication\.draft\.version\} ↗/)
   assert.match(client, /<GuidedPlanExperience/)
   assert.match(client, /persistPreferences=\{false\}/)
   assert.match(client, /showGuideActions=\{false\}/)
-  assert.match(client, /Experiencia temporal del cliente/)
+  assert.match(client, /Así recibiría el cliente esta versión/)
   assert.match(client, /document\.body\.style\.overflow = 'hidden'/)
   assert.match(client, /event\.key === 'Escape'/)
+  assert.match(client, /Guardar borrador sintético/)
+  assert.match(client, /Confirmo que revisé calorías, exclusiones y la señal de medicamentos/)
+  assert.match(client, /Simular aprobación y publicación/)
+  assert.match(client, /Abrir versión publicada v\$\{publication\.published\.version\}/)
+  assert.match(client, /plan=\{experienceSnapshot\.plan\}/)
+  assert.match(client, /Simulación en memoria/)
   assert.match(client, /Cálculo energético sintético/)
   assert.match(client, /Mantenimiento estimado/)
   assert.match(client, /Déficit aplicado/)
@@ -176,8 +184,11 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(questionnaire, /Generar opciones con AQ Buddy/)
   assert.doesNotMatch(questionnaire, /fetch\(|airtable|localStorage|sessionStorage/i)
   assert.doesNotMatch(questionnaireProfile, /fetch\(|airtable|localStorage|sessionStorage/i)
+  assert.doesNotMatch(syntheticPublication, /fetch\(|airtable|localStorage|sessionStorage/i)
   assert.match(questionnaireProfile, /CONTROLLED_DEFICIT_CALORIES = 500/)
   assert.match(questionnaireProfile, /safetyReviewRequired: answers\.medicationReview === 'required'/)
+  assert.match(syntheticPublication, /plan\.status !== 'ready_for_review'/)
+  assert.match(syntheticPublication, /state\.published\?\.version !== state\.draft\.version/)
 })
 
 test('the guided plan keeps headings clear and cards readable on narrow screens', async () => {
