@@ -254,6 +254,7 @@ function VersionComparison({
   lang: 'es' | 'en'
 }) {
   const es = lang === 'es'
+  const profileChanged = comparison.profileChanges.length > 0
 
   return (
     <section className={styles.versionComparison} aria-live="polite" data-testid="synthetic-version-comparison">
@@ -270,8 +271,12 @@ function VersionComparison({
       </header>
       {!comparison.clientDeliveryChanged ? (
         <p className={styles.comparisonWarning}>{es
-          ? 'El perfil cambió, pero el cliente recibiría las mismas recetas, porciones, complementos y macros. Esta versión no puede publicarse.'
-          : 'The profile changed, but the client would receive the same recipes, portions, complements, and macros. This version cannot be published.'}</p>
+          ? (profileChanged
+            ? 'El perfil cambió, pero el cliente recibiría las mismas recetas, porciones, complementos y macros. Esta versión no puede publicarse.'
+            : 'El perfil y el plan no presentan cambios visibles para el cliente. Esta versión no puede publicarse.')
+          : (profileChanged
+            ? 'The profile changed, but the client would receive the same recipes, portions, complements, and macros. This version cannot be published.'
+            : 'The profile and plan have no client-visible changes. This version cannot be published.')}</p>
       ) : null}
       <div className={styles.comparisonColumns}>
         <div>

@@ -155,6 +155,8 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /Sin cambios visibles para publicar/)
   assert.match(client, /synthetic-version-comparison/)
   assert.match(client, /El perfil cambió, pero el cliente recibiría las mismas recetas, porciones, complementos y macros/)
+  assert.match(client, /El perfil y el plan no presentan cambios visibles para el cliente/)
+  assert.match(client, /profileChanged = comparison\.profileChanges\.length > 0/)
   assert.match(client, /publication\.publishedVersions/)
   assert.match(client, /publication\.auditTrail/)
   assert.match(client, /plan=\{experienceSnapshot\.plan\}/)
