@@ -148,6 +148,10 @@
 .publicationHeading { display: grid; gap: 6px; margin-bottom: 2px; }
 .publicationHeading span { color: #9ed9f6; font-size: 8px; letter-spacing: .09em; text-transform: uppercase; }
 .publicationHeading strong { color: #f1ede4; font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 400; }
+.workflowIdentity { display: grid; gap: 6px; margin: 0; border: 1px solid rgba(95,174,219,.16); border-radius: 10px; padding: 10px; background: rgba(43,138,191,.035); }
+.workflowIdentity div { display: grid; grid-template-columns: 1fr auto; gap: 10px; border: 0; padding: 0; }
+.workflowIdentity dt { color: #8e989d; font-size: 8px; }
+.workflowIdentity dd { overflow: hidden; margin: 0; color: #bce6fb; font-size: 8px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .publicationActions > button { min-height: 42px; border-radius: 10px; padding: 0 12px; font: 600 9px Montserrat, sans-serif; cursor: pointer; }
 .publicationActions > button:focus-visible, .reviewConfirmation input:focus-visible + span { outline: 2px solid #9ed9f6; outline-offset: 2px; }
 .publicationActions > button:disabled { border-color: rgba(255,255,255,.1); color: #77726c; background: rgba(255,255,255,.025); cursor: not-allowed; }
@@ -160,6 +164,25 @@
 .reviewConfirmation input:checked + span { border-color: rgba(112,188,95,.38); color: #c9e5be; background: rgba(75,139,62,.06); }
 .reviewConfirmation input:checked + span::before { content: '✓'; display: grid; place-items: center; border-color: #83c871; color: #83c871; font-size: 9px; }
 .reviewConfirmation input:disabled + span { color: #706c67; cursor: not-allowed; }
+.reviewRecord { display: grid; gap: 4px; border-left: 2px solid #83c871; padding: 8px 10px; background: rgba(75,139,62,.055); }
+.reviewRecord span, .versionHistory > span { color: #91a38a; font-size: 7px; letter-spacing: .08em; text-transform: uppercase; }
+.reviewRecord strong { color: #c9e5be; font-size: 9px; font-weight: 500; }
+.reviewRecord small { color: #827f79; font-size: 7px; }
+.versionHistory { display: grid; gap: 7px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }
+.versionHistory article { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; padding: 8px 9px; background: rgba(255,255,255,.02); }
+.versionHistory article > div { min-width: 0; display: grid; gap: 3px; }
+.versionHistory strong { color: #e5ddd1; font-size: 8px; font-weight: 500; }
+.versionHistory small { overflow: hidden; color: #85817c; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.versionHistory button { flex: 0 0 auto; border: 1px solid rgba(201,168,76,.32); border-radius: 7px; padding: 5px 7px; color: #e4c870; background: transparent; font: 500 7px Montserrat, sans-serif; cursor: pointer; }
+.versionHistory button:hover { border-color: #d7b85e; color: #fff0b2; }
+.versionHistory button:focus-visible { outline: 2px solid #9ed9f6; outline-offset: 2px; }
+.auditTrail { border-top: 1px solid rgba(255,255,255,.08); padding-top: 9px; }
+.auditTrail summary { color: #9ed9f6; font-size: 8px; cursor: pointer; }
+.auditTrail ol { display: grid; gap: 7px; margin: 9px 0 0; padding-left: 17px; }
+.auditTrail li { color: #77726c; font-size: 7px; }
+.auditTrail li strong, .auditTrail li span { display: block; }
+.auditTrail li strong { color: #b7b0a7; font-size: 8px; font-weight: 500; }
+.auditTrail li span { margin-top: 2px; line-height: 1.4; }
 .publicationActions p { margin: 3px 0 0; color: #8f8982; font-size: 8px; line-height: 1.55; }
 @media (max-width: 1120px) {
   .workspace { grid-template-columns: 1fr; }

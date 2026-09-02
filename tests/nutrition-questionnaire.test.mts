@@ -12,6 +12,8 @@ import {
   createSyntheticPublicationState,
   publishSyntheticDraft,
   saveSyntheticDraft,
+  SYNTHETIC_CLIENT,
+  SYNTHETIC_REVIEWER,
 } from '../lib/nutrition/synthetic-publication.ts'
 import { planContainsBlockedFood, validateEveryCombination } from '../lib/nutrition/validation.ts'
 
@@ -121,29 +123,83 @@ test('a synthetic plan cannot publish before a ready draft and explicit human re
   const empty = createSyntheticPublicationState()
 
   assert.equal(saveSyntheticDraft(empty, blockedPlan), empty)
-  const drafted = saveSyntheticDraft(empty, readyPlan)
+  const drafted = saveSyntheticDraft(empty, readyPlan, SYNTHETIC_REVIEWER, '2026-09-02T16:00:00.000Z')
   assert.equal(drafted.draft?.version, 1)
+  assert.deepEqual(drafted.draft?.client, SYNTHETIC_CLIENT)
+  assert.deepEqual(drafted.draft?.savedBy, SYNTHETIC_REVIEWER)
   assert.equal(drafted.published, null)
   assert.equal(canPublishSyntheticDraft(drafted), false)
   assert.equal(publishSyntheticDraft(drafted), drafted)
 
-  const reviewed = confirmSyntheticReview(drafted, true)
+  const reviewed = confirmSyntheticReview(
+    drafted,
+    true,
+    SYNTHETIC_REVIEWER,
+    '2026-09-02T16:05:00.000Z',
+  )
   assert.equal(canPublishSyntheticDraft(reviewed), true)
-  const published = publishSyntheticDraft(reviewed)
+  assert.equal(reviewed.review?.reviewer.displayName, 'Revisor sintético 01')
+  const published = publishSyntheticDraft(
+    reviewed,
+    SYNTHETIC_REVIEWER,
+    '2026-09-02T16:06:00.000Z',
+  )
   assert.equal(published.published?.version, 1)
   assert.equal(published.published?.plan, readyPlan)
+  assert.equal(published.published?.replacesVersion, null)
+  assert.deepEqual(published.publishedVersions.map(version => version.version), [1])
+  assert.deepEqual(published.auditTrail.map(event => event.type), [
+    'draft_saved',
+    'review_confirmed',
+    'version_published',
+  ])
 })
 
-test('the published synthetic snapshot remains frozen when a newer draft is created', () => {
+test('a reviewed v2 replaces v1 without erasing the frozen publication history', () => {
   const firstPlan = generate(BASE)
   const revisedPlan = generate({ ...BASE, mealCount: 2 })
-  const firstDraft = saveSyntheticDraft(createSyntheticPublicationState(), firstPlan)
-  const firstPublished = publishSyntheticDraft(confirmSyntheticReview(firstDraft, true))
-  const revisedDraft = saveSyntheticDraft(firstPublished, revisedPlan)
+  const firstDraft = saveSyntheticDraft(
+    createSyntheticPublicationState(),
+    firstPlan,
+    SYNTHETIC_REVIEWER,
+    '2026-09-02T16:00:00.000Z',
+  )
+  const firstPublished = publishSyntheticDraft(
+    confirmSyntheticReview(firstDraft, true, SYNTHETIC_REVIEWER, '2026-09-02T16:05:00.000Z'),
+    SYNTHETIC_REVIEWER,
+    '2026-09-02T16:06:00.000Z',
+  )
+  const revisedDraft = saveSyntheticDraft(
+    firstPublished,
+    revisedPlan,
+    SYNTHETIC_REVIEWER,
+    '2026-09-02T17:00:00.000Z',
+  )
 
   assert.equal(revisedDraft.draft?.version, 2)
   assert.equal(revisedDraft.draft?.plan, revisedPlan)
   assert.equal(revisedDraft.published?.version, 1)
   assert.equal(revisedDraft.published?.plan, firstPlan)
-  assert.equal(revisedDraft.reviewConfirmed, false)
+  assert.equal(revisedDraft.review, null)
+  assert.equal(canPublishSyntheticDraft(revisedDraft), false)
+
+  const secondPublished = publishSyntheticDraft(
+    confirmSyntheticReview(revisedDraft, true, SYNTHETIC_REVIEWER, '2026-09-02T17:05:00.000Z'),
+    SYNTHETIC_REVIEWER,
+    '2026-09-02T17:06:00.000Z',
+  )
+
+  assert.equal(secondPublished.published?.version, 2)
+  assert.equal(secondPublished.published?.replacesVersion, 1)
+  assert.deepEqual(secondPublished.publishedVersions.map(version => version.version), [1, 2])
+  assert.equal(secondPublished.publishedVersions[0]?.plan, firstPlan)
+  assert.equal(secondPublished.publishedVersions[1]?.plan, revisedPlan)
+  assert.equal(secondPublished.auditTrail.length, 6)
+})
+
+test('saving an unchanged plan does not create a duplicate synthetic version', () => {
+  const plan = generate(BASE)
+  const firstDraft = saveSyntheticDraft(createSyntheticPublicationState(), plan)
+
+  assert.equal(saveSyntheticDraft(firstDraft, plan), firstDraft)
 })

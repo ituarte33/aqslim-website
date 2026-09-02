@@ -9,7 +9,9 @@ import {
   createSyntheticPublicationState,
   publishSyntheticDraft,
   saveSyntheticDraft,
+  SYNTHETIC_REVIEWER,
 } from '@/lib/nutrition/synthetic-publication'
+import type { SyntheticPlanSnapshot } from '@/lib/nutrition/synthetic-publication'
 import type {
   CompletionComponent,
   GuidedPlan,
@@ -89,6 +91,13 @@ function resetPreviewScroll() {
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
 }
 
+function workflowDate(value: string, lang: 'es' | 'en') {
+  return new Intl.DateTimeFormat(lang === 'es' ? 'es-US' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
 export function PlanPreviewClient({ user, plans, recipes, components, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
@@ -96,6 +105,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
   const [showTemporaryExperience, setShowTemporaryExperience] = useState(false)
   const [experienceMode, setExperienceMode] = useState<'draft' | 'published'>('draft')
+  const [experienceSnapshot, setExperienceSnapshot] = useState<SyntheticPlanSnapshot | null>(null)
   const [publication, setPublication] = useState(createSyntheticPublicationState)
   const es = lang === 'es'
   const availablePlans = useMemo(
@@ -115,9 +125,10 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const generationPassed = plan.status === 'ready_for_review'
   const isQuestionnairePlan = plan.profile.id === 'SYN-JING-QUESTIONNAIRE-DRAFT'
   const draftMatchesCurrentPlan = publication.draft?.plan === plan
-  const experienceSnapshot = experienceMode === 'published'
-    ? publication.published
-    : publication.draft
+  const hasUnpublishedDraft = Boolean(
+    publication.draft && publication.published?.version !== publication.draft.version,
+  )
+  const reviewConfirmed = publication.review?.draftVersion === publication.draft?.version
   const coverageGap = plan.groups.find(group => group.options.length < 3)
 
   useEffect(() => {
@@ -165,24 +176,32 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   function generateQuestionnairePlan(profile: NutritionProfile) {
     const generatedPlan = buildGuidedPlan({ profile, recipes, components })
     setShowTemporaryExperience(false)
+    setExperienceSnapshot(null)
     setExperienceMode('draft')
-    setPublication(createSyntheticPublicationState())
     setQuestionnairePlan(generatedPlan)
     setSelectedProfileId(profile.id)
     window.requestAnimationFrame(resetPreviewScroll)
   }
 
-  function openSyntheticExperience(mode: 'draft' | 'published') {
+  function openSyntheticExperience(
+    mode: 'draft' | 'published',
+    snapshot: SyntheticPlanSnapshot | null = mode === 'published' ? publication.published : publication.draft,
+  ) {
+    if (!snapshot) return
     setExperienceMode(mode)
+    setExperienceSnapshot(snapshot)
     setShowTemporaryExperience(true)
   }
 
   function saveCurrentSyntheticDraft() {
     setPublication(current => saveSyntheticDraft(current, plan))
+    setExperienceSnapshot(null)
+    setExperienceMode('draft')
   }
 
   function publishCurrentSyntheticDraft() {
     setPublication(current => publishSyntheticDraft(current))
+    setExperienceSnapshot(null)
     setExperienceMode('published')
   }
 
@@ -208,7 +227,17 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
               >
                 {es ? `Abrir vista de ${plan.profile.firstName} ↗` : `Open ${plan.profile.firstName}’s view ↗`}
               </Link>
-            ) : generationPassed && isQuestionnairePlan && publication.published ? (
+            ) : isQuestionnairePlan && hasUnpublishedDraft ? (
+              <button
+                type="button"
+                className={`${styles.previewLink} ${styles.previewLinkButton}`}
+                onClick={() => openSyntheticExperience('draft')}
+              >
+                {es
+                  ? `Revisar borrador v${publication.draft?.version} ↗`
+                  : `Review draft v${publication.draft?.version} ↗`}
+              </button>
+            ) : isQuestionnairePlan && publication.published ? (
               <button
                 type="button"
                 className={`${styles.previewLink} ${styles.previewLinkButton}`}
@@ -217,16 +246,6 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 {es
                   ? `Abrir versión publicada v${publication.published.version} ↗`
                   : `Open published version v${publication.published.version} ↗`}
-              </button>
-            ) : generationPassed && isQuestionnairePlan && publication.draft ? (
-              <button
-                type="button"
-                className={`${styles.previewLink} ${styles.previewLinkButton}`}
-                onClick={() => openSyntheticExperience('draft')}
-              >
-                {es
-                  ? `Revisar borrador v${publication.draft.version} ↗`
-                  : `Review draft v${publication.draft.version} ↗`}
               </button>
             ) : isQuestionnairePlan ? (
               <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
@@ -247,7 +266,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización y publicación v0.5' : 'Personalization and publishing test v0.5'}</span>
+              <span>{es ? 'Prueba de personalización y publicación v0.6' : 'Personalization and publishing test v0.6'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -375,9 +394,13 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 <div>
                   <small>{es ? 'Publicación' : 'Publishing'}</small>
                   <strong className={publication.published && isQuestionnairePlan ? styles.publishedStatus : styles.reviewStatus}>
-                    {publication.published && isQuestionnairePlan
-                      ? (es ? `Publicada en simulación · v${publication.published.version}` : `Published in simulation · v${publication.published.version}`)
-                      : publication.draft && isQuestionnairePlan
+                    {hasUnpublishedDraft && isQuestionnairePlan
+                      ? (es
+                        ? `Borrador v${publication.draft?.version} · publicada v${publication.published?.version ?? '—'} sigue activa`
+                        : `Draft v${publication.draft?.version} · published v${publication.published?.version ?? '—'} remains active`)
+                      : publication.published && isQuestionnairePlan
+                        ? (es ? `Publicada en simulación · v${publication.published.version}` : `Published in simulation · v${publication.published.version}`)
+                        : publication.draft && isQuestionnairePlan
                         ? (es ? `Borrador v${publication.draft.version} · revisión pendiente` : `Draft v${publication.draft.version} · review pending`)
                         : generationPassed
                           ? (es ? 'Pendiente de revisión humana' : 'Pending human review')
@@ -448,27 +471,35 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
               <div className={styles.publicationActions} data-testid="synthetic-publication-controls">
                 <div className={styles.publicationHeading}>
                   <span>{es ? 'Flujo de publicación sintético' : 'Synthetic publishing workflow'}</span>
-                  <strong>{publication.published
-                    ? (es ? `Publicado v${publication.published.version}` : `Published v${publication.published.version}`)
-                    : publication.draft
+                  <strong>{hasUnpublishedDraft
+                    ? (es
+                      ? `Borrador v${publication.draft?.version} · publicada v${publication.published?.version ?? '—'} activa`
+                      : `Draft v${publication.draft?.version} · published v${publication.published?.version ?? '—'} active`)
+                    : publication.published
+                      ? (es ? `Publicado v${publication.published.version}` : `Published v${publication.published.version}`)
+                      : publication.draft
                       ? (es ? `Borrador v${publication.draft.version}` : `Draft v${publication.draft.version}`)
                       : (es ? 'Sin guardar' : 'Not saved')}</strong>
                 </div>
+                <dl className={styles.workflowIdentity}>
+                  <div><dt>{es ? 'Cliente vinculado' : 'Linked client'}</dt><dd>{publication.client.displayName}</dd></div>
+                  <div><dt>ID sintético</dt><dd>{publication.client.id}</dd></div>
+                </dl>
                 <button
                   type="button"
                   className={styles.draftAction}
-                  disabled={!generationPassed || Boolean(publication.published)}
+                  disabled={!generationPassed || draftMatchesCurrentPlan}
                   onClick={saveCurrentSyntheticDraft}
                 >
                   {publication.draft
-                    ? (es ? 'Actualizar borrador' : 'Update draft')
+                    ? (es ? `Guardar como borrador v${publication.draft.version + 1}` : `Save as draft v${publication.draft.version + 1}`)
                     : (es ? 'Guardar borrador sintético' : 'Save synthetic draft')}
                 </button>
                 <label className={styles.reviewConfirmation}>
                   <input
                     type="checkbox"
-                    checked={publication.reviewConfirmed}
-                    disabled={!publication.draft || Boolean(publication.published) || !draftMatchesCurrentPlan}
+                    checked={reviewConfirmed}
+                    disabled={!hasUnpublishedDraft || !draftMatchesCurrentPlan}
                     onChange={event => setPublication(current => confirmSyntheticReview(current, event.target.checked))}
                   />
                   <span>{es
@@ -481,13 +512,59 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   disabled={!canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
                   onClick={publishCurrentSyntheticDraft}
                 >
-                  {publication.published
-                    ? (es ? `Versión v${publication.published.version} publicada` : `Version v${publication.published.version} published`)
-                    : (es ? 'Simular aprobación y publicación' : 'Simulate approval and publishing')}
+                  {canPublishSyntheticDraft(publication)
+                    ? (publication.published
+                      ? (es ? `Publicar v${publication.draft?.version} y reemplazar v${publication.published.version}` : `Publish v${publication.draft?.version} and replace v${publication.published.version}`)
+                      : (es ? 'Simular aprobación y publicación' : 'Simulate approval and publishing'))
+                    : publication.published && !hasUnpublishedDraft
+                      ? (es ? `Versión v${publication.published.version} publicada` : `Version v${publication.published.version} published`)
+                      : (es ? 'Revisión humana requerida' : 'Human review required')}
                 </button>
+                {publication.review ? (
+                  <div className={styles.reviewRecord}>
+                    <span>{es ? 'Revisión registrada' : 'Review recorded'}</span>
+                    <strong>{publication.review.reviewer.displayName}</strong>
+                    <small>{workflowDate(publication.review.reviewedAt, lang)} · v{publication.review.draftVersion}</small>
+                  </div>
+                ) : null}
+                {publication.publishedVersions.length > 0 ? (
+                  <div className={styles.versionHistory}>
+                    <span>{es ? 'Historial conservado' : 'Preserved history'}</span>
+                    {[...publication.publishedVersions].reverse().map(version => (
+                      <article key={version.version}>
+                        <div>
+                          <strong>v{version.version} {version.version === publication.published?.version
+                            ? (es ? '· Activa' : '· Active')
+                            : (es ? '· Reemplazada' : '· Replaced')}</strong>
+                          <small>{workflowDate(version.publishedAt, lang)} · {version.publishedBy.displayName}</small>
+                        </div>
+                        <button type="button" onClick={() => openSyntheticExperience('published', version)}>
+                          {es ? 'Abrir' : 'Open'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+                {publication.auditTrail.length > 0 ? (
+                  <details className={styles.auditTrail}>
+                    <summary>{es ? `Ver bitácora (${publication.auditTrail.length})` : `View audit trail (${publication.auditTrail.length})`}</summary>
+                    <ol>
+                      {publication.auditTrail.map(event => (
+                        <li key={event.id}>
+                          <strong>{event.type === 'draft_saved'
+                            ? (es ? 'Borrador guardado' : 'Draft saved')
+                            : event.type === 'review_confirmed'
+                              ? (es ? 'Revisión confirmada' : 'Review confirmed')
+                              : (es ? 'Versión publicada' : 'Version published')}</strong>
+                          <span>v{event.version} · {event.actor.displayName} · {workflowDate(event.at, lang)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ) : null}
                 <p>{es
-                  ? 'Simulación en memoria: no escribe en Airtable, no llega a clientes y se reinicia al refrescar.'
-                  : 'In-memory simulation: it does not write to Airtable, reach clients, and resets on refresh.'}</p>
+                  ? `Simulación en memoria por ${SYNTHETIC_REVIEWER.displayName}: no escribe en Airtable, no llega a clientes y se reinicia al refrescar.`
+                  : `In-memory simulation by ${SYNTHETIC_REVIEWER.displayName}: it does not write to Airtable, reach clients, and resets on refresh.`}</p>
               </div>
             ) : (
               <div className={styles.disabledActions}>
