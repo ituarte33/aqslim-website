@@ -98,6 +98,107 @@ function workflowDate(value: string, lang: 'es' | 'en') {
   }).format(new Date(value))
 }
 
+type PlanStopExplanation = {
+  statusLabel: string
+  heading: string
+  details: readonly string[]
+  action: string
+}
+
+function planStopExplanation(plan: GuidedPlan, lang: 'es' | 'en'): PlanStopExplanation | null {
+  if (plan.status === 'ready_for_review') return null
+
+  const es = lang === 'es'
+  if (plan.status === 'blocked_safety_review') {
+    const medicationReview = plan.profile.safetyReviewRequired
+    return {
+      statusLabel: es ? 'Detenida por señal de seguridad' : 'Stopped by a safety signal',
+      heading: es
+        ? 'El perfil sí se calculó; el plan requiere revisión antes de guardarse.'
+        : 'The profile was calculated; the plan requires review before it can be saved.',
+      details: [medicationReview
+        ? (es
+          ? 'Se indicó que los medicamentos deben revisarse antes de generar y guardar opciones.'
+          : 'Medication review was requested before choices can be generated and saved.')
+        : (es
+          ? 'El cálculo energético quedó fuera de los límites autorizados de esta prueba.'
+          : 'The energy calculation is outside this test’s authorized limits.')],
+      action: medicationReview
+        ? (es
+          ? 'Vuelve al cuestionario. Usa “No en esta prueba” únicamente si el perfil ficticio no necesita esa revisión.'
+          : 'Return to the questionnaire. Use “Not in this test” only if the fictional profile does not need that review.')
+        : (es
+          ? 'Revisa edad, estatura, pesos y actividad; después genera las opciones otra vez.'
+          : 'Review age, height, weights, and activity, then generate the choices again.'),
+    }
+  }
+
+  if (plan.status === 'blocked_profile') {
+    return {
+      statusLabel: es ? 'Detenida por perfil fuera de cobertura' : 'Stopped because the profile is out of coverage',
+      heading: es
+        ? 'El perfil sí se creó; esta prueba todavía no puede convertirlo en un plan.'
+        : 'The profile was created; this test cannot convert it into a plan yet.',
+      details: [es
+        ? 'El Preview sólo cubre Jing con dos o tres comidas.'
+        : 'The Preview only covers Jing with two or three meals.'],
+      action: es
+        ? 'Corrige la configuración y vuelve a generar las opciones.'
+        : 'Correct the configuration and generate the choices again.',
+    }
+  }
+
+  const details: string[] = []
+  const incompleteGroups = plan.groups.filter(group => group.options.length < 3)
+  for (const group of incompleteGroups) {
+    details.push(es
+      ? `${SLOT_LABEL[group.slot].es}: ${group.options.length} de 3 opciones compatibles.`
+      : `${SLOT_LABEL[group.slot].en}: ${group.options.length} of 3 compatible choices.`)
+  }
+
+  if (plan.groups.length > 0 && (
+    plan.envelope.minCalories < plan.envelope.calorieFloor
+    || plan.envelope.maxCalories > plan.envelope.calorieCeiling
+  )) {
+    details.push(es
+      ? `Energía diaria posible: ${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal; rango permitido: ${plan.envelope.calorieFloor}–${plan.envelope.calorieCeiling} kcal.`
+      : `Possible daily energy: ${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal; allowed range: ${plan.envelope.calorieFloor}–${plan.envelope.calorieCeiling} kcal.`)
+  }
+  if (plan.groups.length > 0 && plan.envelope.maxNetCarbsG > plan.envelope.carbCeilingG) {
+    details.push(es
+      ? `Carbohidratos netos posibles: ${plan.envelope.maxNetCarbsG} g; máximo Jing: ${plan.envelope.carbCeilingG} g.`
+      : `Possible net carbs: ${plan.envelope.maxNetCarbsG} g; Jing maximum: ${plan.envelope.carbCeilingG} g.`)
+  }
+  if (
+    plan.groups.length > 0
+    && (
+      plan.envelope.minProteinG < plan.energyEstimate.proteinFloorG
+      || plan.envelope.maxProteinG > plan.energyEstimate.proteinCeilingG
+    )
+  ) {
+    details.push(es
+      ? `Proteína diaria para revisar: ${plan.envelope.minProteinG}–${plan.envelope.maxProteinG} g; rango de referencia: ${plan.energyEstimate.proteinFloorG}–${plan.energyEstimate.proteinCeilingG} g.`
+      : `Daily protein to review: ${plan.envelope.minProteinG}–${plan.envelope.maxProteinG} g; reference range: ${plan.energyEstimate.proteinFloorG}–${plan.energyEstimate.proteinCeilingG} g.`)
+  }
+
+  return {
+    statusLabel: incompleteGroups.length > 0
+      ? (es ? 'Detenida por cobertura incompleta' : 'Stopped by incomplete coverage')
+      : (es ? 'Detenida por compatibilidad diaria' : 'Stopped by daily compatibility'),
+    heading: es
+      ? 'El perfil sí se creó; el borrador del plan todavía no se puede guardar.'
+      : 'The profile was created; the plan draft cannot be saved yet.',
+    details: details.length > 0
+      ? details
+      : [es
+        ? 'Ninguna combinación diaria completa cumple todas las reglas de esta prueba.'
+        : 'No complete daily combination satisfies every rule in this test.'],
+    action: es
+      ? 'Ajusta el número de comidas, gustos o exclusiones y pulsa “Generar opciones con AQ Buddy” otra vez.'
+      : 'Adjust the meal count, preferences, or exclusions and select “Generate choices with AQ Buddy” again.',
+  }
+}
+
 export function PlanPreviewClient({ user, plans, recipes, components, recipeVariantCount, componentCount }: Props) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
@@ -128,8 +229,13 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const hasUnpublishedDraft = Boolean(
     publication.draft && publication.published?.version !== publication.draft.version,
   )
-  const reviewConfirmed = publication.review?.draftVersion === publication.draft?.version
+  const reviewConfirmed = Boolean(
+    draftMatchesCurrentPlan
+    && hasUnpublishedDraft
+    && publication.review?.draftVersion === publication.draft?.version,
+  )
   const coverageGap = plan.groups.find(group => group.options.length < 3)
+  const stopExplanation = planStopExplanation(plan, lang)
 
   useEffect(() => {
     const previousScrollRestoration = window.history.scrollRestoration
@@ -385,7 +491,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   <small>{es ? 'Validación automática' : 'Automated validation'}</small>
                   <strong>{generationPassed
                     ? (es ? `Aprobada · ${combinationCount}/${combinationCount} combinaciones` : `Passed · ${combinationCount}/${combinationCount} combinations`)
-                    : (es ? 'Detenida por regla de cobertura' : 'Stopped by coverage rule')}</strong>
+                    : stopExplanation?.statusLabel}</strong>
                 </div>
               </div>
               <div className={styles.statusDivider} />
@@ -485,15 +591,27 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   <div><dt>{es ? 'Cliente vinculado' : 'Linked client'}</dt><dd>{publication.client.displayName}</dd></div>
                   <div><dt>ID sintético</dt><dd>{publication.client.id}</dd></div>
                 </dl>
+                {stopExplanation ? (
+                  <div className={styles.publicationBlocker} role="status" aria-live="polite" id="synthetic-publication-blocker">
+                    <strong>{stopExplanation.heading}</strong>
+                    <ul>{stopExplanation.details.map(detail => <li key={detail}>{detail}</li>)}</ul>
+                    <p>{stopExplanation.action}</p>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className={styles.draftAction}
                   disabled={!generationPassed || draftMatchesCurrentPlan}
                   onClick={saveCurrentSyntheticDraft}
+                  aria-describedby={stopExplanation ? 'synthetic-publication-blocker' : undefined}
                 >
-                  {publication.draft
-                    ? (es ? `Guardar como borrador v${publication.draft.version + 1}` : `Save as draft v${publication.draft.version + 1}`)
-                    : (es ? 'Guardar borrador sintético' : 'Save synthetic draft')}
+                  {!generationPassed
+                    ? (es ? 'Plan detenido · revisa la causa' : 'Plan stopped · review the reason')
+                    : draftMatchesCurrentPlan
+                      ? (es ? `Plan guardado como borrador v${publication.draft?.version}` : `Plan saved as draft v${publication.draft?.version}`)
+                      : publication.draft
+                        ? (es ? `Guardar plan como borrador v${publication.draft.version + 1}` : `Save plan as draft v${publication.draft.version + 1}`)
+                        : (es ? 'Guardar plan como borrador v1' : 'Save plan as draft v1')}
                 </button>
                 <label className={styles.reviewConfirmation}>
                   <input

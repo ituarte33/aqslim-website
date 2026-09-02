@@ -152,6 +152,10 @@
 .workflowIdentity div { display: grid; grid-template-columns: 1fr auto; gap: 10px; border: 0; padding: 0; }
 .workflowIdentity dt { color: #8e989d; font-size: 8px; }
 .workflowIdentity dd { overflow: hidden; margin: 0; color: #bce6fb; font-size: 8px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.publicationBlocker { display: grid; gap: 8px; border: 1px solid rgba(209,132,100,.38); border-radius: 11px; padding: 12px; background: rgba(135,75,54,.09); }
+.publicationBlocker > strong { color: #f0b9a2; font-size: 9px; font-weight: 500; line-height: 1.5; }
+.publicationBlocker ul { display: grid; gap: 5px; margin: 0; padding-left: 16px; color: #cba89a; font-size: 8px; line-height: 1.5; }
+.publicationBlocker > p { margin: 0; color: #aaa49d; font-size: 8px; line-height: 1.55; }
 .publicationActions > button { min-height: 42px; border-radius: 10px; padding: 0 12px; font: 600 9px Montserrat, sans-serif; cursor: pointer; }
 .publicationActions > button:focus-visible, .reviewConfirmation input:focus-visible + span { outline: 2px solid #9ed9f6; outline-offset: 2px; }
 .publicationActions > button:disabled { border-color: rgba(255,255,255,.1); color: #77726c; background: rgba(255,255,255,.025); cursor: not-allowed; }
