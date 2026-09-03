@@ -3,11 +3,21 @@ import { redirect } from 'next/navigation'
 import { requireActor } from '@/lib/auth'
 import { buildSyntheticPersonalizationPlans } from '@/lib/nutrition/preview'
 import { JING_COMPLETION_COMPONENTS, JING_RECIPE_VARIANTS } from '@/lib/nutrition/fixtures'
+import { canReviewSyntheticPreview } from '@/lib/nutrition/synthetic-preview-policy'
 import { PlanPreviewClient } from './plan-preview-client'
 
 export default async function PlanPreviewPage() {
   const actor = await requireActor()
-  if (actor.role !== 'admin') redirect('/dashboard')
+  const canReview = canReviewSyntheticPreview({
+    role: actor.role,
+    email: actor.email,
+    environment: {
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+      MYAQ_PREVIEW_REVIEWER_EMAILS: process.env.MYAQ_PREVIEW_REVIEWER_EMAILS,
+    },
+  })
+  if (!canReview) redirect('/dashboard')
 
   const user = await currentUser()
   return (

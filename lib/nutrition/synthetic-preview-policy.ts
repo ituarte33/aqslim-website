@@ -22,6 +22,35 @@ export function isAllowedSyntheticPreviewClient(clientId: unknown): clientId is 
   return clientId === SYNTHETIC_PREVIEW_CLIENT_ID
 }
 
+function previewReviewerEmails(value?: string) {
+  return new Set(
+    (value ?? '')
+      .split(',')
+      .map(email => email.trim().toLowerCase())
+      .filter(Boolean),
+  )
+}
+
+export function canReviewSyntheticPreview({
+  role,
+  email,
+  environment,
+}: {
+  role: 'admin' | 'patient'
+  email: string
+  environment: {
+    VERCEL_ENV?: string
+    VERCEL_GIT_COMMIT_REF?: string
+    MYAQ_PREVIEW_REVIEWER_EMAILS?: string
+  }
+}) {
+  if (role === 'admin') return true
+  if (!isSyntheticPreviewEnvironment(environment)) return false
+
+  return previewReviewerEmails(environment.MYAQ_PREVIEW_REVIEWER_EMAILS)
+    .has(email.trim().toLowerCase())
+}
+
 export function syntheticPreviewScopeKey(accountId: string, clientId: string) {
   return `preview:${accountId}:${clientId}`
 }

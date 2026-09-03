@@ -107,7 +107,7 @@ test('the real client plan route remains connected to its existing portal data',
   assert.doesNotMatch(route, /nutrition\/preview|buildSyntheticGuidedPlan/)
 })
 
-test('the Dashboard Preview is admin-only, review-first, and persists an account-scoped synthetic ledger', async () => {
+test('the Dashboard Preview is reviewer-controlled, review-first, and persists an account-scoped synthetic ledger', async () => {
   const [page, client, questionnaire, questionnaireProfile, syntheticPublication, publicationStorage, publicationApi, previewPolicy, airtable, shell, middleware] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
@@ -121,7 +121,8 @@ test('the Dashboard Preview is admin-only, review-first, and persists an account
     readFile(DASHBOARD_SHELL, 'utf8'),
     readFile(MIDDLEWARE, 'utf8'),
   ])
-  assert.match(page, /actor\.role !== 'admin'/)
+  assert.match(page, /canReviewSyntheticPreview/)
+  assert.match(page, /MYAQ_PREVIEW_REVIEWER_EMAILS/)
   assert.match(page, /buildSyntheticPersonalizationPlans/)
   assert.doesNotMatch(page, /airtable/i)
   assert.match(client, /disabled>.*Guardar borrador/)
@@ -226,7 +227,8 @@ test('the Dashboard Preview is admin-only, review-first, and persists an account
   assert.match(publicationStorage, /isPublicationState\(stored\.state, client\)/)
   assert.match(publicationApi, /isSyntheticPreviewEnvironment/)
   assert.match(publicationApi, /hasSyntheticPreviewStorageConfiguration/)
-  assert.match(publicationApi, /actor\.role !== 'admin'/)
+  assert.match(publicationApi, /canReviewSyntheticPreview/)
+  assert.match(publicationApi, /MYAQ_PREVIEW_REVIEWER_EMAILS/)
   assert.match(publicationApi, /isAllowedSyntheticPreviewClient/)
   assert.match(publicationApi, /actor\.clerkUserId/)
   assert.match(publicationApi, /expectedRevision/)

@@ -14,6 +14,7 @@ import {
 import { hasSameSyntheticPlan, SYNTHETIC_CLIENT } from '@/lib/nutrition/synthetic-publication'
 import { parseSyntheticGuidedPlan } from '@/lib/nutrition/synthetic-publication-storage'
 import {
+  canReviewSyntheticPreview,
   hasSyntheticPreviewStorageConfiguration,
   isAllowedSyntheticPreviewClient,
   isSyntheticPreviewEnvironment,
@@ -46,7 +47,15 @@ async function previewActor(): Promise<AuthenticatedActor | Response> {
   }
   try {
     const actor = await requireActor()
-    if (actor.role !== 'admin') return json({ error: 'forbidden' }, 403)
+    if (!canReviewSyntheticPreview({
+      role: actor.role,
+      email: actor.email,
+      environment: {
+        VERCEL_ENV: process.env.VERCEL_ENV,
+        VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+        MYAQ_PREVIEW_REVIEWER_EMAILS: process.env.MYAQ_PREVIEW_REVIEWER_EMAILS,
+      },
+    })) return json({ error: 'forbidden' }, 403)
     return actor
   } catch (error) {
     const status = error instanceof AuthorizationError && error.code === 'FORBIDDEN' ? 403 : 401
