@@ -44,8 +44,8 @@ export function canReviewSyntheticPreview({
     MYAQ_PREVIEW_REVIEWER_EMAILS?: string
   }
 }) {
-  if (role === 'admin') return true
   if (!isSyntheticPreviewEnvironment(environment)) return false
+  if (role === 'admin') return true
 
   return previewReviewerEmails(environment.MYAQ_PREVIEW_REVIEWER_EMAILS)
     .has(email.trim().toLowerCase())

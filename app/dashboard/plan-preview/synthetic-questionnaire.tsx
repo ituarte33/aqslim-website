@@ -129,16 +129,16 @@ export function SyntheticQuestionnaire({ lang, onGenerate }: Props) {
   return (
     <details className={styles.questionnaire} open>
       <summary>
-        <span>{es ? 'Cuestionario sintético v0.1' : 'Synthetic questionnaire v0.1'}</span>
-        <strong>{es ? 'Crear un perfil sin datos reales' : 'Create a profile without real data'}</strong>
+        <span>{es ? 'Cuestionario personal del piloto' : 'Personal pilot questionnaire'}</span>
+        <strong>{es ? 'Calcular con mis datos reales' : 'Calculate with my real data'}</strong>
         <small>{es ? 'Abrir/cerrar' : 'Open/close'}</small>
       </summary>
       <form onSubmit={submit}>
         <div className={styles.questionnaireNotice}>
-          <strong>{es ? 'Sólo para pruebas ficticias' : 'Fictional testing only'}</strong>
+          <strong>{es ? 'Piloto interno con consentimiento' : 'Consented internal pilot'}</strong>
           <span>{es
-            ? 'No escribas nombres, diagnósticos ni medicamentos. Las respuestas no se guardan; al guardar, sólo el perfil y plan sintéticos quedan en el registro seguro de Preview.'
-            : 'Do not enter names, diagnoses, or medications. Answers are not saved; when saved, only the synthetic profile and plan enter the secure Preview record.'}</span>
+            ? 'Puedes usar edad, estatura, peso, meta y preferencias reales. No escribas diagnósticos ni nombres de medicamentos. Los datos entran al registro aislado de Preview únicamente cuando guardas el plan.'
+            : 'You may use real age, height, weight, goal, and preferences. Do not enter diagnoses or medication names. Data enters the isolated Preview record only when you save the plan.'}</span>
         </div>
 
         <fieldset className={styles.questionnaireSection}>
@@ -160,7 +160,7 @@ export function SyntheticQuestionnaire({ lang, onGenerate }: Props) {
             <label><input type="radio" name="meal-count" checked={answers.mealCount === 2} onChange={() => setAnswer('mealCount', 2)} /><span>{es ? '2 comidas' : '2 meals'}</span></label>
             <label><input type="radio" name="meal-count" checked={answers.mealCount === 3} onChange={() => setAnswer('mealCount', 3)} /><span>{es ? '3 comidas' : '3 meals'}</span></label>
           </div>
-          <div className={styles.foodQuestion}><strong>{es ? 'Priorizar' : 'Prioritize'}</strong><small>{es ? 'Elige lo que le gusta al perfil ficticio.' : 'Choose what the fictional profile likes.'}</small>{foodChoices('preferredFoods', PREFERRED_FOODS)}</div>
+          <div className={styles.foodQuestion}><strong>{es ? 'Priorizar' : 'Prioritize'}</strong><small>{es ? 'Elige lo que te gusta.' : 'Choose what you like.'}</small>{foodChoices('preferredFoods', PREFERRED_FOODS)}</div>
           <div className={styles.foodQuestion}><strong>{es ? 'No le gusta' : 'Dislikes'}</strong><small>{es ? 'AQ Buddy no lo incluirá.' : 'AQ Buddy will not include it.'}</small>{foodChoices('dislikedFoods', DISLIKED_FOODS)}</div>
           <div className={styles.foodQuestion}><strong>{es ? 'Exclusión estricta' : 'Strict exclusion'}</strong><small>{es ? 'Tiene prioridad sobre cualquier gusto.' : 'This overrides every preference.'}</small>{foodChoices('excludedFoods', EXCLUDED_FOODS)}</div>
         </fieldset>
@@ -168,10 +168,10 @@ export function SyntheticQuestionnaire({ lang, onGenerate }: Props) {
         <fieldset className={styles.questionnaireSection}>
           <legend>{es ? '3 · Revisión antes de publicar' : '3 · Review before publishing'}</legend>
           <p>{es
-            ? '¿Este perfil ficticio representa a alguien cuyos medicamentos deben ser revisados por el equipo antes de publicar el plan?'
-            : 'Does this fictional profile represent someone whose medications must be reviewed by the team before publishing the plan?'}</p>
+            ? '¿Tus medicamentos deben ser revisados por el equipo antes de guardar o publicar este plan? No escribas aquí cuáles son.'
+            : 'Should your medications be reviewed by the team before this plan is saved or published? Do not enter their names here.'}</p>
           <div className={styles.questionnaireRadioRow}>
-            <label><input type="radio" name="medication-review" checked={answers.medicationReview === 'none'} onChange={() => setAnswer('medicationReview', 'none')} /><span>{es ? 'No en esta prueba' : 'Not in this test'}</span></label>
+            <label><input type="radio" name="medication-review" checked={answers.medicationReview === 'none'} onChange={() => setAnswer('medicationReview', 'none')} /><span>{es ? 'No necesito revisión' : 'I do not need review'}</span></label>
             <label><input type="radio" name="medication-review" checked={answers.medicationReview === 'required'} onChange={() => setAnswer('medicationReview', 'required')} /><span>{es ? 'Sí · detener para revisión' : 'Yes · stop for review'}</span></label>
           </div>
         </fieldset>
@@ -187,7 +187,7 @@ export function SyntheticQuestionnaire({ lang, onGenerate }: Props) {
           <button type="submit">{es ? 'Generar opciones con AQ Buddy' : 'Generate choices with AQ Buddy'}</button>
           <span aria-live="polite">{generated
             ? (es ? 'Perfil calculado. Revisa el resultado debajo.' : 'Profile calculated. Review the result below.')
-            : (es ? 'Déficit controlado automáticamente; publicación desactivada.' : 'Deficit controlled automatically; publishing disabled.')}</span>
+            : (es ? 'Déficit controlado automáticamente; todo permanece dentro de Preview.' : 'Deficit controlled automatically; everything remains inside Preview.')}</span>
         </div>
       </form>
     </details>

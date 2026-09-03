@@ -17,6 +17,11 @@ import type {
   SyntheticProfileChange,
 } from '@/lib/nutrition/synthetic-publication'
 import { parseSyntheticPublicationState } from '@/lib/nutrition/synthetic-publication-storage'
+import {
+  INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+  parseInternalPilotConsent,
+  type InternalPilotConsent,
+} from '@/lib/nutrition/synthetic-publication-ledger'
 import type {
   CompletionComponent,
   GuidedPlan,
@@ -341,6 +346,10 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [publicationBusy, setPublicationBusy] = useState(false)
   const [publicationError, setPublicationError] = useState<string | null>(null)
   const [showVersionComparison, setShowVersionComparison] = useState(false)
+  const [pilotConsent, setPilotConsent] = useState<InternalPilotConsent | null>(null)
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
+  const [deleteChecked, setDeleteChecked] = useState(false)
   const es = lang === 'es'
   const availablePlans = useMemo(
     () => questionnairePlan ? [questionnairePlan, ...plans] : plans,
@@ -399,11 +408,17 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
         })
         const payload: unknown = await response.json()
         if (!response.ok || !payload || typeof payload !== 'object') throw new Error('load_failed')
-        const result = payload as { state?: unknown; revision?: unknown }
+        const result = payload as { state?: unknown; revision?: unknown; consent?: unknown }
         const restored = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
-        if (!restored || !Number.isInteger(result.revision) || Number(result.revision) < 0) throw new Error('invalid_state')
+        const restoredConsent = result.consent === null ? null : parseInternalPilotConsent(result.consent)
+        if (
+          !restored
+          || !Number.isInteger(result.revision)
+          || Number(result.revision) < 0
+          || (result.consent !== null && !restoredConsent)
+        ) throw new Error('invalid_state')
         if (cancelled) return
-        applyPublication(restored, Number(result.revision))
+        applyPublication(restored, Number(result.revision), restoredConsent)
         setPublicationAvailable(true)
       } catch {
         if (!cancelled) setPublicationError(es
@@ -482,10 +497,15 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
     setShowTemporaryExperience(true)
   }
 
-  function applyPublication(restored: SyntheticPublicationState, revision: number) {
+  function applyPublication(
+    restored: SyntheticPublicationState,
+    revision: number,
+    consent: InternalPilotConsent | null = pilotConsent,
+  ) {
     const restoredPlan = restored.draft?.plan ?? restored.published?.plan ?? null
     setPublication(restored)
     setPublicationRevision(revision)
+    setPilotConsent(consent)
     if (restoredPlan) {
       setQuestionnairePlan(restoredPlan)
       setSelectedProfileId(restoredPlan.profile.id)
@@ -511,15 +531,18 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
       })
       const payload: unknown = await response.json()
       if (!payload || typeof payload !== 'object') throw new Error('invalid_response')
-      const result = payload as { state?: unknown; revision?: unknown; error?: unknown }
+      const result = payload as { state?: unknown; revision?: unknown; consent?: unknown; error?: unknown }
       const nextState = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
       const nextRevision = Number(result.revision)
+      const nextConsent = parseInternalPilotConsent(result.consent)
       if (response.status === 409 && nextState && Number.isInteger(nextRevision)) {
-        applyPublication(nextState, nextRevision)
+        applyPublication(nextState, nextRevision, result.consent === null ? null : nextConsent)
         throw new Error('revision_conflict')
       }
-      if (!response.ok || !nextState || !Number.isInteger(nextRevision)) throw new Error(String(result.error ?? 'write_failed'))
-      applyPublication(nextState, nextRevision)
+      if (!response.ok || !nextState || !Number.isInteger(nextRevision) || !nextConsent) {
+        throw new Error(String(result.error ?? 'write_failed'))
+      }
+      applyPublication(nextState, nextRevision, nextConsent)
       setExperienceSnapshot(null)
       setShowVersionComparison(true)
       return true
@@ -545,19 +568,127 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
     if (await updatePublication({ action: 'publish' })) setExperienceMode('published')
   }
 
+  async function grantPilotConsent() {
+    if (!consentChecked) return
+    const saved = await updatePublication({
+      action: 'grant_personal_data_consent',
+      accepted: true,
+      noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+    })
+    if (saved) setConsentChecked(false)
+  }
+
+  async function deleteMyPilotData() {
+    if (!deleteChecked) return
+    setPublicationBusy(true)
+    setPublicationError(null)
+    try {
+      const response = await fetch(`/api/dashboard/plan-preview/publication?clientId=${encodeURIComponent(SYNTHETIC_CLIENT.id)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmation: 'DELETE_MY_INTERNAL_PILOT_DATA',
+          expectedRevision: publicationRevision,
+        }),
+      })
+      const payload: unknown = await response.json()
+      if (!payload || typeof payload !== 'object') throw new Error('invalid_response')
+      const result = payload as { state?: unknown; revision?: unknown; consent?: unknown; error?: unknown }
+      const nextState = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
+      const nextRevision = Number(result.revision)
+      if (response.status === 409 && nextState && Number.isInteger(nextRevision)) {
+        applyPublication(nextState, nextRevision, result.consent === null ? null : parseInternalPilotConsent(result.consent))
+        throw new Error('revision_conflict')
+      }
+      if (!response.ok || !nextState || nextRevision !== 0 || result.consent !== null) {
+        throw new Error(String(result.error ?? 'delete_failed'))
+      }
+      applyPublication(nextState, 0, null)
+      setQuestionnairePlan(null)
+      setSelectedProfileId(plans[0]?.profile.id ?? '')
+      setExperienceSnapshot(null)
+      setShowTemporaryExperience(false)
+      setShowVersionComparison(false)
+      setShowDeleteConfirmation(false)
+      setDeleteChecked(false)
+    } catch (error) {
+      setPublicationError(error instanceof Error && error.message === 'revision_conflict'
+        ? (es
+          ? 'El registro cambió en otra sesión. Ya cargamos la versión más reciente; confirma nuevamente el borrado.'
+          : 'The record changed in another session. The latest version is loaded; confirm deletion again.')
+        : (es
+          ? 'No se pudieron eliminar tus datos de Preview. No se ocultó ni simuló el resultado.'
+          : 'Your Preview data could not be deleted. The result was not hidden or simulated.'))
+    } finally {
+      setPublicationBusy(false)
+    }
+  }
+
+  if (!pilotConsent) {
+    return (
+      <DashboardShell user={user} lang={lang} setLang={setLang} isolatedPreview>
+        <div className={styles.page}>
+          <header className={styles.intro}>
+            <div>
+              <div className={styles.kicker}>{es ? 'Piloto interno · Preview aislado' : 'Internal pilot · Isolated Preview'}</div>
+              <h1>{es ? 'Activa tu piloto personal' : 'Activate your personal pilot'}</h1>
+              <p>{es
+                ? 'Antes de usar peso, estatura, meta y preferencias reales, necesitamos tu consentimiento individual.'
+                : 'Before using real weight, height, goal, and preferences, we need your individual consent.'}</p>
+            </div>
+            <span className={styles.syntheticBadge}>{es ? 'No es Producción' : 'Not Production'}</span>
+          </header>
+
+          <section className={styles.consentGate} aria-labelledby="pilot-consent-title">
+            <span>{es ? 'Consentimiento del piloto interno' : 'Internal pilot consent'}</span>
+            <h2 id="pilot-consent-title">{es ? 'Tus datos quedan vinculados sólo a tu cuenta' : 'Your data stays linked only to your account'}</h2>
+            <ul>
+              <li>{es ? 'Participación voluntaria para probar las herramientas de AQSLIM en Preview.' : 'Voluntary participation to test AQSLIM tools in Preview.'}</li>
+              <li>{es ? 'Al guardar, se conservarán tus medidas, preferencias, planes, revisiones y bitácora en el registro aislado de Preview.' : 'When saved, your measurements, preferences, plans, reviews, and audit history are kept in the isolated Preview record.'}</li>
+              <li>{es ? 'Cada cuenta sólo puede leer, modificar y eliminar sus propios datos del piloto.' : 'Each account can only read, modify, and delete its own pilot data.'}</li>
+              <li>{es ? 'No se incorporan clientes reales ni se modifica Producción. Este piloto no sustituye atención médica.' : 'No real clients are enrolled and Production is not modified. This pilot does not replace medical care.'}</li>
+              <li>{es ? 'No escribas diagnósticos ni nombres de medicamentos; usa únicamente la señal de revisión.' : 'Do not enter diagnoses or medication names; use only the review flag.'}</li>
+            </ul>
+            <label className={styles.consentCheck}>
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                disabled={!publicationStorageReady || !publicationAvailable || publicationBusy}
+                onChange={event => setConsentChecked(event.target.checked)}
+              />
+              <span>{es
+                ? 'Entiendo lo anterior y doy mi consentimiento para usar mis datos personales en este piloto interno.'
+                : 'I understand the above and consent to use my personal data in this internal pilot.'}</span>
+            </label>
+            <button
+              type="button"
+              disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !consentChecked}
+              onClick={() => void grantPilotConsent()}
+            >
+              {!publicationStorageReady
+                ? (es ? 'Verificando registro seguro…' : 'Checking secure record…')
+                : (es ? 'Aceptar y comenzar mi piloto' : 'Accept and start my pilot')}
+            </button>
+            {publicationError ? <p role="alert">{publicationError}</p> : null}
+          </section>
+        </div>
+      </DashboardShell>
+    )
+  }
+
   return (
     <DashboardShell user={user} lang={lang} setLang={setLang} isolatedPreview>
       <div className={styles.page}>
         <header className={styles.intro}>
           <div>
-            <div className={styles.kicker}>{es ? 'MYAQ-001-REC-001 · Preview aislado' : 'MYAQ-001-REC-001 · Isolated Preview'}</div>
-            <h1>{es ? 'Revisión de planes personalizados' : 'Personalized plan review'}</h1>
+            <div className={styles.kicker}>{es ? 'Piloto personal interno · Preview aislado' : 'Internal personal pilot · Isolated Preview'}</div>
+            <h1>{es ? 'Mi plan personalizado' : 'My personalized plan'}</h1>
             <p>{es
-              ? 'AQ Buddy genera las opciones automáticamente; aquí revisas las excepciones antes de publicar. Todos los datos son sintéticos.'
-              : 'AQ Buddy generates the choices automatically; review exceptions here before publishing. All data is synthetic.'}</p>
+              ? 'AQ Buddy calcula opciones con tus datos y mantiene el flujo dentro del piloto interno.'
+              : 'AQ Buddy calculates choices with your data and keeps the workflow inside the internal pilot.'}</p>
           </div>
           <div className={styles.headerActions}>
-            <span className={styles.syntheticBadge}>{es ? 'Datos sintéticos' : 'Synthetic data'}</span>
+            <span className={styles.syntheticBadge}>{es ? 'Datos personales · Preview' : 'Personal data · Preview'}</span>
             {generationPassed && !isQuestionnairePlan ? (
               <Link
                 href={{ pathname: '/my-aqslim/demo/plan', query: { profile: plan.profile.id } }}
@@ -600,6 +731,30 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
             )}
           </div>
         </header>
+
+        <section className={styles.privacyBar}>
+          <div>
+            <strong>{es ? 'Consentimiento activo' : 'Consent active'}</strong>
+            <span>{es
+              ? `Registrado ${workflowDate(pilotConsent.grantedAt, lang)} · datos separados por cuenta`
+              : `Recorded ${workflowDate(pilotConsent.grantedAt, lang)} · data separated by account`}</span>
+          </div>
+          <button type="button" onClick={() => setShowDeleteConfirmation(value => !value)}>
+            {showDeleteConfirmation ? (es ? 'Cancelar' : 'Cancel') : (es ? 'Eliminar mis datos del piloto' : 'Delete my pilot data')}
+          </button>
+          {showDeleteConfirmation ? (
+            <div className={styles.deleteConfirmation}>
+              <strong>{es ? 'Esta acción elimina permanentemente tu consentimiento, perfil, borradores, versiones y bitácora de Preview.' : 'This permanently deletes your consent, profile, drafts, versions, and Preview audit history.'}</strong>
+              <label>
+                <input type="checkbox" checked={deleteChecked} onChange={event => setDeleteChecked(event.target.checked)} />
+                <span>{es ? 'Confirmo que deseo eliminar todos mis datos de este piloto.' : 'I confirm that I want to delete all my data from this pilot.'}</span>
+              </label>
+              <button type="button" disabled={!deleteChecked || publicationBusy} onClick={() => void deleteMyPilotData()}>
+                {es ? 'Eliminar definitivamente' : 'Delete permanently'}
+              </button>
+            </div>
+          ) : null}
+        </section>
 
         <SyntheticQuestionnaire lang={lang} onGenerate={generateQuestionnairePlan} />
 

@@ -302,7 +302,7 @@ function syntheticLedgerEntryFromRecord(record: SyntheticLedgerAirtableRecord): 
   }
 }
 
-export async function getSyntheticPublicationLedgerEntries(scopeKey: string): Promise<SyntheticLedgerEntry[]> {
+async function getSyntheticLedgerAirtableRecords(scopeKey: string): Promise<SyntheticLedgerAirtableRecord[]> {
   const records: SyntheticLedgerAirtableRecord[] = []
   let offset: string | undefined
 
@@ -321,7 +321,11 @@ export async function getSyntheticPublicationLedgerEntries(scopeKey: string): Pr
     offset = typeof data.offset === 'string' ? data.offset : undefined
   } while (offset)
 
-  return records.map(syntheticLedgerEntryFromRecord)
+  return records
+}
+
+export async function getSyntheticPublicationLedgerEntries(scopeKey: string): Promise<SyntheticLedgerEntry[]> {
+  return (await getSyntheticLedgerAirtableRecords(scopeKey)).map(syntheticLedgerEntryFromRecord)
 }
 
 export async function appendSyntheticPublicationLedgerEntry(entry: SyntheticLedgerEntry): Promise<void> {
@@ -350,9 +354,27 @@ export async function appendSyntheticPublicationLedgerEntry(entry: SyntheticLedg
         [SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACTOR_LABEL]: entry.actor.displayName,
         [SYNTHETIC_PREVIEW_LEDGER_FIELDS.EVENT_AT]: entry.at,
       },
-      typecast: false,
+      typecast: true,
     }),
   })
+}
+
+export async function deleteSyntheticPublicationLedgerEntries(scopeKey: string): Promise<number> {
+  let deleted = 0
+  for (let pass = 0; pass < 5; pass += 1) {
+    const records = await getSyntheticLedgerAirtableRecords(scopeKey)
+    if (records.length === 0) return deleted
+    for (let index = 0; index < records.length; index += 10) {
+      const params = new URLSearchParams()
+      records.slice(index, index + 10).forEach(record => params.append('records[]', record.id))
+      await airtableFetch(`/${SYNTHETIC_PREVIEW_LEDGER_TABLE}?${params}`, { method: 'DELETE' })
+      deleted += Math.min(10, records.length - index)
+    }
+  }
+  if ((await getSyntheticLedgerAirtableRecords(scopeKey)).length > 0) {
+    throw new Error('SYNTHETIC_LEDGER_DELETE_INCOMPLETE')
+  }
+  return deleted
 }
 
 export async function getClientesByEmail(email: string): Promise<Cliente[]> {

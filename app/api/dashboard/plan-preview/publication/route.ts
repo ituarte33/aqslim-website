@@ -1,17 +1,20 @@
 import { AuthorizationError, requireActor, type AuthenticatedActor } from '@/lib/auth'
 import {
   appendSyntheticPublicationLedgerEntry,
+  deleteSyntheticPublicationLedgerEntries,
   getSyntheticPublicationLedgerEntries,
 } from '@/lib/airtable'
 import { buildGuidedPlan } from '@/lib/nutrition/assembler'
 import { JING_COMPLETION_COMPONENTS, JING_RECIPE_VARIANTS } from '@/lib/nutrition/fixtures'
 import {
+  createInternalPilotConsentLedgerEntry,
   createSyntheticLedgerEntry,
+  INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
   replaySyntheticPublicationLedger,
   SyntheticLedgerError,
   type SyntheticPublicationAction,
 } from '@/lib/nutrition/synthetic-publication-ledger'
-import { hasSameSyntheticPlan, SYNTHETIC_CLIENT } from '@/lib/nutrition/synthetic-publication'
+import { createSyntheticPublicationState, hasSameSyntheticPlan, SYNTHETIC_CLIENT } from '@/lib/nutrition/synthetic-publication'
 import { parseSyntheticGuidedPlan } from '@/lib/nutrition/synthetic-publication-storage'
 import {
   canReviewSyntheticPreview,
@@ -64,7 +67,7 @@ async function previewActor(): Promise<AuthenticatedActor | Response> {
 }
 
 function actorIdentity(actor: AuthenticatedActor) {
-  return { id: actor.clerkUserId, displayName: 'Revisor de Preview' }
+  return { id: actor.clerkUserId, displayName: 'Participante interno' }
 }
 
 function requestedClientId(request: Request) {
@@ -89,7 +92,7 @@ export async function GET(request: Request) {
 
   try {
     const current = await currentPublication(actor, clientId)
-    return json({ state: current.state, revision: current.revision })
+    return json({ state: current.state, revision: current.revision, consent: current.consent })
   } catch (error) {
     const correlationId = crypto.randomUUID()
     console.error('[synthetic-publication] read_failed', {
@@ -119,6 +122,12 @@ function parseAction(body: unknown): SyntheticPublicationAction | null {
   }
   if (value.action === 'publish') return { type: 'publish' }
   return null
+}
+
+function isConsentAction(value: Record<string, unknown>) {
+  return value.action === 'grant_personal_data_consent'
+    && value.accepted === true
+    && value.noticeVersion === INTERNAL_PILOT_CONSENT_NOTICE_VERSION
 }
 
 function isApprovedSyntheticQuestionnaireProfile(plan: NonNullable<ReturnType<typeof parseSyntheticGuidedPlan>>) {
@@ -177,8 +186,9 @@ export async function POST(request: Request) {
   if (typeof value.expectedRevision !== 'number' || !Number.isInteger(value.expectedRevision) || value.expectedRevision < 0) {
     return json({ error: 'invalid_revision' }, 400)
   }
-  const action = parseAction(body)
-  if (!action) return json({ error: 'invalid_action' }, 400)
+  const consentAction = isConsentAction(value)
+  const action = consentAction ? null : parseAction(body)
+  if (!consentAction && !action) return json({ error: 'invalid_action' }, 400)
 
   try {
     const current = await currentPublication(actor, value.clientId)
@@ -187,9 +197,30 @@ export async function POST(request: Request) {
         error: 'revision_conflict',
         state: current.state,
         revision: current.revision,
+        consent: current.consent,
       }, 409)
     }
     const at = new Date().toISOString()
+    if (consentAction) {
+      const entry = createInternalPilotConsentLedgerEntry({
+        revision: current.revision,
+        scopeKey: current.scopeKey,
+        accountId: actor.clerkUserId,
+        clientId: value.clientId,
+        actor: actorIdentity(actor),
+        at,
+        currentConsent: current.consent,
+        accepted: true,
+        noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+      })
+      await appendSyntheticPublicationLedgerEntry(entry)
+      return json({
+        state: current.state,
+        revision: entry.revision,
+        consent: { noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION, grantedAt: at },
+      })
+    }
+    if (!current.consent) return json({ error: 'personal_data_consent_required' }, 403)
     const next = createSyntheticLedgerEntry({
       state: current.state,
       revision: current.revision,
@@ -198,10 +229,10 @@ export async function POST(request: Request) {
       clientId: value.clientId,
       actor: actorIdentity(actor),
       at,
-      action,
+      action: action!,
     })
     await appendSyntheticPublicationLedgerEntry(next.entry)
-    return json({ state: next.state, revision: next.entry.revision })
+    return json({ state: next.state, revision: next.entry.revision, consent: current.consent })
   } catch (error) {
     if (error instanceof SyntheticLedgerError && error.code === 'INVALID_TRANSITION') {
       return json({ error: 'invalid_transition' }, 409)
@@ -211,6 +242,52 @@ export async function POST(request: Request) {
     }
     const correlationId = crypto.randomUUID()
     console.error('[synthetic-publication] write_failed', {
+      correlationId,
+      errorType: error instanceof Error ? error.name : 'unknown',
+    })
+    return json({ error: 'preview_storage_unavailable', correlationId }, 503)
+  }
+}
+
+export async function DELETE(request: Request) {
+  const actor = await previewActor()
+  if (actor instanceof Response) return actor
+  const clientId = requestedClientId(request)
+  if (!isAllowedSyntheticPreviewClient(clientId)) return json({ error: 'invalid_synthetic_client' }, 400)
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'invalid_request' }, 400)
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'invalid_request' }, 400)
+  const value = body as Record<string, unknown>
+  if (value.confirmation !== 'DELETE_MY_INTERNAL_PILOT_DATA') return json({ error: 'confirmation_required' }, 400)
+  if (typeof value.expectedRevision !== 'number' || !Number.isInteger(value.expectedRevision) || value.expectedRevision < 0) {
+    return json({ error: 'invalid_revision' }, 400)
+  }
+
+  try {
+    const current = await currentPublication(actor, clientId)
+    if (current.revision !== value.expectedRevision) {
+      return json({
+        error: 'revision_conflict',
+        state: current.state,
+        revision: current.revision,
+        consent: current.consent,
+      }, 409)
+    }
+    const deletedRecords = await deleteSyntheticPublicationLedgerEntries(current.scopeKey)
+    return json({
+      state: createSyntheticPublicationState(SYNTHETIC_CLIENT),
+      revision: 0,
+      consent: null,
+      deletedRecords,
+    })
+  } catch (error) {
+    const correlationId = crypto.randomUUID()
+    console.error('[internal-pilot] delete_failed', {
       correlationId,
       errorType: error instanceof Error ? error.name : 'unknown',
     })

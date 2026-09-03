@@ -10,6 +10,7 @@ import { parseSyntheticGuidedPlan } from './synthetic-publication-storage.ts'
 import type { GuidedPlan } from './types'
 
 export type SyntheticLedgerEventType =
+  | 'personal_data_consent_granted'
   | 'draft_saved'
   | 'review_confirmed'
   | 'review_cleared'
@@ -32,6 +33,19 @@ export type SyntheticPublicationAction =
   | { type: 'save_draft'; plan: GuidedPlan }
   | { type: 'review'; confirmed: boolean }
   | { type: 'publish' }
+
+export const INTERNAL_PILOT_CONSENT_NOTICE_VERSION = '2026-09-03'
+
+export type InternalPilotConsent = {
+  noticeVersion: typeof INTERNAL_PILOT_CONSENT_NOTICE_VERSION
+  grantedAt: string
+}
+
+type StoredInternalPilotConsent = {
+  schema: 'myaq-internal-personal-pilot-consent'
+  accepted: true
+  noticeVersion: typeof INTERNAL_PILOT_CONSENT_NOTICE_VERSION
+}
 
 export class SyntheticLedgerError extends Error {
   readonly code: 'CORRUPT_LEDGER' | 'INVALID_TRANSITION'
@@ -70,7 +84,41 @@ function stateAfterEntry(
   if (entry.eventType === 'review_cleared') {
     return confirmSyntheticReview(state, false, entry.actor, entry.at)
   }
-  return publishSyntheticDraft(state, entry.actor, entry.at)
+  if (entry.eventType === 'version_published') {
+    return publishSyntheticDraft(state, entry.actor, entry.at)
+  }
+  throw new SyntheticLedgerError('CORRUPT_LEDGER')
+}
+
+function consentFromEntry(entry: SyntheticLedgerEntry): InternalPilotConsent {
+  if (!entry.planJson || entry.planVersion !== 1) throw new SyntheticLedgerError('CORRUPT_LEDGER')
+  let value: unknown
+  try {
+    value = JSON.parse(entry.planJson)
+  } catch {
+    throw new SyntheticLedgerError('CORRUPT_LEDGER')
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new SyntheticLedgerError('CORRUPT_LEDGER')
+  }
+  const consent = value as Partial<StoredInternalPilotConsent>
+  if (
+    consent.schema !== 'myaq-internal-personal-pilot-consent'
+    || consent.accepted !== true
+    || consent.noticeVersion !== INTERNAL_PILOT_CONSENT_NOTICE_VERSION
+  ) throw new SyntheticLedgerError('CORRUPT_LEDGER')
+  return { noticeVersion: consent.noticeVersion, grantedAt: entry.at }
+}
+
+export function parseInternalPilotConsent(value: unknown): InternalPilotConsent | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const consent = value as Partial<InternalPilotConsent>
+  if (
+    consent.noticeVersion !== INTERNAL_PILOT_CONSENT_NOTICE_VERSION
+    || typeof consent.grantedAt !== 'string'
+    || Number.isNaN(Date.parse(consent.grantedAt))
+  ) return null
+  return { noticeVersion: consent.noticeVersion, grantedAt: consent.grantedAt }
 }
 
 export function replaySyntheticPublicationLedger(
@@ -80,6 +128,7 @@ export function replaySyntheticPublicationLedger(
 ) {
   const ordered = [...entries].toSorted((left, right) => left.revision - right.revision)
   let state = createSyntheticPublicationState(client)
+  let consent: InternalPilotConsent | null = null
 
   for (let index = 0; index < ordered.length; index += 1) {
     const entry = ordered[index]
@@ -95,6 +144,12 @@ export function replaySyntheticPublicationLedger(
       || Number.isNaN(Date.parse(entry.at))
     ) throw new SyntheticLedgerError('CORRUPT_LEDGER')
 
+    if (entry.eventType === 'personal_data_consent_granted') {
+      if (consent) throw new SyntheticLedgerError('CORRUPT_LEDGER')
+      consent = consentFromEntry(entry)
+      continue
+    }
+
     const next = stateAfterEntry(state, entry)
     const audit = next.auditTrail.at(-1)
     if (
@@ -108,7 +163,44 @@ export function replaySyntheticPublicationLedger(
     state = next
   }
 
-  return { state, revision: ordered.length }
+  return { state, revision: ordered.length, consent }
+}
+
+export function createInternalPilotConsentLedgerEntry(input: {
+  revision: number
+  scopeKey: string
+  accountId: string
+  clientId: string
+  actor: SyntheticWorkflowIdentity
+  at: string
+  currentConsent: InternalPilotConsent | null
+  accepted: boolean
+  noticeVersion: string
+}): SyntheticLedgerEntry {
+  if (
+    input.currentConsent
+    || input.accepted !== true
+    || input.noticeVersion !== INTERNAL_PILOT_CONSENT_NOTICE_VERSION
+  ) throw new SyntheticLedgerError('INVALID_TRANSITION')
+
+  const nextRevision = input.revision + 1
+  const stored: StoredInternalPilotConsent = {
+    schema: 'myaq-internal-personal-pilot-consent',
+    accepted: true,
+    noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+  }
+  return {
+    entryKey: `${input.scopeKey}:${nextRevision}`,
+    scopeKey: input.scopeKey,
+    accountId: input.accountId,
+    clientId: input.clientId,
+    revision: nextRevision,
+    eventType: 'personal_data_consent_granted',
+    planVersion: 1,
+    planJson: JSON.stringify(stored),
+    actor: input.actor,
+    at: input.at,
+  }
 }
 
 export function createSyntheticLedgerEntry(input: {

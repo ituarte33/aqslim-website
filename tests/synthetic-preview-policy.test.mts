@@ -20,12 +20,17 @@ test('the synthetic plan remains limited to the dedicated Preview branch', () =>
   }), false)
 })
 
-test('an admin retains access to the synthetic review surface', () => {
+test('an admin retains access only on the dedicated Preview branch', () => {
   assert.equal(canReviewSyntheticPreview({
     role: 'admin',
     email: 'admin@example.test',
-    environment: {},
+    environment: previewEnvironment,
   }), true)
+  assert.equal(canReviewSyntheticPreview({
+    role: 'admin',
+    email: 'admin@example.test',
+    environment: { ...previewEnvironment, VERCEL_ENV: 'production' },
+  }), false)
 })
 
 test('an allowlisted internal reviewer can enter only in the dedicated Preview environment', () => {

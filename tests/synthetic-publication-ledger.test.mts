@@ -3,7 +3,9 @@ import test from 'node:test'
 import { buildGuidedPlan } from '../lib/nutrition/assembler.ts'
 import { JING_COMPLETION_COMPONENTS, JING_RECIPE_VARIANTS } from '../lib/nutrition/fixtures.ts'
 import {
+  createInternalPilotConsentLedgerEntry,
   createSyntheticLedgerEntry,
+  INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
   replaySyntheticPublicationLedger,
   SyntheticLedgerError,
   type SyntheticLedgerEntry,
@@ -124,5 +126,52 @@ test('scope keys isolate the same synthetic client for different authenticated a
   assert.notEqual(
     syntheticPreviewScopeKey('user_alpha', SYNTHETIC_CLIENT.id),
     syntheticPreviewScopeKey('user_beta', SYNTHETIC_CLIENT.id),
+  )
+})
+
+test('records individual pilot consent in the same account-scoped ledger', () => {
+  const entry = createInternalPilotConsentLedgerEntry({
+    revision: 0,
+    scopeKey: SCOPE_KEY,
+    accountId: ACCOUNT_ID,
+    clientId: SYNTHETIC_CLIENT.id,
+    actor: ACTOR,
+    at: '2026-09-03T13:00:00.000Z',
+    currentConsent: null,
+    accepted: true,
+    noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+  })
+  const replayed = replaySyntheticPublicationLedger([entry], SYNTHETIC_CLIENT, {
+    scopeKey: SCOPE_KEY,
+    accountId: ACCOUNT_ID,
+  })
+
+  assert.equal(entry.eventType, 'personal_data_consent_granted')
+  assert.equal(replayed.revision, 1)
+  assert.deepEqual(replayed.consent, {
+    noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+    grantedAt: '2026-09-03T13:00:00.000Z',
+  })
+  assert.equal(replayed.state.auditTrail.length, 0)
+})
+
+test('rejects duplicate or malformed pilot consent', () => {
+  const consent = {
+    noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+    grantedAt: '2026-09-03T13:00:00.000Z',
+  } as const
+  assert.throws(
+    () => createInternalPilotConsentLedgerEntry({
+      revision: 1,
+      scopeKey: SCOPE_KEY,
+      accountId: ACCOUNT_ID,
+      clientId: SYNTHETIC_CLIENT.id,
+      actor: ACTOR,
+      at: '2026-09-03T13:01:00.000Z',
+      currentConsent: consent,
+      accepted: true,
+      noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+    }),
+    (error: unknown) => error instanceof SyntheticLedgerError && error.code === 'INVALID_TRANSITION',
   )
 })
