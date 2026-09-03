@@ -142,6 +142,14 @@ function clientDeliverySignature(plan: GuidedPlan) {
   })
 }
 
+function fullPlanSignature(plan: GuidedPlan) {
+  return JSON.stringify(plan)
+}
+
+export function hasSameSyntheticPlan(before: GuidedPlan, after: GuidedPlan): boolean {
+  return fullPlanSignature(before) === fullPlanSignature(after)
+}
+
 export function hasSameSyntheticClientDelivery(before: GuidedPlan, after: GuidedPlan): boolean {
   return clientDeliverySignature(before) === clientDeliverySignature(after)
 }
@@ -268,7 +276,7 @@ export function saveSyntheticDraft(
   actor: SyntheticWorkflowIdentity = SYNTHETIC_REVIEWER,
   at = new Date().toISOString(),
 ): SyntheticPublicationState {
-  if (plan.status !== 'ready_for_review' || state.draft?.plan === plan) return state
+  if (plan.status !== 'ready_for_review' || (state.draft && hasSameSyntheticPlan(state.draft.plan, plan))) return state
 
   const draft: SyntheticPlanSnapshot = {
     plan,

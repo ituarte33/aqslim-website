@@ -8,8 +8,10 @@ import {
   compareSyntheticPlans,
   confirmSyntheticReview,
   createSyntheticPublicationState,
+  hasSameSyntheticPlan,
   publishSyntheticDraft,
   saveSyntheticDraft,
+  SYNTHETIC_CLIENT,
   SYNTHETIC_REVIEWER,
 } from '@/lib/nutrition/synthetic-publication'
 import type {
@@ -17,6 +19,10 @@ import type {
   SyntheticPlanSnapshot,
   SyntheticProfileChange,
 } from '@/lib/nutrition/synthetic-publication'
+import {
+  loadSyntheticPublication,
+  saveSyntheticPublication,
+} from '@/lib/nutrition/synthetic-publication-storage'
 import type {
   CompletionComponent,
   GuidedPlan,
@@ -335,6 +341,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [experienceMode, setExperienceMode] = useState<'draft' | 'published'>('draft')
   const [experienceSnapshot, setExperienceSnapshot] = useState<SyntheticPlanSnapshot | null>(null)
   const [publication, setPublication] = useState(createSyntheticPublicationState)
+  const [publicationStorageReady, setPublicationStorageReady] = useState(false)
   const [showVersionComparison, setShowVersionComparison] = useState(false)
   const es = lang === 'es'
   const availablePlans = useMemo(
@@ -353,7 +360,9 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   )
   const generationPassed = plan.status === 'ready_for_review'
   const isQuestionnairePlan = plan.profile.id === 'SYN-JING-QUESTIONNAIRE-DRAFT'
-  const draftMatchesCurrentPlan = publication.draft?.plan === plan
+  const draftMatchesCurrentPlan = Boolean(
+    publication.draft && hasSameSyntheticPlan(publication.draft.plan, plan),
+  )
   const hasUnpublishedDraft = Boolean(
     publication.draft && publication.published?.version !== publication.draft.version,
   )
@@ -382,6 +391,26 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   )
   const coverageGap = plan.groups.find(group => group.options.length < 3)
   const stopExplanation = planStopExplanation(plan, lang)
+
+  useEffect(() => {
+    const restored = loadSyntheticPublication(window.localStorage, SYNTHETIC_CLIENT)
+    const restoredPlan = restored.draft?.plan ?? restored.published?.plan ?? null
+    setPublication(restored)
+    if (restoredPlan) {
+      setQuestionnairePlan(restoredPlan)
+      setSelectedProfileId(restoredPlan.profile.id)
+      setShowVersionComparison(
+        Boolean(restored.published && restored.draft?.version !== restored.published.version)
+        || restored.publishedVersions.length >= 2,
+      )
+    }
+    setPublicationStorageReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!publicationStorageReady) return
+    saveSyntheticPublication(window.localStorage, publication)
+  }, [publication, publicationStorageReady])
 
   useEffect(() => {
     const previousScrollRestoration = window.history.scrollRestoration
@@ -521,7 +550,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización y publicación v0.7' : 'Personalization and publishing test v0.7'}</span>
+              <span>{es ? 'Prueba de personalización y publicación v0.8' : 'Personalization and publishing test v0.8'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -782,7 +811,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 <button
                   type="button"
                   className={styles.draftAction}
-                  disabled={!generationPassed || draftMatchesCurrentPlan}
+                  disabled={!publicationStorageReady || !generationPassed || draftMatchesCurrentPlan}
                   onClick={saveCurrentSyntheticDraft}
                   aria-describedby={stopExplanation ? 'synthetic-publication-blocker' : undefined}
                 >
@@ -800,7 +829,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   <input
                     type="checkbox"
                     checked={reviewConfirmed}
-                    disabled={!hasUnpublishedDraft || !draftMatchesCurrentPlan || draftHasNoVisibleChanges}
+                    disabled={!publicationStorageReady || !hasUnpublishedDraft || !draftMatchesCurrentPlan || draftHasNoVisibleChanges}
                     onChange={event => setPublication(current => confirmSyntheticReview(current, event.target.checked))}
                   />
                   <span>{es
@@ -810,7 +839,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 <button
                   type="button"
                   className={styles.publishAction}
-                  disabled={!canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
+                  disabled={!publicationStorageReady || !canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
                   onClick={publishCurrentSyntheticDraft}
                 >
                   {canPublishSyntheticDraft(publication)
@@ -866,8 +895,8 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   </details>
                 ) : null}
                 <p>{es
-                  ? `Simulación en memoria por ${SYNTHETIC_REVIEWER.displayName}: no escribe en Airtable, no llega a clientes y se reinicia al refrescar.`
-                  : `In-memory simulation by ${SYNTHETIC_REVIEWER.displayName}: it does not write to Airtable, reach clients, and resets on refresh.`}</p>
+                  ? `Simulación local por ${SYNTHETIC_REVIEWER.displayName}: se conserva al refrescar en este navegador, aislada por cliente sintético; no escribe en Airtable ni llega a clientes.`
+                  : `Local simulation by ${SYNTHETIC_REVIEWER.displayName}: preserved across refreshes in this browser and isolated by synthetic client; it does not write to Airtable or reach clients.`}</p>
               </div>
             ) : (
               <div className={styles.disabledActions}>

@@ -137,8 +137,8 @@ export function SyntheticQuestionnaire({ lang, onGenerate }: Props) {
         <div className={styles.questionnaireNotice}>
           <strong>{es ? 'Sólo para pruebas ficticias' : 'Fictional testing only'}</strong>
           <span>{es
-            ? 'No escribas nombres, diagnósticos ni medicamentos. Nada se guarda ni se publica.'
-            : 'Do not enter names, diagnoses, or medications. Nothing is saved or published.'}</span>
+            ? 'No escribas nombres, diagnósticos ni medicamentos. Las respuestas no se guardan; sólo un borrador sintético se conserva si decides guardarlo.'
+            : 'Do not enter names, diagnoses, or medications. Answers are not saved; only a synthetic draft is preserved if you choose to save it.'}</span>
         </div>
 
         <fieldset className={styles.questionnaireSection}>

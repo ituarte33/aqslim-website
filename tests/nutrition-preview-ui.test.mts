@@ -11,6 +11,7 @@ const DASHBOARD_CLIENT = new URL('../app/dashboard/plan-preview/plan-preview-cli
 const SYNTHETIC_QUESTIONNAIRE = new URL('../app/dashboard/plan-preview/synthetic-questionnaire.tsx', import.meta.url)
 const QUESTIONNAIRE_PROFILE = new URL('../lib/nutrition/questionnaire-profile.ts', import.meta.url)
 const SYNTHETIC_PUBLICATION = new URL('../lib/nutrition/synthetic-publication.ts', import.meta.url)
+const SYNTHETIC_PUBLICATION_STORAGE = new URL('../lib/nutrition/synthetic-publication-storage.ts', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
 const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
 const RECIPE_DATA = new URL('../app/my-aqslim/plan/recipe-detail-data.ts', import.meta.url)
@@ -103,13 +104,14 @@ test('the real client plan route remains connected to its existing portal data',
   assert.doesNotMatch(route, /nutrition\/preview|buildSyntheticGuidedPlan/)
 })
 
-test('the Dashboard Preview is admin-only, review-first, and has no persistence path', async () => {
-  const [page, client, questionnaire, questionnaireProfile, syntheticPublication, shell, middleware] = await Promise.all([
+test('the Dashboard Preview is admin-only, review-first, and persists only its synthetic workflow locally', async () => {
+  const [page, client, questionnaire, questionnaireProfile, syntheticPublication, publicationStorage, shell, middleware] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
     readFile(SYNTHETIC_QUESTIONNAIRE, 'utf8'),
     readFile(QUESTIONNAIRE_PROFILE, 'utf8'),
     readFile(SYNTHETIC_PUBLICATION, 'utf8'),
+    readFile(SYNTHETIC_PUBLICATION_STORAGE, 'utf8'),
     readFile(DASHBOARD_SHELL, 'utf8'),
     readFile(MIDDLEWARE, 'utf8'),
   ])
@@ -125,7 +127,7 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /Validación automática/)
   assert.match(client, /Pendiente de revisión humana/)
   assert.match(client, /combinaciones compatibles/)
-  assert.match(client, /Prueba de personalización y publicación v0\.7/)
+  assert.match(client, /Prueba de personalización y publicación v0\.8/)
   assert.match(client, /<SyntheticQuestionnaire lang=\{lang\} onGenerate=\{generateQuestionnairePlan\}/)
   assert.match(client, /buildGuidedPlan\(\{ profile, recipes, components \}\)/)
   assert.match(client, /Revisar borrador v\$\{publication\.draft\?\.version\} ↗/)
@@ -160,7 +162,12 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.match(client, /publication\.publishedVersions/)
   assert.match(client, /publication\.auditTrail/)
   assert.match(client, /plan=\{experienceSnapshot\.plan\}/)
-  assert.match(client, /Simulación en memoria/)
+  assert.match(client, /Simulación local/)
+  assert.match(client, /se conserva al refrescar en este navegador/)
+  assert.match(client, /loadSyntheticPublication\(window\.localStorage, SYNTHETIC_CLIENT\)/)
+  assert.match(client, /saveSyntheticPublication\(window\.localStorage, publication\)/)
+  assert.match(client, /publicationStorageReady/)
+  assert.match(client, /hasSameSyntheticPlan\(publication\.draft\.plan, plan\)/)
   assert.match(client, /Cálculo energético sintético/)
   assert.match(client, /Mantenimiento estimado/)
   assert.match(client, /Déficit aplicado/)
@@ -199,12 +206,16 @@ test('the Dashboard Preview is admin-only, review-first, and has no persistence 
   assert.doesNotMatch(client, /Constructor de planes/)
   assert.match(questionnaire, /Cuestionario sintético v0\.1/)
   assert.match(questionnaire, /No escribas nombres, diagnósticos ni medicamentos/)
-  assert.match(questionnaire, /Nada se guarda ni se publica/)
+  assert.match(questionnaire, /Las respuestas no se guardan; sólo un borrador sintético se conserva/)
   assert.match(questionnaire, /Sí · detener para revisión/)
   assert.match(questionnaire, /Generar opciones con AQ Buddy/)
   assert.doesNotMatch(questionnaire, /fetch\(|airtable|localStorage|sessionStorage/i)
   assert.doesNotMatch(questionnaireProfile, /fetch\(|airtable|localStorage|sessionStorage/i)
   assert.doesNotMatch(syntheticPublication, /fetch\(|airtable|localStorage|sessionStorage/i)
+  assert.doesNotMatch(publicationStorage, /fetch\(|airtable|sessionStorage/i)
+  assert.match(publicationStorage, /myaq-preview-synthetic-publication/)
+  assert.match(publicationStorage, /stored\.clientId !== client\.id/)
+  assert.match(publicationStorage, /isPublicationState\(stored\.state, client\)/)
   assert.match(questionnaireProfile, /CONTROLLED_DEFICIT_CALORIES = 500/)
   assert.match(questionnaireProfile, /safetyReviewRequired: answers\.medicationReview === 'required'/)
   assert.match(syntheticPublication, /plan\.status !== 'ready_for_review'/)

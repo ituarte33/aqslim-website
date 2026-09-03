@@ -12,6 +12,7 @@ import {
   confirmSyntheticReview,
   createSyntheticPublicationState,
   hasSameSyntheticClientDelivery,
+  hasSameSyntheticPlan,
   publishSyntheticDraft,
   saveSyntheticDraft,
   SYNTHETIC_CLIENT,
@@ -204,6 +205,8 @@ test('saving an unchanged plan does not create a duplicate synthetic version', (
   const firstDraft = saveSyntheticDraft(createSyntheticPublicationState(), plan)
 
   assert.equal(saveSyntheticDraft(firstDraft, plan), firstDraft)
+  assert.equal(hasSameSyntheticPlan(plan, JSON.parse(JSON.stringify(plan))), true)
+  assert.equal(saveSyntheticDraft(firstDraft, JSON.parse(JSON.stringify(plan))), firstDraft)
 })
 
 test('profile-only changes are visible in comparison but cannot publish an identical client delivery', () => {
