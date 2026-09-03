@@ -168,10 +168,21 @@ function isReview(value: unknown): value is SyntheticReview {
 function isAuditEvent(value: unknown): value is SyntheticAuditEvent {
   return isRecord(value)
     && typeof value.id === 'string'
-    && ['draft_saved', 'review_confirmed', 'version_published'].includes(String(value.type))
+    && ['draft_saved', 'review_confirmed', 'review_cleared', 'version_published'].includes(String(value.type))
     && isPositiveInteger(value.version)
     && isIdentity(value.actor)
     && isValidDate(value.at)
+}
+
+export function parseSyntheticGuidedPlan(value: unknown): GuidedPlan | null {
+  return isGuidedPlan(value) ? value : null
+}
+
+export function parseSyntheticPublicationState(
+  value: unknown,
+  client: SyntheticWorkflowIdentity,
+): SyntheticPublicationState | null {
+  return isPublicationState(value, client) ? value : null
 }
 
 function isPublicationState(value: unknown, client: SyntheticWorkflowIdentity): value is SyntheticPublicationState {

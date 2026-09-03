@@ -6,23 +6,17 @@ import { buildGuidedPlan } from '@/lib/nutrition/assembler'
 import {
   canPublishSyntheticDraft,
   compareSyntheticPlans,
-  confirmSyntheticReview,
   createSyntheticPublicationState,
   hasSameSyntheticPlan,
-  publishSyntheticDraft,
-  saveSyntheticDraft,
   SYNTHETIC_CLIENT,
-  SYNTHETIC_REVIEWER,
 } from '@/lib/nutrition/synthetic-publication'
 import type {
   SyntheticPlanComparison,
   SyntheticPlanSnapshot,
+  SyntheticPublicationState,
   SyntheticProfileChange,
 } from '@/lib/nutrition/synthetic-publication'
-import {
-  loadSyntheticPublication,
-  saveSyntheticPublication,
-} from '@/lib/nutrition/synthetic-publication-storage'
+import { parseSyntheticPublicationState } from '@/lib/nutrition/synthetic-publication-storage'
 import type {
   CompletionComponent,
   GuidedPlan,
@@ -341,7 +335,11 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const [experienceMode, setExperienceMode] = useState<'draft' | 'published'>('draft')
   const [experienceSnapshot, setExperienceSnapshot] = useState<SyntheticPlanSnapshot | null>(null)
   const [publication, setPublication] = useState(createSyntheticPublicationState)
+  const [publicationRevision, setPublicationRevision] = useState(0)
   const [publicationStorageReady, setPublicationStorageReady] = useState(false)
+  const [publicationAvailable, setPublicationAvailable] = useState(false)
+  const [publicationBusy, setPublicationBusy] = useState(false)
+  const [publicationError, setPublicationError] = useState<string | null>(null)
   const [showVersionComparison, setShowVersionComparison] = useState(false)
   const es = lang === 'es'
   const availablePlans = useMemo(
@@ -393,24 +391,33 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
   const stopExplanation = planStopExplanation(plan, lang)
 
   useEffect(() => {
-    const restored = loadSyntheticPublication(window.localStorage, SYNTHETIC_CLIENT)
-    const restoredPlan = restored.draft?.plan ?? restored.published?.plan ?? null
-    setPublication(restored)
-    if (restoredPlan) {
-      setQuestionnairePlan(restoredPlan)
-      setSelectedProfileId(restoredPlan.profile.id)
-      setShowVersionComparison(
-        Boolean(restored.published && restored.draft?.version !== restored.published.version)
-        || restored.publishedVersions.length >= 2,
-      )
+    let cancelled = false
+    async function loadPublication() {
+      try {
+        const response = await fetch(`/api/dashboard/plan-preview/publication?clientId=${encodeURIComponent(SYNTHETIC_CLIENT.id)}`, {
+          cache: 'no-store',
+        })
+        const payload: unknown = await response.json()
+        if (!response.ok || !payload || typeof payload !== 'object') throw new Error('load_failed')
+        const result = payload as { state?: unknown; revision?: unknown }
+        const restored = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
+        if (!restored || !Number.isInteger(result.revision) || Number(result.revision) < 0) throw new Error('invalid_state')
+        if (cancelled) return
+        applyPublication(restored, Number(result.revision))
+        setPublicationAvailable(true)
+      } catch {
+        if (!cancelled) setPublicationError(es
+          ? 'No se pudo cargar el registro seguro de Preview. Los controles permanecen bloqueados.'
+          : 'The secure Preview record could not be loaded. Controls remain locked.')
+      } finally {
+        if (!cancelled) setPublicationStorageReady(true)
+      }
     }
-    setPublicationStorageReady(true)
+    void loadPublication()
+    return () => { cancelled = true }
+    // The server record is loaded once; language changes must not repeat the request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!publicationStorageReady) return
-    saveSyntheticPublication(window.localStorage, publication)
-  }, [publication, publicationStorageReady])
 
   useEffect(() => {
     const previousScrollRestoration = window.history.scrollRestoration
@@ -475,18 +482,67 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
     setShowTemporaryExperience(true)
   }
 
-  function saveCurrentSyntheticDraft() {
-    setPublication(current => saveSyntheticDraft(current, plan))
-    setExperienceSnapshot(null)
-    setExperienceMode('draft')
-    setShowVersionComparison(true)
+  function applyPublication(restored: SyntheticPublicationState, revision: number) {
+    const restoredPlan = restored.draft?.plan ?? restored.published?.plan ?? null
+    setPublication(restored)
+    setPublicationRevision(revision)
+    if (restoredPlan) {
+      setQuestionnairePlan(restoredPlan)
+      setSelectedProfileId(restoredPlan.profile.id)
+      setShowVersionComparison(
+        Boolean(restored.published && restored.draft?.version !== restored.published.version)
+        || restored.publishedVersions.length >= 2,
+      )
+    }
   }
 
-  function publishCurrentSyntheticDraft() {
-    setPublication(current => publishSyntheticDraft(current))
-    setExperienceSnapshot(null)
-    setExperienceMode('published')
-    setShowVersionComparison(true)
+  async function updatePublication(action: Record<string, unknown>) {
+    setPublicationBusy(true)
+    setPublicationError(null)
+    try {
+      const response = await fetch('/api/dashboard/plan-preview/publication', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...action,
+          clientId: SYNTHETIC_CLIENT.id,
+          expectedRevision: publicationRevision,
+        }),
+      })
+      const payload: unknown = await response.json()
+      if (!payload || typeof payload !== 'object') throw new Error('invalid_response')
+      const result = payload as { state?: unknown; revision?: unknown; error?: unknown }
+      const nextState = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
+      const nextRevision = Number(result.revision)
+      if (response.status === 409 && nextState && Number.isInteger(nextRevision)) {
+        applyPublication(nextState, nextRevision)
+        throw new Error('revision_conflict')
+      }
+      if (!response.ok || !nextState || !Number.isInteger(nextRevision)) throw new Error(String(result.error ?? 'write_failed'))
+      applyPublication(nextState, nextRevision)
+      setExperienceSnapshot(null)
+      setShowVersionComparison(true)
+      return true
+    } catch (error) {
+      setPublicationError(error instanceof Error && error.message === 'revision_conflict'
+        ? (es
+          ? 'El registro cambió en otra sesión. Ya cargamos la versión más reciente; revisa antes de continuar.'
+          : 'The record changed in another session. The latest version is now loaded; review it before continuing.')
+        : (es
+          ? 'No se pudo guardar en Preview. No se aplicó ningún cambio local.'
+          : 'Preview could not be saved. No local change was applied.'))
+      return false
+    } finally {
+      setPublicationBusy(false)
+    }
+  }
+
+  async function saveCurrentSyntheticDraft() {
+    if (await updatePublication({ action: 'save_draft', plan })) setExperienceMode('draft')
+  }
+
+  async function publishCurrentSyntheticDraft() {
+    if (await updatePublication({ action: 'publish' })) setExperienceMode('published')
   }
 
   return (
@@ -550,7 +606,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
         <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
           <div className={styles.profilePickerIntro}>
             <div>
-              <span>{es ? 'Prueba de personalización y publicación v0.8' : 'Personalization and publishing test v0.8'}</span>
+              <span>{es ? 'Prueba de personalización y publicación v0.9' : 'Personalization and publishing test v0.9'}</span>
               <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
             </div>
             <p>{es
@@ -808,10 +864,15 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                     <p>{stopExplanation.action}</p>
                   </div>
                 ) : null}
+                {publicationError ? (
+                  <div className={styles.publicationBlocker} role="alert" aria-live="assertive">
+                    <strong>{publicationError}</strong>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className={styles.draftAction}
-                  disabled={!publicationStorageReady || !generationPassed || draftMatchesCurrentPlan}
+                  disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !generationPassed || draftMatchesCurrentPlan}
                   onClick={saveCurrentSyntheticDraft}
                   aria-describedby={stopExplanation ? 'synthetic-publication-blocker' : undefined}
                 >
@@ -829,8 +890,8 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   <input
                     type="checkbox"
                     checked={reviewConfirmed}
-                    disabled={!publicationStorageReady || !hasUnpublishedDraft || !draftMatchesCurrentPlan || draftHasNoVisibleChanges}
-                    onChange={event => setPublication(current => confirmSyntheticReview(current, event.target.checked))}
+                    disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !hasUnpublishedDraft || !draftMatchesCurrentPlan || draftHasNoVisibleChanges}
+                    onChange={event => void updatePublication({ action: 'review', confirmed: event.target.checked })}
                   />
                   <span>{es
                     ? 'Confirmo que revisé calorías, exclusiones y la señal de medicamentos.'
@@ -839,7 +900,7 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                 <button
                   type="button"
                   className={styles.publishAction}
-                  disabled={!publicationStorageReady || !canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
+                  disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
                   onClick={publishCurrentSyntheticDraft}
                 >
                   {canPublishSyntheticDraft(publication)
@@ -887,6 +948,8 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                             ? (es ? 'Borrador guardado' : 'Draft saved')
                             : event.type === 'review_confirmed'
                               ? (es ? 'Revisión confirmada' : 'Review confirmed')
+                              : event.type === 'review_cleared'
+                                ? (es ? 'Revisión retirada' : 'Review cleared')
                               : (es ? 'Versión publicada' : 'Version published')}</strong>
                           <span>v{event.version} · {event.actor.displayName} · {workflowDate(event.at, lang)}</span>
                         </li>
@@ -895,8 +958,8 @@ export function PlanPreviewClient({ user, plans, recipes, components, recipeVari
                   </details>
                 ) : null}
                 <p>{es
-                  ? `Simulación local por ${SYNTHETIC_REVIEWER.displayName}: se conserva al refrescar en este navegador, aislada por cliente sintético; no escribe en Airtable ni llega a clientes.`
-                  : `Local simulation by ${SYNTHETIC_REVIEWER.displayName}: preserved across refreshes in this browser and isolated by synthetic client; it does not write to Airtable or reach clients.`}</p>
+                  ? 'Registro seguro de Preview: persiste en Airtable por cuenta y cliente sintético. No modifica tablas operativas ni llega a clientes reales.'
+                  : 'Secure Preview record: persisted in Airtable per account and synthetic client. It does not modify operational tables or reach real clients.'}</p>
               </div>
             ) : (
               <div className={styles.disabledActions}>

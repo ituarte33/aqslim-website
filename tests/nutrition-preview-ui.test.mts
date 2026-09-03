@@ -12,6 +12,9 @@ const SYNTHETIC_QUESTIONNAIRE = new URL('../app/dashboard/plan-preview/synthetic
 const QUESTIONNAIRE_PROFILE = new URL('../lib/nutrition/questionnaire-profile.ts', import.meta.url)
 const SYNTHETIC_PUBLICATION = new URL('../lib/nutrition/synthetic-publication.ts', import.meta.url)
 const SYNTHETIC_PUBLICATION_STORAGE = new URL('../lib/nutrition/synthetic-publication-storage.ts', import.meta.url)
+const SYNTHETIC_PUBLICATION_API = new URL('../app/api/dashboard/plan-preview/publication/route.ts', import.meta.url)
+const SYNTHETIC_PREVIEW_POLICY = new URL('../lib/nutrition/synthetic-preview-policy.ts', import.meta.url)
+const AIRTABLE = new URL('../lib/airtable.ts', import.meta.url)
 const DASHBOARD_SHELL = new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url)
 const RECIPE_DIALOG = new URL('../app/my-aqslim/plan/recipe-detail-dialog.tsx', import.meta.url)
 const RECIPE_DATA = new URL('../app/my-aqslim/plan/recipe-detail-data.ts', import.meta.url)
@@ -104,14 +107,17 @@ test('the real client plan route remains connected to its existing portal data',
   assert.doesNotMatch(route, /nutrition\/preview|buildSyntheticGuidedPlan/)
 })
 
-test('the Dashboard Preview is admin-only, review-first, and persists only its synthetic workflow locally', async () => {
-  const [page, client, questionnaire, questionnaireProfile, syntheticPublication, publicationStorage, shell, middleware] = await Promise.all([
+test('the Dashboard Preview is admin-only, review-first, and persists an account-scoped synthetic ledger', async () => {
+  const [page, client, questionnaire, questionnaireProfile, syntheticPublication, publicationStorage, publicationApi, previewPolicy, airtable, shell, middleware] = await Promise.all([
     readFile(DASHBOARD_PAGE, 'utf8'),
     readFile(DASHBOARD_CLIENT, 'utf8'),
     readFile(SYNTHETIC_QUESTIONNAIRE, 'utf8'),
     readFile(QUESTIONNAIRE_PROFILE, 'utf8'),
     readFile(SYNTHETIC_PUBLICATION, 'utf8'),
     readFile(SYNTHETIC_PUBLICATION_STORAGE, 'utf8'),
+    readFile(SYNTHETIC_PUBLICATION_API, 'utf8'),
+    readFile(SYNTHETIC_PREVIEW_POLICY, 'utf8'),
+    readFile(AIRTABLE, 'utf8'),
     readFile(DASHBOARD_SHELL, 'utf8'),
     readFile(MIDDLEWARE, 'utf8'),
   ])
@@ -120,14 +126,15 @@ test('the Dashboard Preview is admin-only, review-first, and persists only its s
   assert.doesNotMatch(page, /airtable/i)
   assert.match(client, /disabled>.*Guardar borrador/)
   assert.match(client, /disabled>.*Aprobar y publicar/)
-  assert.doesNotMatch(client, /fetch\(|createRecord|updateRecord|from ['\"]@\/lib\/airtable/)
+  assert.doesNotMatch(client, /createRecord|updateRecord|from ['\"]@\/lib\/airtable/)
+  assert.match(client, /fetch\('\/api\/dashboard\/plan-preview\/publication'/)
   assert.match(client, /Revisión de planes personalizados/)
   assert.match(client, /AQ Buddy genera las opciones automáticamente/)
   assert.match(client, /Biblioteca piloto/)
   assert.match(client, /Validación automática/)
   assert.match(client, /Pendiente de revisión humana/)
   assert.match(client, /combinaciones compatibles/)
-  assert.match(client, /Prueba de personalización y publicación v0\.8/)
+  assert.match(client, /Prueba de personalización y publicación v0\.9/)
   assert.match(client, /<SyntheticQuestionnaire lang=\{lang\} onGenerate=\{generateQuestionnairePlan\}/)
   assert.match(client, /buildGuidedPlan\(\{ profile, recipes, components \}\)/)
   assert.match(client, /Revisar borrador v\$\{publication\.draft\?\.version\} ↗/)
@@ -162,11 +169,12 @@ test('the Dashboard Preview is admin-only, review-first, and persists only its s
   assert.match(client, /publication\.publishedVersions/)
   assert.match(client, /publication\.auditTrail/)
   assert.match(client, /plan=\{experienceSnapshot\.plan\}/)
-  assert.match(client, /Simulación local/)
-  assert.match(client, /se conserva al refrescar en este navegador/)
-  assert.match(client, /loadSyntheticPublication\(window\.localStorage, SYNTHETIC_CLIENT\)/)
-  assert.match(client, /saveSyntheticPublication\(window\.localStorage, publication\)/)
+  assert.match(client, /Registro seguro de Preview/)
+  assert.match(client, /persisted in Airtable per account and synthetic client/)
+  assert.doesNotMatch(client, /window\.localStorage/)
   assert.match(client, /publicationStorageReady/)
+  assert.match(client, /expectedRevision: publicationRevision/)
+  assert.match(client, /response\.status === 409/)
   assert.match(client, /hasSameSyntheticPlan\(publication\.draft\.plan, plan\)/)
   assert.match(client, /Cálculo energético sintético/)
   assert.match(client, /Mantenimiento estimado/)
@@ -206,7 +214,7 @@ test('the Dashboard Preview is admin-only, review-first, and persists only its s
   assert.doesNotMatch(client, /Constructor de planes/)
   assert.match(questionnaire, /Cuestionario sintético v0\.1/)
   assert.match(questionnaire, /No escribas nombres, diagnósticos ni medicamentos/)
-  assert.match(questionnaire, /Las respuestas no se guardan; sólo un borrador sintético se conserva/)
+  assert.match(questionnaire, /sólo el perfil y plan sintéticos quedan en el registro seguro de Preview/)
   assert.match(questionnaire, /Sí · detener para revisión/)
   assert.match(questionnaire, /Generar opciones con AQ Buddy/)
   assert.doesNotMatch(questionnaire, /fetch\(|airtable|localStorage|sessionStorage/i)
@@ -216,6 +224,23 @@ test('the Dashboard Preview is admin-only, review-first, and persists only its s
   assert.match(publicationStorage, /myaq-preview-synthetic-publication/)
   assert.match(publicationStorage, /stored\.clientId !== client\.id/)
   assert.match(publicationStorage, /isPublicationState\(stored\.state, client\)/)
+  assert.match(publicationApi, /isSyntheticPreviewEnvironment/)
+  assert.match(publicationApi, /hasSyntheticPreviewStorageConfiguration/)
+  assert.match(publicationApi, /actor\.role !== 'admin'/)
+  assert.match(publicationApi, /isAllowedSyntheticPreviewClient/)
+  assert.match(publicationApi, /actor\.clerkUserId/)
+  assert.match(publicationApi, /expectedRevision/)
+  assert.match(publicationApi, /buildGuidedPlan/)
+  assert.match(publicationApi, /hasSameSyntheticPlan/)
+  assert.match(publicationApi, /profile\.firstName === 'Perfil generado'/)
+  assert.match(publicationApi, /requestedDeficitCalories === 500/)
+  assert.doesNotMatch(publicationApi, /getCliente|CLIENTES_TABLE|PLAN_AQSLIM_TABLE/)
+  assert.match(previewPolicy, /VERCEL_ENV === 'preview'/)
+  assert.match(previewPolicy, /myaq-rec-001-preview-010/)
+  assert.match(previewPolicy, /preview:\$\{accountId\}:\$\{clientId\}/)
+  assert.match(airtable, /tblVqKHjbyTNJayHn/)
+  assert.match(airtable, /appendSyntheticPublicationLedgerEntry/)
+  assert.match(airtable, /SYNTHETIC_LEDGER_CONFLICT/)
   assert.match(questionnaireProfile, /CONTROLLED_DEFICIT_CALORIES = 500/)
   assert.match(questionnaireProfile, /safetyReviewRequired: answers\.medicationReview === 'required'/)
   assert.match(syntheticPublication, /plan\.status !== 'ready_for_review'/)

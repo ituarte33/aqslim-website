@@ -72,7 +72,7 @@ export type SyntheticReview = {
 
 export type SyntheticAuditEvent = {
   id: string
-  type: 'draft_saved' | 'review_confirmed' | 'version_published'
+  type: 'draft_saved' | 'review_confirmed' | 'review_cleared' | 'version_published'
   version: number
   actor: SyntheticWorkflowIdentity
   at: string
@@ -305,7 +305,17 @@ export function confirmSyntheticReview(
     || state.published?.version === state.draft.version
     || (state.published && hasSameSyntheticClientDelivery(state.published.plan, state.draft.plan))
   ) return state
-  if (!confirmed) return { ...state, review: null }
+  if (!confirmed) {
+    if (!state.review) return state
+    return {
+      ...state,
+      review: null,
+      auditTrail: [
+        ...state.auditTrail,
+        auditEvent(state, 'review_cleared', state.draft.version, reviewer, at),
+      ],
+    }
+  }
   if (state.review?.draftVersion === state.draft.version) return state
 
   const review: SyntheticReview = {

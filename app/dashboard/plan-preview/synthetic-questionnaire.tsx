@@ -137,8 +137,8 @@ export function SyntheticQuestionnaire({ lang, onGenerate }: Props) {
         <div className={styles.questionnaireNotice}>
           <strong>{es ? 'Sólo para pruebas ficticias' : 'Fictional testing only'}</strong>
           <span>{es
-            ? 'No escribas nombres, diagnósticos ni medicamentos. Las respuestas no se guardan; sólo un borrador sintético se conserva si decides guardarlo.'
-            : 'Do not enter names, diagnoses, or medications. Answers are not saved; only a synthetic draft is preserved if you choose to save it.'}</span>
+            ? 'No escribas nombres, diagnósticos ni medicamentos. Las respuestas no se guardan; al guardar, sólo el perfil y plan sintéticos quedan en el registro seguro de Preview.'
+            : 'Do not enter names, diagnoses, or medications. Answers are not saved; when saved, only the synthetic profile and plan enter the secure Preview record.'}</span>
         </div>
 
         <fieldset className={styles.questionnaireSection}>
