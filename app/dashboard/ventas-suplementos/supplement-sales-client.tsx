@@ -3,9 +3,10 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { Cliente, Suplemento } from '@/lib/airtable'
-import { calculateSupplementSale, supplementReceiptLines, SUPPLEMENT_PAYMENT_METHODS, type SupplementSaleItem, type SupplementSaleReceipt } from '@/lib/supplement-sales'
+import { calculateSupplementSale, SUPPLEMENT_PAYMENT_METHODS, type SupplementSaleItem, type SupplementSaleReceipt } from '@/lib/supplement-sales'
 import { DashboardShell } from '../dashboard-shell'
 import { saveSupplementSale } from './actions'
+import { ReceiptPanel } from './receipt-panel'
 
 const gold = '#C9A84C'
 const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '12px 14px', color: '#FAFAF8', background: '#121212', border: '1px solid rgba(201,168,76,.35)', fontSize: 16 }
@@ -129,12 +130,7 @@ export function SupplementSalesClient({ user, clients, products, loadError }: {
         </section>
         </fieldset>
       </form>
-      {receipt && <section aria-label="Recibo de venta" style={{ border: '1px solid rgba(201,168,76,.25)', padding: 22, marginTop: 24 }}>
-        <h2 style={{ fontWeight: 400 }}>Recibo {receipt.id}</h2>
-        <p>{receipt.fecha} · {receipt.metodoPago}</p>
-        {receipt.items.map(item => <p key={item.id}>{item.nombre} × {item.cantidad} · ${(item.precio * item.cantidad).toFixed(2)}</p>)}
-        <dl>{supplementReceiptLines(receipt.totals).map(line => <div key={line.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 0' }}><dt>{line.label}</dt><dd style={{ margin: 0 }}>${line.amount.toFixed(2)}</dd></div>)}</dl>
-      </section>}
+      {receipt && <ReceiptPanel key={receipt.id} receipt={receipt} />}
     </DashboardShell>
   )
 }
