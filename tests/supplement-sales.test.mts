@@ -5,7 +5,7 @@ import { calculateSupplementSale, formatSupplementSaleNotes } from '../lib/suppl
 test('calculates supplement-only sale totals with discount and tax', () => {
   const items = [{ id: 'rec123', nombre: 'Producto A', precio: 25, cantidad: 2 }]
   assert.deepEqual(calculateSupplementSale(items, 5, 3.5), {
-    subtotal: 50, discount: 5, tax: 3.5, supplementTotal: 45, total: 48.5,
+    subtotal: 50, discount: 5, tax: 3.5, shipping: 0, supplementTotal: 45, total: 48.5,
   })
 })
 

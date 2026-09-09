@@ -1,11 +1,11 @@
 'use client'
 
 import { ClerkProvider } from '@clerk/nextjs'
-import type { LocalizationResource } from '@clerk/types'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ComponentProps } from 'react'
 
 type Language = 'es' | 'en'
+type LocalizationResource = NonNullable<ComponentProps<typeof ClerkProvider>['localization']>
 
 const spanishLocalization: LocalizationResource = {
   locale: 'es-MX',
