@@ -147,8 +147,24 @@ export const inventoryPersistence = {
   isRejected: (error: unknown) => error instanceof SaleProviderError && error.status >= 400 && error.status < 500 && error.status !== 408,
 }
 
+// Server-only, opt-in configuration. Missing, false, or unrecognized values
+// must never activate inventory enforcement during production sales.
+export function isInventoryEnforcementEnabled(value = process.env.AIRTABLE_INVENTORY_ENFORCEMENT): boolean {
+  return value === 'true'
+}
+
 const createWithInventory = createInventoryWriter(inventoryPersistence)
-export const commitSavedSale = createSaleCommitter({ find: findSavedSale, create: createWithInventory, onRecovered: createWithInventory.confirmed })
+export const commitSavedSale = createSaleCommitter({
+  find: findSavedSale,
+  create: sale => {
+    if (isInventoryEnforcementEnabled()) return createWithInventory(sale)
+    // Deferring normal-sale enforcement is not authorization to execute the
+    // historical reconciliation without its physical-stock verification.
+    if (sale.reconciliation) throw new InventoryPreflightError('La conciliación histórica está aplazada hasta verificar el inventario y activar su control.')
+    return createSavedSale(sale)
+  },
+  onRecovered: createWithInventory.confirmed,
+})
 
 // Read-only candidate search: use broad criteria so an incomplete historical
 // record is never duplicated merely because its payment or shipping is wrong.

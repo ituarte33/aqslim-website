@@ -515,3 +515,103 @@ test('a recovered completed journal clears the local uncertain gate without repe
   assert.equal((await runSupplementSale(form(), { ...f.base.deps, commit: f.commit })).ok, true)
   assert.deepEqual([...f.stock.values()], [16, 16, 14])
 })
+
+const { isInventoryEnforcementEnabled, commitSavedSale: configuredSaleCommit } = await import(moduleUrl('../app/dashboard/ventas-suplementos/sale-persistence.ts'))
+
+test('inventory enforcement requires explicit true and defaults OFF', t => {
+  const previous = process.env.AIRTABLE_INVENTORY_ENFORCEMENT
+  t.after(() => { if (previous === undefined) delete process.env.AIRTABLE_INVENTORY_ENFORCEMENT; else process.env.AIRTABLE_INVENTORY_ENFORCEMENT = previous })
+  delete process.env.AIRTABLE_INVENTORY_ENFORCEMENT
+  assert.equal(isInventoryEnforcementEnabled(), false)
+  for (const value of ['false', '', 'TRUE', '1', 'yes', ' true ']) assert.equal(isInventoryEnforcementEnabled(value), false)
+  assert.equal(isInventoryEnforcementEnabled('true'), true)
+})
+
+for (const mode of [undefined, 'false', 'true']) {
+  for (const invalidStock of [false, true]) test(`production save with flag ${mode ?? 'missing'} and ${invalidStock ? 'negative' : 'valid'} stock`, async t => {
+    const oldBase = process.env.AIRTABLE_BASE_ID; const oldPat = process.env.AIRTABLE_PAT; const oldFlag = process.env.AIRTABLE_INVENTORY_ENFORCEMENT
+    process.env.AIRTABLE_BASE_ID = 'synthetic-base'; process.env.AIRTABLE_PAT = 'synthetic-token'
+    if (mode === undefined) delete process.env.AIRTABLE_INVENTORY_ENFORCEMENT; else process.env.AIRTABLE_INVENTORY_ENFORCEMENT = mode
+    t.after(() => {
+      if (oldBase === undefined) delete process.env.AIRTABLE_BASE_ID; else process.env.AIRTABLE_BASE_ID = oldBase
+      if (oldPat === undefined) delete process.env.AIRTABLE_PAT; else process.env.AIRTABLE_PAT = oldPat
+      if (oldFlag === undefined) delete process.env.AIRTABLE_INVENTORY_ENFORCEMENT; else process.env.AIRTABLE_INVENTORY_ENFORCEMENT = oldFlag
+    })
+    const initial = invalidStock ? [-365, 90, -3] : [20, 20, 20]
+    const stocks = new Map(items.map((item, i) => [item.id, initial[i]]))
+    const calls: Array<{ url: string; method: string }> = []
+    let stored: any = null
+    t.mock.method(globalThis, 'fetch', async (url: string, options: RequestInit) => {
+      assert.ok(url.startsWith('https://api.airtable.com/'))
+      const method = options.method ?? 'GET'; calls.push({ url, method })
+      const u = new URL(url); const id = u.pathname.split('/').at(-1)!
+      if (u.pathname.includes('tblNfS4o1qbZrkL8F')) {
+        assert.equal(mode, 'true', 'OFF must not read or write inventory')
+        if (method === 'GET') return Response.json({ id, fields: { 'Inventario Actual': stocks.get(id) } })
+        const fields = JSON.parse(String(options.body)).fields
+        assert.deepEqual(Object.keys(fields), ['fldPWw9SVriMBSl1s'])
+        stocks.set(id, fields.fldPWw9SVriMBSl1s); return Response.json({ id })
+      }
+      if (method === 'GET') {
+        if (u.searchParams.get('filterByFormula')?.includes('Inventario pendiente')) {
+          assert.equal(mode, 'true', 'OFF must not check historical pending inventory')
+          return Response.json({ records: [] })
+        }
+        return Response.json({ records: stored ? [stored] : [] })
+      }
+      const fields = JSON.parse(String(options.body)).fields
+      if (method === 'POST') {
+        assert.equal(fields.fldQmGAfuC8VedVac, 150); assert.equal(fields.fldEaHNuZQaF9dJOm, 24)
+        assert.equal(fields.fldy4827OopECJivK, 174); assert.equal(fields.flduOI73qhsjzailL, 'Card')
+        stored = { id: 'rec44444444444444', fields: { 'Notas del Terapeuta': fields.fldtCuN8vn9O3xD7v } }
+      } else stored.fields['Notas del Terapeuta'] = fields.fldtCuN8vn9O3xD7v
+      return Response.json(stored)
+    })
+    const data = form()
+    const deps = { ...fixture().deps, getProducts: async () => items.map(item => ({ id: item.id, fields: { Nombre: item.nombre, 'Precio de Venta ($)': item.precio, 'Inventario Actual': stocks.get(item.id) } })), commit: configuredSaleCommit }
+    const results = await Promise.all([runSupplementSale(data, deps), runSupplementSale(data, deps)])
+    assert.deepEqual(results[0], results[1])
+    const result = results[0]
+    if (mode === 'true' && invalidStock) {
+      assert.equal(result.ok, false); assert.match(result.message, /inventario/)
+      assert.equal(calls.filter(call => call.method !== 'GET').length, 0)
+      assert.deepEqual([...stocks.values()], initial)
+      return
+    }
+    assert.equal(result.ok, true); assert.equal(result.receipt.totals.total, 174)
+    assert.deepEqual(result.receipt.items.map((item: any) => item.cantidad), [2, 2, 3])
+    assert.deepEqual([...stocks.values()], mode === 'true' ? [18, 18, 17] : initial)
+    assert.equal(calls.filter(call => call.method === 'POST').length, 1)
+    const writes = calls.filter(call => call.method !== 'GET').length
+    assert.deepEqual(await runSupplementSale(data, deps), result)
+    assert.equal(calls.filter(call => call.method !== 'GET').length, writes, 'retry must not repeat any write')
+    if (mode !== 'true') {
+      assert.equal(writes, 1)
+      assert.doesNotMatch(stored.fields['Notas del Terapeuta'], /AQSLIM Inventario:/)
+      // Enabling enforcement later must not backfill a sale saved while OFF.
+      process.env.AIRTABLE_INVENTORY_ENFORCEMENT = 'true'
+      assert.deepEqual(await runSupplementSale(data, deps), result)
+      assert.equal(calls.filter(call => call.method !== 'GET').length, writes)
+      assert.deepEqual([...stocks.values()], initial)
+    }
+  })
+}
+
+test('OFF does not authorize creation of the deferred September 8 reconciliation', async t => {
+  const previous = process.env.AIRTABLE_INVENTORY_ENFORCEMENT
+  const oldBase = process.env.AIRTABLE_BASE_ID; const oldPat = process.env.AIRTABLE_PAT
+  process.env.AIRTABLE_INVENTORY_ENFORCEMENT = 'false'
+  process.env.AIRTABLE_BASE_ID = 'synthetic-base'; process.env.AIRTABLE_PAT = 'synthetic-token'
+  t.after(() => {
+    if (previous === undefined) delete process.env.AIRTABLE_INVENTORY_ENFORCEMENT; else process.env.AIRTABLE_INVENTORY_ENFORCEMENT = previous
+    if (oldBase === undefined) delete process.env.AIRTABLE_BASE_ID; else process.env.AIRTABLE_BASE_ID = oldBase
+    if (oldPat === undefined) delete process.env.AIRTABLE_PAT; else process.env.AIRTABLE_PAT = oldPat
+  })
+  t.mock.method(globalThis, 'fetch', async (_url: string, options: RequestInit) => {
+    assert.ok(!options.method || options.method === 'GET', 'no historical writes while OFF')
+    return Response.json({ records: [] })
+  })
+  const sale = await prepareSupplementSale(form(), fixture().deps)
+  sale.reconciliation = 'september-8-2026'
+  await assert.rejects(configuredSaleCommit(sale), /conciliación histórica está aplazada/)
+})

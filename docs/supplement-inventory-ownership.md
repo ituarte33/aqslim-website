@@ -1,14 +1,26 @@
 # Portal supplement inventory ownership and September 8 reconciliation
 
+## Deferred enforcement — default OFF
+
+`AIRTABLE_INVENTORY_ENFORCEMENT` is a server-side flag. Only the exact value `true` enables enforcement. A missing variable, `false`, or any unrecognized value leaves it OFF. The example environment explicitly sets `AIRTABLE_INVENTORY_ENFORCEMENT=false`.
+
+With enforcement OFF, ordinary supplement sales still validate products, payment, shipping, discount and tax; save the financial record; and return the same itemized receipt. The same duplicate-submit guard, completed-sale lookup and uncertain-write handling remain active. No inventory preflight, pending-inventory scan, stock decrement, or stock PATCH runs. Invalid or negative historical stock cannot block a new ordinary sale. Product catalog reads remain necessary for names and prices, but stock is not validated. Sales saved while OFF have no inventory journal and will **not** be retroactively decremented when enforcement is later enabled.
+
+A retry of a particular older sale that already has an incomplete inventory journal remains subject to its existing review guard. Turning OFF does not falsify completion of an earlier partial operation, and that record does not block unrelated new sales while OFF.
+
+The inventory service and all its tests are retained. With the flag ON, the existing preflight, decrement, persistent journal, compensation, and recovery path below runs unchanged. Before activation, the Founder must complete the in-office physical count, review and reconcile Airtable balances and any pending journals, and resolve the single-writer deployment requirements described below. Set the flag to `true` only through a separately authorized configuration/deployment change. This PR does not change production configuration, merge, or deploy.
+
+The prepared September 8 reconciliation remains unexecuted. It is not called automatically and cannot create a new historical sale through the production committer while the flag is OFF. Its explicit authorization, candidate checks, and physical-stock checks still apply when later enabled.
+
 ## Scope and ownership
 
-The AQSLIM Portal is the sole **application writer in this repository** of Airtable `Suplementos_AQSLIM.Inventario Actual` for new sales saved by `/dashboard/ventas-suplementos`. It is an AQSLIM operational/analytics mirror. Square inventory remains separately managed by Square; this implementation neither imports Square code nor calls a Square inventory endpoint.
+When enforcement is explicitly enabled, the AQSLIM Portal is the sole **application writer in this repository** of Airtable `Suplementos_AQSLIM.Inventario Actual` for new sales saved by `/dashboard/ventas-suplementos`. It is an AQSLIM operational/analytics mirror. Square inventory remains separately managed by Square; this implementation neither imports Square code nor calls a Square inventory endpoint.
 
 A repository-wide search before implementation found no existing decrement path or Square-to-Airtable stock synchronization. The existing Square integrations handle customers, appointments, payments, catalog service lookup, and subscription/plan events. Historical documentation mentions a catalog import and inventory reporting, not a running decrement. External Airtable automations, external integrations, and manual edits cannot be proven absent by searching this repository; the connector does not enumerate automation code. No competing automation was positively identified.
 
 No merge, deployment, schema modification, or real historical write is part of this change.
 
-## Save and recovery behavior
+## Save and recovery behavior when enforcement is ON
 
 1. Authorize the operator, validate the sale, resolve catalog IDs/prices, and coalesce quantities.
 2. Serialize stock-changing sales within the application process. Check Airtable for incomplete portal inventory journals before starting another sale.
