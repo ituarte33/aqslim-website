@@ -16,6 +16,7 @@ export type SaleProduct = {
 }
 export type PreparedSale = {
   requestId: string
+  reconciliation?: 'september-8-2026'
   fields: Record<string, unknown>
   receipt: Omit<SupplementSaleReceipt, 'id'>
   inventory: Array<{ id: string; quantity: number; unitCost: number | null }>
