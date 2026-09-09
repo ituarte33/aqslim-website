@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { Cliente, Suplemento } from '@/lib/airtable'
-import { calculateSupplementSale, type SupplementSaleItem } from '@/lib/supplement-sales'
+import { calculateSupplementSale, supplementReceiptLines, SUPPLEMENT_PAYMENT_METHODS, type SupplementSaleItem, type SupplementSaleReceipt } from '@/lib/supplement-sales'
 import { DashboardShell } from '../dashboard-shell'
 import { saveSupplementSale } from './actions'
 
@@ -11,19 +11,24 @@ const gold = '#C9A84C'
 const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '12px 14px', color: '#FAFAF8', background: '#121212', border: '1px solid rgba(201,168,76,.35)', fontSize: 16 }
 const label: React.CSSProperties = { display: 'block', marginBottom: 7, color: '#9A9590', fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase' }
 
-export function SupplementSalesClient({ user, clients, products }: {
+export function SupplementSalesClient({ user, clients, products, loadError }: {
   user: { firstName: string | null; lastName: string | null } | null
   clients: Cliente[]
   products: Suplemento[]
+  loadError?: string
 }) {
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [query, setQuery] = useState('')
   const [cart, setCart] = useState<SupplementSaleItem[]>([])
   const [discount, setDiscount] = useState(0)
   const [tax, setTax] = useState(0)
+  const [shipping, setShipping] = useState(0)
+  const [receipt, setReceipt] = useState<SupplementSaleReceipt | null>(null)
+  const submitting = useRef(false)
+  const requestId = useRef<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
-  const totals = calculateSupplementSale(cart, discount, tax)
+  const totals = calculateSupplementSale(cart, discount, tax, shipping)
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return normalizedQuery
@@ -50,17 +55,38 @@ export function SupplementSalesClient({ user, clients, products }: {
       <h1 style={{ fontFamily: 'Playfair Display, serif', fontWeight: 400, fontSize: 40, margin: '22px 0 8px' }}>Registrar venta de suplementos</h1>
       <p style={{ color: '#9A9590', marginBottom: 30 }}>El cliente es opcional. Si no seleccionas uno, se guardará como venta de mostrador.</p>
 
-      <form action={formData => startTransition(async () => {
-        setMessage(null)
+      {loadError && <p role="alert" style={{ color: '#ff7777' }}>{loadError}</p>}
+      <form onSubmit={event => {
+        event.preventDefault()
+        const formData = new FormData(event.currentTarget)
+        if (submitting.current) return
+        submitting.current = true
+        requestId.current ??= crypto.randomUUID()
+        formData.set('requestId', requestId.current)
         formData.set('items', JSON.stringify(cart.map(({ id, cantidad }) => ({ id, cantidad }))))
-        try {
-          const result = await saveSupplementSale(formData)
-          setMessage({ ok: true, text: `Venta guardada · Recibo ${result.id} · Total $${result.total.toFixed(2)}` })
-          setCart([]); setDiscount(0); setTax(0)
-        } catch (error) {
-          setMessage({ ok: false, text: error instanceof Error ? error.message : 'No se pudo guardar la venta.' })
-        }
-      })}>
+        // Clear the previous outcome immediately, not as a deferred transition:
+        // an old receipt must not look like confirmation of this pending save.
+        setMessage(null)
+        setReceipt(null)
+        startTransition(async () => {
+          try {
+            const result = await saveSupplementSale(formData)
+            if (!result.ok) {
+              setMessage({ ok: false, text: result.message })
+              return
+            }
+            setReceipt(result.receipt)
+            setMessage({ ok: true, text: `Venta guardada · Recibo ${result.receipt.id} · Total $${result.receipt.totals.total.toFixed(2)}` })
+            requestId.current = null
+            setCart([]); setDiscount(0); setTax(0); setShipping(0)
+          } catch {
+            setMessage({ ok: false, text: 'No se pudo confirmar la venta. Conserva este formulario y verifica el registro antes de volver a intentar.' })
+          } finally {
+            submitting.current = false
+          }
+        })
+      }}>
+        <fieldset disabled={pending || !!loadError} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 24 }}>
           <section style={{ border: '1px solid rgba(201,168,76,.25)', padding: 22 }}>
             <h2 style={{ fontSize: 20, fontWeight: 400, marginTop: 0 }}>1. Datos de la venta</h2>
@@ -71,7 +97,7 @@ export function SupplementSalesClient({ user, clients, products }: {
             </select>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 18 }}>
               <div><label style={label}>Fecha</label><input name="fecha" type="date" defaultValue={today} required style={input} /></div>
-              <div><label style={label}>Forma de pago</label><select name="metodoPago" required defaultValue="" style={input}><option value="" disabled>Seleccionar</option>{['Efectivo','Tarjeta','Zelle','Venmo','Otro'].map(v => <option key={v}>{v}</option>)}</select></div>
+              <div><label style={label}>Forma de pago</label><select name="metodoPago" required defaultValue="" style={input}><option value="" disabled>Seleccionar</option>{SUPPLEMENT_PAYMENT_METHODS.map(v => <option key={v}>{v}</option>)}</select></div>
             </div>
             <label style={{ ...label, marginTop: 18 }}>Nota (opcional)</label>
             <textarea name="nota" rows={3} maxLength={1000} style={input} placeholder="Detalle útil de la venta" />
@@ -94,13 +120,21 @@ export function SupplementSalesClient({ user, clients, products }: {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginTop: 20 }}>
             <div><label style={label}>Descuento ($)</label><input name="discount" type="number" min="0" step="0.01" value={discount} onChange={e => setDiscount(Number(e.target.value))} style={input} /></div>
             <div><label style={label}>Impuesto ($)</label><input name="tax" type="number" min="0" step="0.01" value={tax} onChange={e => setTax(Number(e.target.value))} style={input} /></div>
-            <div style={{ padding: 10 }}><span style={label}>Subtotal</span><strong>${totals.subtotal.toFixed(2)}</strong></div>
+            <div><label htmlFor="sale-shipping" style={label}>Envío / Shipping ($)</label><input id="sale-shipping" name="shipping" type="number" min="0" step="0.01" value={shipping} onChange={e => setShipping(Number(e.target.value))} style={input} /></div>
+            <div style={{ padding: 10 }}><span style={label}>Subtotal productos</span><strong>${totals.subtotal.toFixed(2)}</strong></div>
             <div style={{ padding: 10 }}><span style={label}>Total</span><strong style={{ color: gold, fontSize: 24 }}>${totals.total.toFixed(2)}</strong></div>
           </div>
           {message && <p role="status" style={{ color: message.ok ? '#7fcf7f' : '#ff7777', padding: '12px 0' }}>{message.text}</p>}
           <button type="submit" disabled={pending || cart.length === 0} style={{ marginTop: 18, padding: '14px 28px', background: pending || cart.length === 0 ? '#5d512f' : gold, color: '#090909', border: 0, letterSpacing: '.12em', textTransform: 'uppercase', cursor: pending ? 'wait' : 'pointer', fontWeight: 600 }}>{pending ? 'Guardando…' : 'Guardar venta y generar recibo'}</button>
         </section>
+        </fieldset>
       </form>
+      {receipt && <section aria-label="Recibo de venta" style={{ border: '1px solid rgba(201,168,76,.25)', padding: 22, marginTop: 24 }}>
+        <h2 style={{ fontWeight: 400 }}>Recibo {receipt.id}</h2>
+        <p>{receipt.fecha} · {receipt.metodoPago}</p>
+        {receipt.items.map(item => <p key={item.id}>{item.nombre} × {item.cantidad} · ${(item.precio * item.cantidad).toFixed(2)}</p>)}
+        <dl>{supplementReceiptLines(receipt.totals).map(line => <div key={line.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 0' }}><dt>{line.label}</dt><dd style={{ margin: 0 }}>${line.amount.toFixed(2)}</dd></div>)}</dl>
+      </section>}
     </DashboardShell>
   )
 }
