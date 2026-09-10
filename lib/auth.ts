@@ -3,6 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
 import { getClienteById, getClientesByEmail, type Cliente } from '@/lib/airtable'
+import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
 import {
   AuthorizationError,
   assertPatientOwnership,
@@ -12,6 +13,12 @@ import {
   type AppRole,
   type Capability,
 } from '@/lib/authorization-policy'
+import {
+  ACTIVE_PILOT_FEATURES,
+  pilotAccessFromMetadata,
+  type PilotFeature,
+} from '@/lib/pilot-policy'
+import { canReviewSyntheticPreview } from '@/lib/nutrition/synthetic-preview-policy'
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .split(',')
@@ -24,6 +31,8 @@ export type AuthenticatedActor = {
   role: AppRole
   capabilities: ReadonlySet<Capability>
   boundPatientId: string | null
+  rawPlan: unknown
+  shadowPilotFeatures: ReadonlySet<PilotFeature> | null
 }
 
 function primaryEmail(user: NonNullable<Awaited<ReturnType<typeof currentUser>>>): string | null {
@@ -31,6 +40,27 @@ function primaryEmail(user: NonNullable<Awaited<ReturnType<typeof currentUser>>>
     ? user.emailAddresses.find(address => address.id === user.primaryEmailAddressId)
     : user.emailAddresses[0]
   return selected?.emailAddress?.trim().toLowerCase() || null
+}
+
+function shadowPilotFeaturesFor(
+  user: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
+  email: string,
+  role: AppRole,
+): ReadonlySet<PilotFeature> | null {
+  const metadataAccess = pilotAccessFromMetadata(user.privateMetadata)
+  if (metadataAccess) return metadataAccess.enabledFeatures
+
+  const previewReviewer = canReviewSyntheticPreview({
+    role,
+    email,
+    environment: {
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+      MYAQ_PREVIEW_REVIEWER_EMAILS: process.env.MYAQ_PREVIEW_REVIEWER_EMAILS,
+    },
+  })
+
+  return previewReviewer ? new Set(ACTIVE_PILOT_FEATURES) : null
 }
 
 export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
@@ -50,6 +80,8 @@ export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
     role,
     capabilities: capabilitiesForRole(role),
     boundPatientId,
+    rawPlan: user.privateMetadata?.plan,
+    shadowPilotFeatures: shadowPilotFeaturesFor(user, email, role),
   }
 })
 
@@ -62,6 +94,18 @@ export async function requireActor(): Promise<AuthenticatedActor> {
 export async function requireCapability(capability: Capability): Promise<AuthenticatedActor> {
   const actor = await requireActor()
   assertRoleCapability(actor.role, capability)
+
+  if (capability === 'buddy:chat') {
+    observeEntitlementShadow({
+      clerkUserId: actor.clerkUserId,
+      capability: 'buddy:chat',
+      currentAccessAllowed: true,
+      rawPlan: actor.rawPlan,
+      hasPilotAccess: actor.shadowPilotFeatures !== null,
+      pilotFeatures: actor.shadowPilotFeatures ?? undefined,
+    })
+  }
+
   return actor
 }
 
