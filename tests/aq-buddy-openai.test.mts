@@ -4,7 +4,7 @@ import {
   DEFAULT_AQ_BUDDY_OPENAI_MODEL,
   parseOpenAIResponseSSEBlock,
   resolveAQBuddyProvider,
-} from '../lib/aq-buddy-openai.ts'
+} from '../lib/aq-buddy-provider-policy.ts'
 
 test('OpenAI is selected when a key is available and Anthropic was not forced', () => {
   assert.deepEqual(resolveAQBuddyProvider({ hasOpenAIKey: true }), {
