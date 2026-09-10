@@ -10,6 +10,7 @@ import {
   type ConsumptionStatus,
   type MealType,
 } from '@/lib/airtable'
+import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
 import {
   effectiveFoodScanPlan,
   evaluateFoodScanUsage,
@@ -124,6 +125,15 @@ export async function POST(req: Request) {
   if (hasImage && (!ALLOWED_IMAGE_TYPES.has(mimeType) || imageBase64.length > MAX_BASE64_LENGTH)) {
     return Response.json({ error: 'invalid_image' }, { status: 400 })
   }
+
+  observeEntitlementShadow({
+    clerkUserId: userId,
+    capability: 'food_scan:analyze',
+    currentAccessAllowed: true,
+    rawPlan: privateMetadata?.plan,
+    hasPilotAccess: pilot !== null,
+    pilotFeatures: pilot?.enabledFeatures,
+  })
 
   let message: Anthropic.Message
   try {
@@ -289,6 +299,19 @@ export async function PATCH(req: Request) {
     ) {
       return Response.json({ error: 'invalid_correction' }, { status: 400 })
     }
+
+    const [shadowUser, shadowPilot] = await Promise.all([
+      currentUser().catch(() => null),
+      getPilotAccess().catch(() => null),
+    ])
+    observeEntitlementShadow({
+      clerkUserId: userId,
+      capability: 'food_scan:reanalyze',
+      currentAccessAllowed: true,
+      rawPlan: shadowUser?.privateMetadata?.plan,
+      hasPilotAccess: shadowPilot !== null,
+      pilotFeatures: shadowPilot?.enabledFeatures,
+    })
 
     let message: Anthropic.Message
     try {
