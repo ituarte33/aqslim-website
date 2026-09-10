@@ -16,6 +16,16 @@ export type ObserveEntitlementShadowInput = {
   pilotFeatures?: ReadonlySet<PilotFeature> | readonly PilotFeature[]
 }
 
+export type EntitlementShadowComparison = 'MATCH' | 'MISMATCH' | 'REVIEW'
+
+export function compareEntitlementShadow(
+  currentAccessAllowed: boolean,
+  decision: EntitlementShadowDecision['decision'],
+): EntitlementShadowComparison {
+  if (decision === 'unresolved') return 'REVIEW'
+  return currentAccessAllowed === (decision === 'allow') ? 'MATCH' : 'MISMATCH'
+}
+
 export function observeEntitlementShadow(
   input: ObserveEntitlementShadowInput,
 ): EntitlementShadowDecision {
@@ -25,12 +35,14 @@ export function observeEntitlementShadow(
     hasPilotAccess: input.hasPilotAccess,
     pilotFeatures: input.pilotFeatures,
   })
+  const comparison = compareEntitlementShadow(input.currentAccessAllowed, decision.decision)
 
   console.info('[entitlement-shadow]', {
     clerkUserId: input.clerkUserId,
     capability: input.capability,
     currentAccessAllowed: input.currentAccessAllowed,
     shadowDecision: decision.decision,
+    comparison,
     shadowTier: decision.tier,
     shadowLifecycle: decision.lifecycle,
     policyBasis: decision.policyBasis,
