@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { pilotHasFeature } from '@/lib/pilot-policy'
 import { getPatientPortalData } from '@/lib/patient-portal'
@@ -113,6 +114,15 @@ export async function POST(request: Request) {
 
   if (body.action === 'detect') {
     if (!validImages(body.images)) return Response.json({ error: 'invalid_images' }, { status: 400 })
+
+    observeEntitlementShadow({
+      clerkUserId: userId,
+      capability: 'fridge_recipe:detect',
+      currentAccessAllowed: true,
+      hasPilotAccess: true,
+      pilotFeatures: pilot.enabledFeatures,
+    })
+
     const additionalIngredients = typeof body.additionalIngredients === 'string'
       ? body.additionalIngredients.trim().slice(0, 400)
       : ''
@@ -173,6 +183,15 @@ Respond in ${responseLanguage}. Return ONLY concise valid JSON:
       : 2
     const confirmedPhase = canonicalFridgePhase(patient.phase)
     const phaseInstruction = fridgePhaseInstruction(confirmedPhase)
+
+    observeEntitlementShadow({
+      clerkUserId: userId,
+      capability: 'fridge_recipe:generate',
+      currentAccessAllowed: true,
+      hasPilotAccess: true,
+      pilotFeatures: pilot.enabledFeatures,
+    })
+
     const generation = await requestValidatedJson(
       [{
         type: 'text',
