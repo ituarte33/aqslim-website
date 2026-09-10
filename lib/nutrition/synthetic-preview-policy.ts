@@ -1,11 +1,13 @@
 export const SYNTHETIC_PREVIEW_BRANCH = 'myaq-rec-001-preview-010'
 export const ENTITLEMENT_PREVIEW_BRANCH = 'myaq-entitlement-preview-001'
+export const AQ_BUDDY_OPENAI_PREVIEW_BRANCH = 'myaq-ai-001-aq-buddy-openai-preview'
 export const SYNTHETIC_PREVIEW_CLIENT_ID = 'SYN-CLIENT-001'
 export const SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID = 'appuUHRs26ATXnZjf'
 
 const ALLOWED_PREVIEW_BRANCHES = new Set([
   SYNTHETIC_PREVIEW_BRANCH,
   ENTITLEMENT_PREVIEW_BRANCH,
+  AQ_BUDDY_OPENAI_PREVIEW_BRANCH,
 ])
 
 export function isSyntheticPreviewEnvironment(environment: {
