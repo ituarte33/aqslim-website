@@ -13,7 +13,9 @@ export type EntitlementTier =
 export type EntitlementCapability =
   | 'buddy:chat'
   | 'food_scan:analyze'
+  | 'food_scan:reanalyze'
   | 'food_log:text'
+  | 'fridge_recipe:detect'
   | 'fridge_recipe:generate'
   | 'restaurant_menu:analyze'
   | 'weekly_summary:generate'
@@ -47,7 +49,9 @@ type ShadowEntitlementInput = {
 const PILOT_FEATURE_FOR_CAPABILITY: Record<EntitlementCapability, PilotFeature> = {
   'buddy:chat': 'aq_buddy',
   'food_scan:analyze': 'food_scan',
+  'food_scan:reanalyze': 'food_scan',
   'food_log:text': 'food_scan',
+  'fridge_recipe:detect': 'fridge_recipes',
   'fridge_recipe:generate': 'fridge_recipes',
   'restaurant_menu:analyze': 'restaurant_advisor',
   'weekly_summary:generate': 'weekly_summary',
@@ -56,7 +60,9 @@ const PILOT_FEATURE_FOR_CAPABILITY: Record<EntitlementCapability, PilotFeature> 
 const PREVIEW_KENKHO_AI_CAPABILITIES: ReadonlySet<EntitlementCapability> = new Set([
   'buddy:chat',
   'food_scan:analyze',
+  'food_scan:reanalyze',
   'food_log:text',
+  'fridge_recipe:detect',
   'fridge_recipe:generate',
   'restaurant_menu:analyze',
   'weekly_summary:generate',
