@@ -31,6 +31,23 @@ test('governed internal pilot access resolves from existing pilot features', () 
   assert.equal(allowed.reason, 'INTERNAL_PILOT_FEATURE_ALLOWED')
 })
 
+test('cost-bearing suboperations inherit their governed pilot feature in shadow mode', () => {
+  for (const capability of [
+    'food_scan:reanalyze',
+    'fridge_recipe:detect',
+    'fridge_recipe:generate',
+  ] as const) {
+    const decision = evaluateEntitlementShadow({
+      capability,
+      hasPilotAccess: true,
+      pilotFeatures: ACTIVE_PILOT_FEATURES,
+    })
+    assert.equal(decision.decision, 'allow')
+    assert.equal(decision.enforced, false)
+    assert.equal(decision.tier, 'internal_pilot')
+  }
+})
+
 test('a missing internal pilot feature is visible as a shadow mismatch only', () => {
   const denied = evaluateEntitlementShadow({
     capability: 'weekly_summary:generate',
