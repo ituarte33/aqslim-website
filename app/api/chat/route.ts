@@ -5,6 +5,13 @@ import { getPatientPortalData } from '@/lib/patient-portal'
 import { buildFast36BuddyContext, normalizeFast36Status, type Fast36Session } from '@/lib/fast36-policy'
 import { foodScanPeriodBoundaries } from '@/lib/food-scan-policy'
 import { buildFoodScanContextPrompt, parseBuddyContextReference } from '@/lib/aq-buddy-context'
+import {
+  configuredAQBuddyOpenAIModel,
+  hasOpenAIAQBuddyKey,
+  resolveAQBuddyProvider,
+  streamOpenAIAQBuddyText,
+  type AQBuddyOpenAIMessage,
+} from '@/lib/aq-buddy-openai'
 import { SYSTEM_PROMPT } from './system-prompt'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -88,6 +95,24 @@ function messageText(message: ChatMessage | undefined) {
     .filter((block): block is Anthropic.TextBlockParam => block.type === 'text')
     .map((block) => block.text)
     .join(' ')
+}
+
+async function* streamAnthropicAQBuddyText(systemPrompt: string, messages: ChatMessage[]) {
+  const stream = client.messages.stream({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages,
+  })
+
+  for await (const chunk of stream) {
+    if (
+      chunk.type === 'content_block_delta' &&
+      chunk.delta.type === 'text_delta'
+    ) {
+      yield chunk.delta.text
+    }
+  }
 }
 
 function requiresDiabetesMedicationSafety(messages: ChatMessage[]) {
@@ -255,32 +280,72 @@ export async function POST(req: Request) {
     requiredSafetyBlocks.length > 0 ? MEDICAL_SAFETY_RESPONSE_BOUNDARY : '',
   ].filter(Boolean).join('\n\n')
 
-  const stream = client.messages.stream({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages,
+  const providerDecision = resolveAQBuddyProvider({
+    requestedProvider: process.env.AQ_BUDDY_PROVIDER,
+    hasOpenAIKey: hasOpenAIAQBuddyKey(),
   })
+  const openAIMessages: AQBuddyOpenAIMessage[] = messages
+    .map(message => ({ role: message.role, content: messageText(message).trim() }))
+    .filter(message => message.content.length > 0)
 
   const readable = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder()
+      let providerUsed = providerDecision.provider
+      let openAIEmittedText = false
+
       try {
-        for await (const chunk of stream) {
-          if (
-            chunk.type === 'content_block_delta' &&
-            chunk.delta.type === 'text_delta'
-          ) {
-            controller.enqueue(encoder.encode(chunk.delta.text))
+        if (providerDecision.provider === 'openai') {
+          try {
+            for await (const delta of streamOpenAIAQBuddyText({
+              instructions: systemPrompt,
+              messages: openAIMessages,
+              maxOutputTokens: 2048,
+            })) {
+              openAIEmittedText = true
+              controller.enqueue(encoder.encode(delta))
+            }
+            console.info('[aq-buddy-provider]', {
+              provider: 'openai',
+              model: configuredAQBuddyOpenAIModel(),
+              reason: providerDecision.reason,
+            })
+          } catch (error) {
+            if (openAIEmittedText) throw error
+            providerUsed = 'anthropic'
+            console.warn('[aq-buddy-provider]', {
+              provider: 'openai',
+              fallback: 'anthropic',
+              errorType: error instanceof Error ? error.name : 'unknown',
+            })
+            for await (const delta of streamAnthropicAQBuddyText(systemPrompt, messages)) {
+              controller.enqueue(encoder.encode(delta))
+            }
+          }
+        } else {
+          console.info('[aq-buddy-provider]', {
+            provider: 'anthropic',
+            reason: providerDecision.reason,
+          })
+          for await (const delta of streamAnthropicAQBuddyText(systemPrompt, messages)) {
+            controller.enqueue(encoder.encode(delta))
           }
         }
+
         if (requiredSafetyBlocks.length > 0) {
           controller.enqueue(
             encoder.encode(`\n\n---\n\n${requiredSafetyBlocks.join('\n\n---\n\n')}`)
           )
         }
-      } finally {
         controller.close()
+      } catch (error) {
+        const correlationId = crypto.randomUUID()
+        console.error('[aq-buddy-provider] stream_failed', {
+          correlationId,
+          provider: providerUsed,
+          errorType: error instanceof Error ? error.name : 'unknown',
+        })
+        controller.error(error instanceof Error ? error : new Error('AQ Buddy provider failed'))
       }
     },
   })
