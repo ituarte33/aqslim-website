@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { pilotHasFeature } from '@/lib/pilot-policy'
 import { getPatientPortalData } from '@/lib/patient-portal'
@@ -24,6 +25,14 @@ export async function POST(request: Request) {
   if (!body.imageBase64 || !body.mimeType || !ALLOWED_TYPES.has(body.mimeType) || body.imageBase64.length > MAX_BASE64_LENGTH) {
     return Response.json({ error: 'invalid_image' }, { status: 400 })
   }
+
+  observeEntitlementShadow({
+    clerkUserId: userId,
+    capability: 'restaurant_menu:analyze',
+    currentAccessAllowed: true,
+    hasPilotAccess: true,
+    pilotFeatures: pilot.enabledFeatures,
+  })
 
   const language = body.language === 'en' ? 'English' : 'Spanish'
   const restaurant = body.restaurant?.trim().slice(0, 100) || 'not provided'
