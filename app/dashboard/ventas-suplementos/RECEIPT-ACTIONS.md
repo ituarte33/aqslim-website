@@ -15,3 +15,13 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-
 ```
 
 All providers in tests are mocked. Do not use a real sale or recipient for UI QA.
+
+## Local verification — 2026-09-10
+
+- Focused receipt, supplement-sale and finance tests: 86 passed, 0 failed.
+- `npm run test:authorization` now includes the receipt action tests: 164 passed, 1 failed. The existing unrelated failure is `photo estimates can be corrected without creating another scan` in `flexible-meal-log-ui.test.mts`.
+- Browser QA used the current receipt panel and document generator in an isolated local harness, with mocked email actions and no real sale or email writes. It verified the sending state, recoverable email failure, successful retry, and disabled button after success.
+- The PDF was downloaded through the button and visually inspected: Colon Optimizer - Fiber 2 × $24 = $48; Veggie Laxative 2 × $18 = $36; AQ JOINTS 3 × $22 = $66; products $150 + shipping $24 = total $174. No extra unit.
+- The print button prepared an isolated receipt document with the same amounts. The native macOS print dialog and physical printing remain unverified; creation of the print document is not confirmation of completed printing.
+- The isolated browser harness production build passed. This does not replace a production build of the full application or live provider verification.
+- Full-application production build also passed in a temporary copy of the current branch, using the matching Next.js 15.5.15 dependency installation and placeholder Resend/Clerk keys. Compilation, type checks, and page generation passed. This validates build compatibility, not live authentication or email delivery. The first attempt without provider environment values stopped on the existing booking webhook's missing Resend key.
