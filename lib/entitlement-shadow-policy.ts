@@ -1,4 +1,4 @@
-import type { PilotFeature } from '@/lib/pilot-policy'
+import type { PilotFeature } from './pilot-policy.ts'
 
 export const ENTITLEMENT_SHADOW_POLICY_VERSION = 'MYAQ-ENTITLEMENT-POLICY-PREVIEW-v0.1'
 
