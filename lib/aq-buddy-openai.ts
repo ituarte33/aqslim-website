@@ -3,7 +3,10 @@ import 'server-only'
 import {
   DEFAULT_AQ_BUDDY_OPENAI_MODEL,
   parseOpenAIResponseSSEBlock,
+  resolveAQBuddyProvider,
 } from './aq-buddy-provider-policy'
+
+export { resolveAQBuddyProvider }
 
 export type AQBuddyOpenAIMessage = {
   role: 'user' | 'assistant'
