@@ -1,13 +1,20 @@
 export const SYNTHETIC_PREVIEW_BRANCH = 'myaq-rec-001-preview-010'
+export const ENTITLEMENT_PREVIEW_BRANCH = 'myaq-entitlement-preview-001'
 export const SYNTHETIC_PREVIEW_CLIENT_ID = 'SYN-CLIENT-001'
 export const SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID = 'appuUHRs26ATXnZjf'
+
+const ALLOWED_PREVIEW_BRANCHES = new Set([
+  SYNTHETIC_PREVIEW_BRANCH,
+  ENTITLEMENT_PREVIEW_BRANCH,
+])
 
 export function isSyntheticPreviewEnvironment(environment: {
   VERCEL_ENV?: string
   VERCEL_GIT_COMMIT_REF?: string
 }) {
   return environment.VERCEL_ENV === 'preview'
-    && environment.VERCEL_GIT_COMMIT_REF === SYNTHETIC_PREVIEW_BRANCH
+    && Boolean(environment.VERCEL_GIT_COMMIT_REF)
+    && ALLOWED_PREVIEW_BRANCHES.has(environment.VERCEL_GIT_COMMIT_REF as string)
 }
 
 export function hasSyntheticPreviewStorageConfiguration(environment: {
