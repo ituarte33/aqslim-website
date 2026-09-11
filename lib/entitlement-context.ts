@@ -9,7 +9,10 @@ import {
   type AccessTier,
   type CanonicalEntitlementRecord,
 } from './entitlement-record'
-import { getPreviewEntitlementSourceRecord } from './preview-entitlement-store'
+import {
+  getPreviewEntitlementSourceRecord,
+  getPreviewEntitlementSourceRecordByPatientRecordId,
+} from './preview-entitlement-store'
 
 export type CanonicalEntitlementContext = {
   record: CanonicalEntitlementRecord | null
@@ -105,7 +108,14 @@ export async function buildCanonicalEntitlementContext({
     }
   }
 
-  const previewSource = await getPreviewEntitlementSourceRecord(subjectId)
+  let previewSource = await getPreviewEntitlementSourceRecord(subjectId)
+  if (!previewSource && authenticatedPatientRecordId) {
+    previewSource = await getPreviewEntitlementSourceRecordByPatientRecordId({
+      patientRecordId: authenticatedPatientRecordId,
+      canonicalSubjectId: subjectId,
+    })
+  }
+
   if (previewSource) {
     return {
       sourceKind: 'preview_store',
