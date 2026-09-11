@@ -1,0 +1,5 @@
+{
+  "env": {
+    "MYAQ_P3_ENFORCEMENT": "enabled"
+  }
+}
