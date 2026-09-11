@@ -25,6 +25,7 @@ const session: Fast36Session = {
 
 test('normalizes Airtable FAST 36 status labels', () => {
   assert.equal(normalizeFast36Status('Activo'), 'active')
+  assert.equal(normalizeFast36Status('Completado'), 'completed')
   assert.equal(normalizeFast36Status('Terminado temprano'), 'ended_early')
   assert.equal(normalizeFast36Status('Interrumpido por seguridad'), 'stopped_for_safety')
   assert.equal(normalizeFast36Status(undefined), 'pending')
@@ -47,13 +48,36 @@ test('selects the active session before a future session', () => {
   assert.equal(selectCurrentFast36Session([session, future], Date.parse('2026-08-17T23:00:00Z'))?.week, 1)
 })
 
-test('selects the most recent elapsed session awaiting confirmation', () => {
+test('selects the most recent elapsed session awaiting confirmation when later weeks have not started', () => {
   const weekOne = { ...session, id: 'recFast36Example0', week: 1, startAt: '2026-08-10T05:00:00Z', plannedEndAt: '2026-08-11T17:00:00Z', status: 'pending' as const }
   const weekTwo = { ...session, week: 2 }
   const future = { ...session, id: 'recFast36Example2', week: 3, startAt: '2026-08-24T05:00:00Z', plannedEndAt: '2026-08-25T17:00:00Z', status: 'pending' as const }
   assert.equal(
     selectCurrentFast36Session([weekOne, weekTwo, future], Date.parse('2026-08-19T00:00:00Z'))?.week,
     2,
+  )
+})
+
+test('a later completed week outranks stale pending history', () => {
+  const weekFive: Fast36Session = {
+    id: 'recFast36Week5',
+    week: 5,
+    startAt: '2026-08-31T05:00:00.000Z',
+    plannedEndAt: '2026-09-01T17:00:00.000Z',
+    actualEndAt: null,
+    status: 'pending',
+  }
+  const weekSix: Fast36Session = {
+    id: 'recFast36Week6',
+    week: 6,
+    startAt: '2026-09-07T05:00:00.000Z',
+    plannedEndAt: '2026-09-08T17:00:00.000Z',
+    actualEndAt: null,
+    status: 'completed',
+  }
+  assert.equal(
+    selectCurrentFast36Session([weekSix, weekFive], Date.parse('2026-09-10T18:00:00Z'))?.week,
+    6,
   )
 })
 
@@ -71,6 +95,20 @@ test('FAST 36 context never infers completion from elapsed time alone', () => {
   assert.match(context, /Documented status: active/)
   assert.match(context, /Scheduled window elapsed: yes/)
   assert.match(context, /Do not claim that the patient completed the fast/)
+})
+
+test('FAST 36 context reports an explicitly completed latest week', () => {
+  const completed: Fast36Session = {
+    ...session,
+    id: 'recFast36Week6',
+    week: 6,
+    startAt: '2026-09-07T05:00:00.000Z',
+    plannedEndAt: '2026-09-08T17:00:00.000Z',
+    status: 'completed',
+  }
+  const context = buildFast36BuddyContext([completed], Date.parse('2026-09-10T18:00:00Z'))
+  assert.match(context, /Program week: 6 of 6/)
+  assert.match(context, /Documented status: completed/)
 })
 
 test('only an elapsed schedule can be confirmed as completed', () => {
