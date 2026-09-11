@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import manifest from '../app/manifest.ts'
 
-test('My AQSLIM installs with the approved name and AQ Buddy icon assets', () => {
+test('My AQSLIM installs with Home as the canonical patient start route', () => {
   const value = manifest()
   assert.equal(value.name, 'My AQSLIM')
   assert.equal(value.short_name, 'My AQSLIM')
-  assert.equal(value.start_url, '/my-aqslim/welcome')
+  assert.equal(value.start_url, '/my-aqslim')
+  assert.notEqual(value.start_url, '/food-scanner')
+  assert.notEqual(value.start_url, '/my-aqslim/pilot')
   assert.equal(value.background_color, '#161513')
   assert.equal(value.theme_color, '#161513')
   assert.deepEqual(
@@ -17,4 +20,11 @@ test('My AQSLIM installs with the approved name and AQ Buddy icon assets', () =>
       ['/icons/myaqslim-512.png', '512x512', 'maskable'],
     ],
   )
+})
+
+test('My AQSLIM welcome sends pilot and regular patient entry to Home', async () => {
+  const source = await readFile(new URL('../app/my-aqslim/welcome/page.tsx', import.meta.url), 'utf8')
+  assert.match(source, /destination="\/my-aqslim"/)
+  assert.doesNotMatch(source, /destination="\/my-aqslim\/pilot"/)
+  assert.doesNotMatch(source, /destination="\/food-scanner"/)
 })
