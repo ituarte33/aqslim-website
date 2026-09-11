@@ -110,20 +110,39 @@ export function fast36ProgressPercent(session: Fast36Session, nowMs = Date.now()
   return Math.max(0, Math.min(100, ((nowMs - startMs) / (endMs - startMs)) * 100))
 }
 
+function compareFast36Sessions(a: Fast36Session, b: Fast36Session): number {
+  const aStart = Date.parse(a.startAt)
+  const bStart = Date.parse(b.startAt)
+  if (Number.isFinite(aStart) && Number.isFinite(bStart) && aStart !== bStart) {
+    return aStart - bStart
+  }
+  if (a.week !== b.week) return a.week - b.week
+  return a.id.localeCompare(b.id)
+}
+
 export function selectCurrentFast36Session(
   sessions: readonly Fast36Session[],
   nowMs = Date.now(),
 ): Fast36Session | null {
   if (!sessions.length) return null
-  const active = sessions.find(session => effectiveFast36Status(session, nowMs) === 'active')
+
+  const ordered = [...sessions].sort(compareFast36Sessions)
+  const active = ordered
+    .filter(session => effectiveFast36Status(session, nowMs) === 'active')
+    .at(-1)
   if (active) return active
-  for (let index = sessions.length - 1; index >= 0; index -= 1) {
-    if (effectiveFast36Status(sessions[index], nowMs) === 'awaiting_confirmation') {
-      return sessions[index]
-    }
-  }
-  const next = sessions.find(session => effectiveFast36Status(session, nowMs) === 'pending')
-  return next ?? sessions.at(-1) ?? null
+
+  const started = ordered.filter(session => {
+    const startMs = Date.parse(session.startAt)
+    return Number.isFinite(startMs) && startMs <= nowMs
+  })
+  if (started.length > 0) return started.at(-1) ?? null
+
+  const future = ordered.find(session => {
+    const startMs = Date.parse(session.startAt)
+    return Number.isFinite(startMs) && startMs > nowMs
+  })
+  return future ?? ordered.at(-1) ?? null
 }
 
 export function buildFast36BuddyContext(
@@ -145,7 +164,7 @@ export function buildFast36BuddyContext(
 FAST 36 RESPONSE RULES
 - Treat this as authenticated patient context, not as a diagnosis.
 - Do not claim that the patient completed the fast unless documented status is completed.
-- If the scheduled window elapsed while status remains active, ask whether it was completed, ended early, or stopped for safety.
+- If the scheduled window elapsed while status is still pending or active, ask whether it was completed, ended early, or stopped for safety.
 - Use logged experience to discuss adherence and patterns, not unsupported medical conclusions.
 - For concerning symptoms, medication questions, pregnancy, breastfeeding, diabetes, or immediate danger, follow the applicable medical-safety rules.`
 }
