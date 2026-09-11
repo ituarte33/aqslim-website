@@ -6,6 +6,7 @@ import {
   ENTITLEMENT_P5_PREVIEW_BRANCH,
 } from '@/lib/nutrition/synthetic-preview-policy'
 import { isP5FounderCanaryEnvironment } from '@/lib/p5-founder-canary-policy'
+import LimitProbe from './limit-probe'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,6 +107,8 @@ export default async function P5FounderCanaryPage() {
             )}
           </section>
         ))}
+
+        <LimitProbe />
       </div>
     </main>
   )
