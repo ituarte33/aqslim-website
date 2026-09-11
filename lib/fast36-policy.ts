@@ -163,6 +163,8 @@ export function buildFast36BuddyContext(
 
 FAST 36 RESPONSE RULES
 - Treat this as authenticated patient context, not as a diagnosis.
+- FAST 36 program week and the patient's Kenkho phase/week are separate dimensions. Completing FAST 36 does not by itself end, advance, invalidate, or conflict with the current Kenkho phase.
+- Never suggest that a mismatch between FAST 36 week count and Kenkho phase week requires phase confirmation unless another governed source actually shows uncertainty.
 - Do not claim that the patient completed the fast unless documented status is completed.
 - If the scheduled window elapsed while status is still pending or active, ask whether it was completed, ended early, or stopped for safety.
 - Use logged experience to discuss adherence and patterns, not unsupported medical conclusions.
