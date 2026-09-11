@@ -9,6 +9,7 @@ import { CalendarIcon, ChevronIcon, MaterialsIcon } from './portal-icons'
 import { PortalShell } from './portal-shell'
 import { usePortalLanguage } from './use-portal-language'
 import styles from './portal.module.css'
+import guidanceStyles from './daily-guidance.module.css'
 
 function formatDate(value: string | null, language: 'es' | 'en', options?: Intl.DateTimeFormatOptions) {
   if (!value) return language === 'es' ? 'Por confirmar' : 'To be confirmed'
@@ -87,8 +88,8 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
         </div>
       </section>
 
-      <section className={`${styles.panel} ${styles.dailyGuidancePanel}`}>
-        <div className={styles.dailyGuidanceHeading}>
+      <section className={`${styles.panel} ${guidanceStyles.panel}`}>
+        <div className={guidanceStyles.heading}>
           <Image
             src="/Aqslim_Buddy_Pics/aqslim_buddy_thumbs_up.png"
             alt="AQ Buddy"
@@ -101,11 +102,11 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
             <span>{guidance.phaseLabel}</span>
           </div>
         </div>
-        <ul className={styles.dailyGuidanceList}>
+        <ul className={guidanceStyles.list}>
           {guidance.bullets.map(item => <li key={item}>{item}</li>)}
         </ul>
-        <p className={styles.dailyGuidanceNote}>{guidance.note}</p>
-        <Link href={guidanceHref} className={styles.dailyGuidanceLink}>
+        <p className={guidanceStyles.note}>{guidance.note}</p>
+        <Link href={guidanceHref} className={guidanceStyles.link}>
           {es ? 'Ver recomendaciones completas' : 'View full recommendations'} <ChevronIcon />
         </Link>
       </section>
