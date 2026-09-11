@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 const FOUNDER_EMAIL = 'rom@ituarteconsulting.com'
 const CANARY_SUBJECT_ID = 'canary_clinic_ai_romtest_v1'
-const CANARY_PATIENT_RECORD_ID = 'recBdRTfuT2S1lFJP'
+const CANARY_PATIENT_RECORD_ID = 'recVF3zCGu95AhKnU'
 
 function primaryEmail(user: NonNullable<Awaited<ReturnType<typeof currentUser>>>): string | null {
   const selected = user.primaryEmailAddressId
@@ -60,14 +60,15 @@ export default async function ClinicAiCanaryPage() {
 
   const scenarios = [
     scenario('Today / active trial', context.record, '2026-09-11T20:40:00.000Z'),
-    scenario('After trial expiry', context.record, '2026-10-10T20:40:00.000Z'),
-    scenario('61+ days without clinic visit', context.record, '2026-11-10T20:40:00.000Z'),
+    scenario('After trial expiry', context.record, '2026-09-18T20:40:00.000Z'),
+    scenario('61+ days without qualifying clinic visit', context.record, '2026-10-19T20:40:00.000Z'),
   ]
   const usage = usagePolicyForEntitlementTier('clinic_ai', 'food_scan')
 
   const expectedPass = (
     context.sourceKind === 'preview_store'
     && context.record.tier === 'clinic_ai'
+    && context.record.lastCompletedVisit === '2026-08-18'
     && usage.dailyLimit === 3
     && usage.monthlyLimit === 90
     && scenarios[0].buddy.decision === 'allow'
@@ -87,14 +88,14 @@ export default async function ClinicAiCanaryPage() {
         <p style={{ color: '#d5b34c', letterSpacing: 1.5, textTransform: 'uppercase' }}>MYAQ-ENT-P3 / Preview only</p>
         <h1>Clinic AI Canary</h1>
         <p style={{ fontSize: 22, fontWeight: 700 }}>{expectedPass ? 'PASS' : 'REVIEW REQUIRED'}</p>
-        <p>This diagnostic does not alter the Founder account. It resolves a separate synthetic subject against the Preview entitlement store and the linked test patient lifecycle.</p>
+        <p>This diagnostic does not alter any real-user entitlement. It resolves a separate synthetic subject against the Preview entitlement store and uses only qualifying clinic visits for lifecycle authority under D11.</p>
 
         <section style={{ border: '1px solid #444', padding: 20, marginTop: 24 }}>
           <h2>Canonical entitlement</h2>
           <p>Source: <strong>{context.sourceKind}</strong></p>
           <p>Tier: <strong>{context.record.tier}</strong></p>
           <p>Status: <strong>{context.record.status}</strong></p>
-          <p>Last completed visit: <strong>{context.record.lastCompletedVisit ?? 'UNRESOLVED'}</strong></p>
+          <p>Last qualifying clinic visit: <strong>{context.record.lastCompletedVisit ?? 'UNRESOLVED'}</strong></p>
           <p>Trial: <strong>{context.record.trialStarts ?? '—'} → {context.record.trialEnds ?? '—'}</strong></p>
         </section>
 
