@@ -1,0 +1,98 @@
+.panel {
+  display: grid;
+  gap: 16px;
+}
+
+.heading {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.heading img {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+}
+
+.heading h2 {
+  margin: 0;
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.heading span {
+  display: block;
+  margin-top: 6px;
+  color: #d4a72c;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  position: relative;
+  padding-left: 20px;
+  color: #f5f2eb;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.list li::before {
+  content: '◆';
+  position: absolute;
+  left: 0;
+  top: .15em;
+  color: #f2cf6a;
+  font-size: 8px;
+}
+
+.note {
+  margin: 0;
+  padding-top: 13px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+  color: #aaa69e;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: #f2cf6a;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.link svg {
+  width: 17px;
+}
+
+@media (max-width: 520px) {
+  .heading {
+    grid-template-columns: 62px 1fr;
+  }
+
+  .heading img {
+    width: 64px;
+    height: 64px;
+  }
+
+  .heading h2 {
+    font-size: 21px;
+  }
+}
