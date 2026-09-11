@@ -12,13 +12,18 @@ import {
 import {
   getPreviewEntitlementSourceRecord,
   getPreviewEntitlementSourceRecordByPatientRecordId,
+  type PreviewEntitlementSourceRecord,
 } from './preview-entitlement-store'
 import { pendingPatientSubjectId } from './p4-provisioning-policy'
 import { claimPendingPreviewEntitlementSubject } from './p4-preview-entitlement-provisioning'
+import {
+  isP5FounderCanaryEnvironment,
+  isP5FounderCanaryRecord,
+} from './p5-founder-canary-policy'
 
 export type CanonicalEntitlementContext = {
   record: CanonicalEntitlementRecord | null
-  sourceKind: 'internal_pilot' | 'preview_store' | 'legacy_kenkho_signal' | 'none'
+  sourceKind: 'internal_pilot' | 'preview_store' | 'founder_canary_preview_store' | 'legacy_kenkho_signal' | 'none'
 }
 
 function kenKhoTierFromPlan(value: unknown): AccessTier | null {
@@ -34,10 +39,12 @@ async function hydrateClinicLifecycleAuthority({
   record,
   sourcePatientRecordId,
   authenticatedPatientRecordId,
+  useStoredLifecycleSnapshot = false,
 }: {
   record: CanonicalEntitlementRecord
   sourcePatientRecordId: string | null
   authenticatedPatientRecordId: string | null
+  useStoredLifecycleSnapshot?: boolean
 }): Promise<CanonicalEntitlementRecord> {
   if (record.tier !== 'portal_basic' && record.tier !== 'clinic_ai') return record
 
@@ -53,6 +60,11 @@ async function hydrateClinicLifecycleAuthority({
       entitlementReason: `${record.entitlementReason}; clinic patient binding unresolved`,
     }
   }
+
+  // P5 uses an explicitly synthetic lifecycle anchor stored only in the Preview entitlement
+  // record. This lets the Founder exercise the real clinic_ai experience without inserting a
+  // fake clinical visit into Consultas. P3/P4 already validate Consultas as lifecycle authority.
+  if (useStoredLifecycleSnapshot) return record
 
   const patient = await getClienteById(authenticatedPatientRecordId)
   if (!patient) {
@@ -74,6 +86,32 @@ async function hydrateClinicLifecycleAuthority({
   }
 }
 
+async function getP5FounderCanarySource({
+  subjectId,
+  authenticatedPatientRecordId,
+}: {
+  subjectId: string
+  authenticatedPatientRecordId: string | null
+}): Promise<PreviewEntitlementSourceRecord | null> {
+  const enabled = isP5FounderCanaryEnvironment({
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_P5_FOUNDER_CANARY: process.env.MYAQ_P5_FOUNDER_CANARY,
+  })
+  if (!enabled || !authenticatedPatientRecordId) return null
+
+  const bySubject = await getPreviewEntitlementSourceRecord(subjectId)
+  if (bySubject && isP5FounderCanaryRecord(bySubject.record)) return bySubject
+
+  const byPatient = await getPreviewEntitlementSourceRecordByPatientRecordId({
+    patientRecordId: authenticatedPatientRecordId,
+    canonicalSubjectId: subjectId,
+  })
+  if (byPatient && isP5FounderCanaryRecord(byPatient.record)) return byPatient
+
+  return null
+}
+
 export async function buildCanonicalEntitlementContext({
   subjectId,
   rawPlan,
@@ -87,6 +125,22 @@ export async function buildCanonicalEntitlementContext({
   authenticatedPatientRecordId: string | null
   now?: Date
 }): Promise<CanonicalEntitlementContext> {
+  const founderCanarySource = await getP5FounderCanarySource({
+    subjectId,
+    authenticatedPatientRecordId,
+  })
+  if (founderCanarySource) {
+    return {
+      sourceKind: 'founder_canary_preview_store',
+      record: await hydrateClinicLifecycleAuthority({
+        record: founderCanarySource.record,
+        sourcePatientRecordId: founderCanarySource.patientRecordId,
+        authenticatedPatientRecordId,
+        useStoredLifecycleSnapshot: true,
+      }),
+    }
+  }
+
   if (hasPilotAccess) {
     return {
       sourceKind: 'internal_pilot',
