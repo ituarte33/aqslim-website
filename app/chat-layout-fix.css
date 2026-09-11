@@ -1,0 +1,36 @@
+/* P5 Preview — AQ Buddy full-screen composer visibility fix.
+   Keep the composer above the persistent patient nav and give long prefilled
+   prompts enough room to be read before the user presses Send. */
+.aqb-wrap--fullscreen,
+.aqb-wrap--fullscreen.aqb-wrap--open {
+  bottom: 96px;
+}
+
+.aqb-wrap--fullscreen .aqb-panel {
+  min-height: 0;
+}
+
+.aqb-wrap--fullscreen .aqb-messages {
+  min-height: 0;
+}
+
+.aqb-wrap--fullscreen .aqb-input-row {
+  padding: 12px 18px 16px;
+}
+
+.aqb-wrap--fullscreen .aqb-input {
+  min-height: 68px;
+  max-height: 120px;
+}
+
+@media (max-width: 600px) {
+  .aqb-wrap--fullscreen,
+  .aqb-wrap--fullscreen.aqb-wrap--open {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .aqb-wrap--fullscreen .aqb-input {
+    min-height: 72px;
+    max-height: 132px;
+  }
+}
