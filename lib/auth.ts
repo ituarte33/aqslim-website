@@ -3,8 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
 import { getClienteById, getClientesByEmail, type Cliente } from '@/lib/airtable'
-import { runEntitlementGateShadow } from '@/lib/entitlement-gate'
-import { runP3PreviewEntitlementGate } from '@/lib/p3-entitlement-gate'
+import { evaluateAiEntitlementAccess } from '@/lib/ai-entitlement-access'
 import {
   AuthorizationError,
   assertPatientOwnership,
@@ -97,25 +96,16 @@ export async function requireCapability(capability: Capability): Promise<Authent
   assertRoleCapability(actor.role, capability)
 
   if (capability === 'buddy:chat') {
-    runEntitlementGateShadow({
+    const access = await evaluateAiEntitlementAccess({
       clerkUserId: actor.clerkUserId,
       capability: 'buddy:chat',
       currentAccessAllowed: true,
       rawPlan: actor.rawPlan,
       hasPilotAccess: actor.shadowPilotFeatures !== null,
       pilotFeatures: actor.shadowPilotFeatures ?? undefined,
-    })
-
-    const p3Gate = await runP3PreviewEntitlementGate({
-      clerkUserId: actor.clerkUserId,
-      capability: 'buddy:chat',
-      rawPlan: actor.rawPlan,
-      hasPilotAccess: actor.shadowPilotFeatures !== null,
       authenticatedPatientRecordId: actor.boundPatientId,
     })
-    if (p3Gate.enforced && p3Gate.decision !== 'allow') {
-      throw new AuthorizationError('FORBIDDEN')
-    }
+    if (!access.allowed) throw new AuthorizationError('FORBIDDEN')
   }
 
   return actor
