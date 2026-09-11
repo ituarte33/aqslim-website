@@ -82,6 +82,20 @@ test('P5 entitlement context checks Founder canary before internal pilot priorit
   assert.match(source, /useStoredLifecycleSnapshot: true/)
 })
 
+test('P5 claimed entitlement resolves by authenticated subject before patient metadata fallback', async () => {
+  const source = await readFile(new URL('../lib/entitlement-context.ts', import.meta.url), 'utf8')
+  const functionStart = source.indexOf('async function getP5FounderCanarySource')
+  const functionEnd = source.indexOf('export async function buildCanonicalEntitlementContext')
+  const p5Lookup = source.slice(functionStart, functionEnd)
+  const subjectLookup = p5Lookup.indexOf('getPreviewEntitlementSourceRecord(subjectId)')
+  const missingPatientGuard = p5Lookup.indexOf('if (!authenticatedPatientRecordId) return null')
+  const patientLookup = p5Lookup.indexOf('getPreviewEntitlementSourceRecordByPatientRecordId')
+  assert.ok(subjectLookup >= 0)
+  assert.ok(missingPatientGuard > subjectLookup)
+  assert.ok(patientLookup > missingPatientGuard)
+  assert.match(source, /authenticatedPatientRecordId \?\? founderCanarySource\.patientRecordId/)
+})
+
 test('P5 Founder binding fallback remains branch-and-identity scoped', async () => {
   const source = await readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8')
   assert.match(source, /isP5FounderCanaryIdentity\(/)
