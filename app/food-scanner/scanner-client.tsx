@@ -86,12 +86,12 @@ function getLang(): 'es' | 'en' {
 
 const COPY = {
   es: {
-    sub:        'Escáner de AQ Buddy',
-    dashboard:  '← Panel',
-    home:       '← My AQSLIM',
-    usage:      (name: string) => `${name ? name + ' · ' : ''}Escaneos de hoy`,
+    sub: 'Escáner de AQ Buddy',
+    dashboard: '← Panel',
+    home: '← My AQSLIM',
+    usage: (name: string) => `${name ? name + ' · ' : ''}Escaneos de hoy`,
     monthlyUsage: (used: number, limit: number) => `${used} de ${limit} este mes`,
-    remaining:  (n: number) => `${n} restante${n !== 1 ? 's' : ''}`,
+    remaining: (n: number) => `${n} restante${n !== 1 ? 's' : ''}`,
     limitReached: 'Límite alcanzado',
     uploadTitle: 'Registra tu comida',
     inputModes: { photo: 'Con fotografía', description: 'Sin fotografía' } as Record<InputMode, string>,
@@ -103,21 +103,21 @@ const COPY = {
     customPortion: 'Otro porcentaje',
     portionResult: (n: number) => `Estimación para ${n}% de la porción completa`,
     personalServingResult: 'Estimación de tu porción personal descrita',
-    dropText:   'Suelta aquí o haz clic para buscar',
-    dropHint:   'JPG, PNG, WEBP · máx. 5 MB',
-    mealTypes:  { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<string, string>,
-    clear:      'Borrar',
-    analyze:    'Estimar y registrar',
-    analyzing:  'Analizando…',
+    dropText: 'Suelta aquí o haz clic para buscar',
+    dropHint: 'JPG, PNG, WEBP · máx. 5 MB',
+    mealTypes: { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<string, string>,
+    clear: 'Borrar',
+    analyze: 'Estimar y registrar',
+    analyzing: 'Analizando…',
     nutritionTitle: 'Estimación Nutricional',
-    carbs:      'Carbos',
-    fats:       'Grasas',
-    protein:    'Proteína',
-    kcal:       'kcal',
+    carbs: 'Carbos',
+    fats: 'Grasas',
+    protein: 'Proteína',
+    kcal: 'kcal',
     placeholder: 'La estimación aparecerá aquí después de registrar tu comida',
-    wantMore:   '¿Quieres más escaneos?',
+    wantMore: '¿Quieres más escaneos?',
     upgradeText: 'Con Kenkho Start, Plus o Elite puedes analizar más platos cada día.',
-    viewPlans:  'Ver Planes',
+    viewPlans: 'Ver Planes',
     plans: {
       free: 'Edición Gratuita',
       start: 'Kenkho Start',
@@ -126,193 +126,11 @@ const COPY = {
       pilot: 'Soft Start',
       portal_basic: 'Portal Basic',
       clinic_ai: 'Clinic AI',
-      kenKho_start: 'Kenkho Start',
-      kenKho_plus: 'Kenkho Plus',
-      kenKho_elite: 'Kenkho Elite',
-      kenKho_dummy: '',
-      kenKho: '',
-      kenKhoPath: '',
-      kenKho_path: '',
-      kenKhoStart: '',
-      kenKhoPlus: '',
-      kenKhoElite: '',
-      kenKhoInternal: '',
-      kenKhoPreview: '',
-      kenKhoClinic: '',
-      kenKhoPortal: '',
-      kenKhoTrial: '',
-      kenKhoPaid: '',
-      kenKhoActive: '',
-      kenKhoGrace: '',
-      kenKhoInactive: '',
-      kenKhoSuspend: '',
-      kenKhoCancel: '',
-      kenKhoExpire: '',
-      kenKhoRestart: '',
-      kenKhoRemote: '',
-      kenKhoBasic: '',
-      kenKhoAi: '',
-      kenKhoPilot: '',
-      kenKhoLegacy: '',
-      kenKhoCurrent: '',
-      kenKhoFuture: '',
-      kenKhoTest: '',
-      kenKhoCandidate: '',
-      kenKhoProduction: '',
-      kenKhoPreviewOnly: '',
-      kenKhoDoNotUse: '',
-      kenKhoReserved: '',
-      kenKhoNone: '',
-      kenKhoUnknown: '',
-      kenKhoUnresolved: '',
-      kenKhoReview: '',
-      kenKhoMatch: '',
-      kenKhoMismatch: '',
-      kenKhoAllow: '',
-      kenKhoDeny: '',
-      kenKhoOverride: '',
-      kenKhoSource: '',
-      kenKhoLifecycle: '',
-      kenKhoEntitlement: '',
-      kenKhoUsage: '',
-      kenKhoScanner: '',
-      kenKhoBuddy: '',
-      kenKhoFridge: '',
-      kenKhoRestaurant: '',
-      kenKhoSummary: '',
-      kenKhoFood: '',
-      kenKhoText: '',
-      kenKhoReanalysis: '',
-      kenKhoCorrection: '',
-      kenKhoScan: '',
-      kenKhoMonthly: '',
-      kenKhoDaily: '',
-      kenKhoLimit: '',
-      kenKhoRemaining: '',
-      kenKhoCounter: '',
-      kenKhoNoCharge: '',
-      kenKhoNoScan: '',
-      kenKhoMax2: '',
-      kenKhoD10: '',
-      kenKhoD09: '',
-      kenKhoD04: '',
-      kenKhoD03: '',
-      kenKhoD02: '',
-      kenKhoD01: '',
-      kenKhoD05: '',
-      kenKhoD06: '',
-      kenKhoD07: '',
-      kenKhoD08: '',
-      kenKhoApproved: '',
-      kenKhoFounder: '',
-      kenKhoReadback: '',
-      kenKhoP3: '',
-      kenKhoP2: '',
-      kenKhoP1: '',
-      kenKhoPass: '',
-      kenKhoReady: '',
-      kenKhoBuild: '',
-      kenKhoCanary: '',
-      kenKhoEnforcement: '',
-      kenKhoFlag: '',
-      kenKhoOff: '',
-      kenKhoOn: '',
-      kenKhoServer: '',
-      kenKhoGate: '',
-      kenKhoIdentity: '',
-      kenKhoTier: '',
-      kenKhoStatus: '',
-      kenKhoSourceKind: '',
-      kenKhoVisit: '',
-      kenKhoTrialEnds: '',
-      kenKhoPaidThrough: '',
-      kenKhoLastVisit: '',
-      kenKhoGraceEnds: '',
-      kenKhoAccessExpires: '',
-      kenKhoSquare: '',
-      kenKhoAdmin: '',
-      kenKhoAudit: '',
-      kenKhoTable: '',
-      kenKhoAirtable: '',
-      kenKhoClerk: '',
-      kenKhoOpenAI: '',
-      kenKhoClaude: '',
-      kenKhoProvider: '',
-      kenKhoModel: '',
-      kenKhoGPT: '',
-      kenKhoLuna: '',
-      kenKhoPhase: '',
-      kenKhoJing: '',
-      kenKhoQi: '',
-      kenKhoXue: '',
-      kenKhoYangSheng: '',
-      kenKhoFast36: '',
-      kenKhoHypocaloric: '',
-      kenKhoEnd: '',
-      kenKhoFinal: '',
-      kenKhoOkay: '',
-      kenKhoClean: '',
-      kenKhoSimple: '',
-      kenKhoReal: '',
-      kenKhoActual: '',
-      kenKhoWorking: '',
-      kenKhoNoop: '',
-      kenKhoPlaceholder: '',
-      kenKhoExtra: '',
-      kenKhoIgnore: '',
-      kenKhoRemove: '',
-      kenKhoStop: '',
-      kenKhoDone: '',
-      kenKhoSafe: '',
-      kenKhoFailClosed: '',
-      kenKhoServerSide: '',
-      kenKhoClientSide: '',
-      kenKhoNoBypass: '',
-      kenKhoNoProduction: '',
-      kenKhoNoMain: '',
-      kenKhoNoBilling: '',
-      kenKhoNoExternal: '',
-      kenKhoNoRealClients: '',
-      kenKhoPreviewBranch: '',
-      kenKhoExactBranch: '',
-      kenKhoInternalPilot: '',
-      kenKhoClinicAI: '',
-      kenKhoPortalBasic: '',
-      kenKhoStart: '',
-      kenKhoPlus: '',
-      kenKhoElite: '',
-      kenKhoInternalPilot2: '',
+      kenkho_start: 'Kenkho Start',
+      kenkho_plus: 'Kenkho Plus',
+      kenkho_elite: 'Kenkho Elite',
       internal_pilot: 'Soft Start',
-      kenKho_start2: '',
-      kenKho_plus2: '',
-      kenKho_elite2: '',
-      kenKho_start_final: '',
-      kenKho_plus_final: '',
-      kenKho_elite_final: '',
-      kenKho_test_end: '',
-      kenKho_test_end2: '',
-      kenKho_test_end3: '',
-      kenKho_test_end4: '',
-      kenKho_test_end5: '',
-      kenKho_test_end6: '',
-      kenKho_test_end7: '',
-      kenKho_test_end8: '',
-      kenKho_test_end9: '',
-      kenKho_test_end10: '',
-      kenKho_test_end11: '',
-      kenKho_test_end12: '',
-      kenKho_test_end13: '',
-      kenKho_test_end14: '',
-      kenKho_test_end15: '',
-      kenKho_test_end16: '',
-      kenKho_test_end17: '',
-      kenKho_test_end18: '',
-      kenKho_test_end19: '',
-      kenKho_test_end20: '',
-      kenKho_start: 'Kenkho Start',
-      kenKho_plus: 'Kenkho Plus',
-      kenKho_elite: 'Kenkho Elite',
-    } as unknown as Record<Plan, string>,
+    } as Record<Plan, string>,
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `Límite ${period === 'month' ? 'mensual' : 'diario'} alcanzado (${limit} escaneo${limit !== 1 ? 's' : ''} para ${plan}).`,
     estimateNotice: 'Valores aproximados para fines informativos. Confirma las porciones e ingredientes para mejorar la estimación.',
@@ -322,7 +140,7 @@ const COPY = {
     correctionPlaceholder: 'Ejemplo: No hay papas. El plato completo tiene pollo shawarma, res desmenuzada, arroz griego y pepperoncini.',
     correctionHint: 'Corrige los ingredientes o cantidades del plato completo. Después aplicaremos el porcentaje que seleccionaste.',
     recalculate: 'Recalcular sin usar otro escaneo',
-    reanalysisRemaining: (n: number) => `${n} corrección${n === 1 ? '' : 'es'} sin costo de scan restante${n === 1 ? '' : 's'} para este análisis.`,
+    reanalysisRemaining: (n: number) => `${n} corrección${n === 1 ? '' : 'es'} sin usar otro scan restante${n === 1 ? '' : 's'} para este análisis.`,
     reanalysisLimitError: 'Ya utilizaste las 2 correcciones disponibles para este escaneo. Para volver a analizar, inicia un nuevo escaneo.',
     recalculating: 'Recalculando…',
     cancelCorrection: 'Cancelar',
@@ -389,11 +207,11 @@ const COPY = {
       pilot: 'Soft Start',
       portal_basic: 'Portal Basic',
       clinic_ai: 'Clinic AI',
-      kenKho_start: 'Kenkho Start',
-      kenKho_plus: 'Kenkho Plus',
-      kenKho_elite: 'Kenkho Elite',
+      kenkho_start: 'Kenkho Start',
+      kenkho_plus: 'Kenkho Plus',
+      kenkho_elite: 'Kenkho Elite',
       internal_pilot: 'Soft Start',
-    } as unknown as Record<Plan, string>,
+    } as Record<Plan, string>,
     limitError: (limit: number, plan: string, period: 'day' | 'month') =>
       `${period === 'month' ? 'Monthly' : 'Daily'} limit reached (${limit} scan${limit !== 1 ? 's' : ''} for ${plan}).`,
     estimateNotice: 'Approximate values for informational use. Confirm portions and ingredients to improve the estimate.',
@@ -401,9 +219,9 @@ const COPY = {
     correctionTitle: 'Help AQ Buddy correct the estimate',
     correctionLabel: 'What does it contain, and how much will you eat?',
     correctionPlaceholder: 'Example: There are no potatoes. I will eat about 4 oz chicken shawarma, 3 oz shredded beef, and ½ cup Greek rice. The peppers are pepperoncini.',
-    correctionHint: 'Enter the amounts you will actually eat. They replace the previous percentage; 25%, 50%, or 75% will not be applied again.',
+    correctionHint: 'Enter the corrected ingredients or amounts for the complete plate. We will apply the selected percentage afterward.',
     recalculate: 'Recalculate without another scan',
-    reanalysisRemaining: (n: number) => `${n} no-scan correction${n === 1 ? '' : 's'} remaining for this analysis.`,
+    reanalysisRemaining: (n: number) => `${n} correction${n === 1 ? '' : 's'} remaining for this analysis without using another scan.`,
     reanalysisLimitError: 'You have used the 2 corrections available for this scan. Start a new scan to analyze again.',
     recalculating: 'Recalculating…',
     cancelCorrection: 'Cancel',
@@ -516,14 +334,8 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const t = COPY[lang]
 
   async function loadFile(file: File) {
-    if (!file.type.startsWith('image/')) {
-      setError(t.imageError)
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError(t.sizeError)
-      return
-    }
+    if (!file.type.startsWith('image/')) { setError(t.imageError); return }
+    if (file.size > 5 * 1024 * 1024) { setError(t.sizeError); return }
     setError(null)
     setResult(null)
     setFeedbackTarget(null)
@@ -532,9 +344,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       const optimized = await optimizeImage(file)
       setMimeType(optimized.mimeType)
       setImage(optimized.dataUrl)
-    } catch {
-      setError(t.imageError)
-    }
+    } catch { setError(t.imageError) }
   }
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -553,27 +363,17 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     setScanning(true)
     setError(null)
     setConfirmationError(null)
-
     const base64 = image?.split(',')[1]
 
     try {
       const res = await fetch('/api/food-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(inputMode === 'photo' ? { imageBase64: base64, mimeType } : { description }),
-          mealType,
-          portionPercent,
-          language: lang,
-        }),
+        body: JSON.stringify({ ...(inputMode === 'photo' ? { imageBase64: base64, mimeType } : { description }), mealType, portionPercent, language: lang }),
       })
       const data = await res.json()
-
       if (!res.ok) {
-        setFeedbackTarget({
-          id: crypto.randomUUID(),
-          context: { errorCode: data.error || 'analysis_failed', correlationId: data.correlationId ?? null, status: res.status, mealType, inputMode, portionPercent },
-        })
+        setFeedbackTarget({ id: crypto.randomUUID(), context: { errorCode: data.error || 'analysis_failed', correlationId: data.correlationId ?? null, status: res.status, mealType, inputMode, portionPercent } })
         if (data.error === 'limit_reached') {
           const period = data.period === 'month' ? 'month' : 'day'
           const periodLimit = period === 'month' ? data.monthlyLimit : data.limit
@@ -582,15 +382,10 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           setLimit(data.limit ?? limit)
           setMonthlyUsed(data.monthlyUsed ?? monthlyUsed)
           setMonthlyLimit(data.monthlyLimit ?? monthlyLimit)
-        } else if (data.error === 'provider_unavailable') {
-          setError(t.providerError)
-        } else if (data.error === 'analysis_format_invalid') {
-          setError(t.formatError)
-        } else if (data.error === 'log_unavailable') {
-          setError(t.logError)
-        } else {
-          setError(t.failError)
-        }
+        } else if (data.error === 'provider_unavailable') setError(t.providerError)
+        else if (data.error === 'analysis_format_invalid') setError(t.formatError)
+        else if (data.error === 'log_unavailable') setError(t.logError)
+        else setError(t.failError)
         return
       }
 
@@ -621,17 +416,12 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     } catch {
       setError(t.networkError)
       setFeedbackTarget({ id: crypto.randomUUID(), context: { errorCode: 'network_error', mealType, inputMode, portionPercent } })
-    } finally {
-      setScanning(false)
-    }
+    } finally { setScanning(false) }
   }
 
   async function recalculateEstimate() {
     if (!result || !image || recalculating || correction.trim().length < 3) return
-    if ((result.reanalysisRemaining ?? 2) <= 0) {
-      setConfirmationError(t.reanalysisLimitError)
-      return
-    }
+    if ((result.reanalysisRemaining ?? 2) <= 0) { setConfirmationError(t.reanalysisLimitError); return }
     setRecalculating(true)
     setConfirmationError(null)
     const base64 = image.split(',')[1]
@@ -639,24 +429,12 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       const response = await fetch('/api/food-scan', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'reanalyze',
-          mealLogId: result.mealLogId,
-          imageBase64: base64,
-          mimeType,
-          correction,
-          language: lang,
-        }),
+        body: JSON.stringify({ action: 'reanalyze', mealLogId: result.mealLogId, imageBase64: base64, mimeType, correction, language: lang }),
       })
       const data = await response.json()
       if (!response.ok) {
         if (data.error === 'reanalysis_limit_reached') {
-          setResult(current => current ? {
-            ...current,
-            reanalysisUsed: data.reanalysisUsed ?? 2,
-            reanalysisLimit: data.reanalysisLimit ?? 2,
-            reanalysisRemaining: data.reanalysisRemaining ?? 0,
-          } : current)
+          setResult(current => current ? { ...current, reanalysisUsed: data.reanalysisUsed ?? 2, reanalysisLimit: data.reanalysisLimit ?? 2, reanalysisRemaining: data.reanalysisRemaining ?? 0 } : current)
           setConfirmationError(t.reanalysisLimitError)
           return
         }
@@ -665,22 +443,12 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       setResult(current => current ? { ...current, ...data } : current)
       setLogs(current => current.map(log => log.id === result.mealLogId ? {
         ...log,
-        fields: {
-          ...log.fields,
-          'Food Description': data.food,
-          'Calories': data.calories,
-          'Carbs (g)': data.carbs,
-          'Fats (g)': data.fats,
-          'Proteins (g)': data.proteins,
-        },
+        fields: { ...log.fields, 'Food Description': data.food, 'Calories': data.calories, 'Carbs (g)': data.carbs, 'Fats (g)': data.fats, 'Proteins (g)': data.proteins },
       } : log))
       setFeedbackTarget({ id: result.mealLogId, context: { mealType, inputMode, portionBasis: 'described_serving', corrected: true, correction, result: data } })
       setCorrectionOpen(false)
-    } catch {
-      setConfirmationError(t.correctionError)
-    } finally {
-      setRecalculating(false)
-    }
+    } catch { setConfirmationError(t.correctionError) }
+    finally { setRecalculating(false) }
   }
 
   async function confirmConsumption(consumptionStatus: 'Consumed' | 'Reference only') {
@@ -688,56 +456,31 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     setConfirming(true)
     setConfirmationError(null)
     try {
-      const response = await fetch('/api/food-scan', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mealLogId: result.mealLogId, consumptionStatus }),
-      })
+      const response = await fetch('/api/food-scan', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mealLogId: result.mealLogId, consumptionStatus }) })
       const data = await response.json()
       if (!response.ok) throw new Error('confirmation_failed')
-
       setResult(current => current ? { ...current, consumptionStatus: data.consumptionStatus } : current)
-      setLogs(current => current.map(log => log.id === result.mealLogId
-        ? { ...log, fields: { ...log.fields, 'Consumption Status': data.consumptionStatus } }
-        : log))
-    } catch {
-      setConfirmationError(t.confirmationError)
-    } finally {
-      setConfirming(false)
-    }
+      setLogs(current => current.map(log => log.id === result.mealLogId ? { ...log, fields: { ...log.fields, 'Consumption Status': data.consumptionStatus } } : log))
+    } catch { setConfirmationError(t.confirmationError) }
+    finally { setConfirming(false) }
   }
 
   async function updateSavedMealType(mealLogId: string, nextMealType: MealType) {
-    const response = await fetch('/api/food-scan', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update_meal_type', mealLogId, mealType: nextMealType }),
-    })
+    const response = await fetch('/api/food-scan', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_meal_type', mealLogId, mealType: nextMealType }) })
     const data = await response.json()
     if (!response.ok) throw new Error(data.error || 'meal_type_update_failed')
-    setLogs(current => current.map(log => log.id === mealLogId
-      ? { ...log, fields: { ...log.fields, 'Meal Type': data.mealType } }
-      : log))
+    setLogs(current => current.map(log => log.id === mealLogId ? { ...log, fields: { ...log.fields, 'Meal Type': data.mealType } } : log))
     return data.mealType as MealType
   }
 
   async function selectMealType(nextMealType: MealType) {
     if (nextMealType === mealType || updatingMealType) return
-    if (!result) {
-      setMealType(nextMealType)
-      return
-    }
-
+    if (!result) { setMealType(nextMealType); return }
     setUpdatingMealType(true)
     setConfirmationError(null)
-    try {
-      const savedMealType = await updateSavedMealType(result.mealLogId, nextMealType)
-      setMealType(savedMealType)
-    } catch {
-      setConfirmationError(t.confirmationError)
-    } finally {
-      setUpdatingMealType(false)
-    }
+    try { setMealType(await updateSavedMealType(result.mealLogId, nextMealType)) }
+    catch { setConfirmationError(t.confirmationError) }
+    finally { setUpdatingMealType(false) }
   }
 
   const remaining = Math.min(limit - used, monthlyLimit - monthlyUsed)
@@ -766,32 +509,18 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
             <h1 id="food-scan-disclosure-title">{t.disclosureTitle}</h1>
             <p>{t.disclosureBody}</p>
             <p className="fs-disclosure-detail">{t.disclosureDetail}</p>
-            <button type="button" onClick={() => { localStorage.setItem(DISCLOSURE_KEY, 'accepted'); setDisclosureAccepted(true) }}>
-              {t.disclosureAccept}
-            </button>
+            <button type="button" onClick={() => { localStorage.setItem(DISCLOSURE_KEY, 'accepted'); setDisclosureAccepted(true) }}>{t.disclosureAccept}</button>
           </section>
         </div>
       )}
 
       <main className="fs-main">
-        <PilotFeedback
-          tool="Escáner de alimentos"
-          language={lang}
-          context={{ surface: 'food_scanner', inputMode, hasImage: Boolean(image), hasDescription: Boolean(description.trim()), portionPercent, hasResult: Boolean(result), hasError: Boolean(error) }}
-          standalone
-        />
+        <PilotFeedback tool="Escáner de alimentos" language={lang} context={{ surface: 'food_scanner', inputMode, hasImage: Boolean(image), hasDescription: Boolean(description.trim()), portionPercent, hasResult: Boolean(result), hasError: Boolean(error) }} standalone />
 
         <div className="fs-usage-bar">
           <span className="fs-usage-label">{t.usage(userName)}</span>
           <div className="fs-usage-pips">
-            {limit <= 10 ? (
-              Array.from({ length: limit }).map((_, i) => <div key={i} className={`fs-pip ${i < used ? 'used' : ''}`} />)
-            ) : (
-              <>
-                <div className="fs-usage-bar-track"><div className="fs-usage-bar-fill" style={{ width: `${Math.min(100, Math.round((used / limit) * 100))}%` }} /></div>
-                <span className="fs-usage-count">{used} / {limit}</span>
-              </>
-            )}
+            {limit <= 10 ? Array.from({ length: limit }).map((_, i) => <div key={i} className={`fs-pip ${i < used ? 'used' : ''}`} />) : <><div className="fs-usage-bar-track"><div className="fs-usage-bar-fill" style={{ width: `${Math.min(100, Math.round((used / limit) * 100))}%` }} /></div><span className="fs-usage-count">{used} / {limit}</span></>}
           </div>
           <span className="fs-usage-remain">{remaining > 0 ? t.remaining(remaining) : t.limitReached}</span>
         </div>
@@ -801,44 +530,24 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           <div className="fs-card">
             <div className="fs-card-title">{t.uploadTitle}</div>
             <div className="fs-input-mode" role="group" aria-label={t.uploadTitle}>
-              {(['photo', 'description'] as const).map(mode => (
-                <button type="button" key={mode} className={inputMode === mode ? 'active' : ''} aria-pressed={inputMode === mode} onClick={() => { setInputMode(mode); setError(null); setResult(null); setFeedbackTarget(null) }}>
-                  {t.inputModes[mode]}
-                </button>
-              ))}
+              {(['photo', 'description'] as const).map(mode => <button type="button" key={mode} className={inputMode === mode ? 'active' : ''} aria-pressed={inputMode === mode} onClick={() => { setInputMode(mode); setError(null); setResult(null); setFeedbackTarget(null) }}>{t.inputModes[mode]}</button>)}
             </div>
 
             {inputMode === 'photo' ? (
               <div className={`fs-drop-zone ${dragging ? 'dragging' : ''} ${image ? 'has-image' : ''}`} onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
-                {image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={image} alt="Food preview" className="fs-preview-img" />
-                ) : (
-                  <div className="fs-drop-placeholder">
-                    <div className="fs-drop-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M6 22l7-9 5 6 3-4 5 7H6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="21" cy="11" r="3" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="5" width="26" height="22" rx="2" stroke="currentColor" strokeWidth="1.5"/></svg></div>
-                    <div className="fs-drop-text">{t.dropText}</div><div className="fs-drop-hint">{t.dropHint}</div>
-                  </div>
-                )}
+                {image ? <img src={image} alt="Food preview" className="fs-preview-img" /> : <div className="fs-drop-placeholder"><div className="fs-drop-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M6 22l7-9 5 6 3-4 5 7H6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="21" cy="11" r="3" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="5" width="26" height="22" rx="2" stroke="currentColor" strokeWidth="1.5"/></svg></div><div className="fs-drop-text">{t.dropText}</div><div className="fs-drop-hint">{t.dropHint}</div></div>}
               </div>
-            ) : (
-              <label className="fs-manual-entry"><span>{t.manualLabel}</span><textarea value={description} maxLength={500} placeholder={t.manualPlaceholder} onChange={event => { setDescription(event.target.value); setError(null); setResult(null) }} /><small>{t.manualHint}</small></label>
-            )}
+            ) : <label className="fs-manual-entry"><span>{t.manualLabel}</span><textarea value={description} maxLength={500} placeholder={t.manualPlaceholder} onChange={event => { setDescription(event.target.value); setError(null); setResult(null) }} /><small>{t.manualHint}</small></label>}
 
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) void loadFile(f) }} />
 
             <div className="fs-meal-type-row">
-              {(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'] as const).map(mt => (
-                <button key={mt} className={`fs-meal-type-btn ${mealType === mt ? 'active' : ''}`} onClick={() => void selectMealType(mt)} disabled={updatingMealType} type="button">{t.mealTypes[mt]}</button>
-              ))}
+              {(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'] as const).map(mt => <button key={mt} className={`fs-meal-type-btn ${mealType === mt ? 'active' : ''}`} onClick={() => void selectMealType(mt)} disabled={updatingMealType} type="button">{t.mealTypes[mt]}</button>)}
             </div>
 
             <div className="fs-portion-block">
               <div className="fs-portion-title">{t.portionTitle}</div>
-              <div className="fs-portion-options">
-                {[25, 50, 75, 100].map(value => (
-                  <button type="button" key={value} className={portionPercent === value ? 'active' : ''} aria-pressed={portionPercent === value} onClick={() => { setPortionPercent(value); setResult(null) }}><strong>{value}%</strong><span>{t.portionOptions[value]}</span></button>
-                ))}
-              </div>
+              <div className="fs-portion-options">{[25, 50, 75, 100].map(value => <button type="button" key={value} className={portionPercent === value ? 'active' : ''} aria-pressed={portionPercent === value} onClick={() => { setPortionPercent(value); setResult(null) }}><strong>{value}%</strong><span>{t.portionOptions[value]}</span></button>)}</div>
               <label className="fs-custom-portion"><span>{t.customPortion}</span><input type="number" min="10" max="100" step="5" value={portionPercent} onChange={event => { const next = Math.min(100, Math.max(10, Number(event.target.value) || 10)); setPortionPercent(Math.round(next)); setResult(null) }} /><span>%</span></label>
             </div>
 
@@ -846,7 +555,6 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               {inputMode === 'photo' && image && <button className="fs-btn-secondary" onClick={() => { setImage(null); setResult(null); setError(null); setConfirmationError(null); setFeedbackTarget(null) }}>{t.clear}</button>}
               <button className="fs-btn-primary" onClick={analyze} disabled={(inputMode === 'photo' ? !image : description.trim().length < 3) || scanning || remaining <= 0}>{scanning ? t.analyzing : t.analyze}</button>
             </div>
-
             {error && <div className="fs-error">{error}</div>}
             {error && feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Escáner de alimentos" language={lang} responseId={feedbackTarget.id} context={feedbackTarget.context} issueOnly /> : null}
           </div>
@@ -857,11 +565,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               <div className="fs-food-name">{result.food}</div>
               <div className="fs-portion-result">{result.portionBasis === 'described_serving' ? t.personalServingResult : t.portionResult(result.portionPercent)}</div>
               <div className="fs-calories-row"><div className="fs-calories-num">{result.calories}</div><div className="fs-calories-label">{t.kcal}</div></div>
-              <div className="fs-macros">
-                <MacroBar label={t.carbs} value={result.carbs} color="#C9A84C" max={Math.max(result.carbs, result.fats, result.proteins)} />
-                <MacroBar label={t.fats} value={result.fats} color="#9A9590" max={Math.max(result.carbs, result.fats, result.proteins)} />
-                <MacroBar label={t.protein} value={result.proteins} color="#E2C87A" max={Math.max(result.carbs, result.fats, result.proteins)} />
-              </div>
+              <div className="fs-macros"><MacroBar label={t.carbs} value={result.carbs} color="#C9A84C" max={Math.max(result.carbs, result.fats, result.proteins)} /><MacroBar label={t.fats} value={result.fats} color="#9A9590" max={Math.max(result.carbs, result.fats, result.proteins)} /><MacroBar label={t.protein} value={result.proteins} color="#E2C87A" max={Math.max(result.carbs, result.fats, result.proteins)} /></div>
               <div className="fs-macro-totals"><MacroChip label="C" value={result.carbs} color="#C9A84C" /><MacroChip label="F" value={result.fats} color="#9A9590" /><MacroChip label="P" value={result.proteins} color="#E2C87A" /></div>
               {result.notes && <div className="fs-notes">{result.notes}</div>}
               <div className="fs-estimate-notice">{t.estimateNotice}</div>
@@ -869,46 +573,30 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               {result.inputMode === 'photo' && result.consumptionStatus === 'Unconfirmed' && (
                 <div className="fs-correction">
                   <div className="fs-estimate-notice">{t.reanalysisRemaining(result.reanalysisRemaining ?? 2)}</div>
-                  {!correctionOpen ? (
-                    <button type="button" className="fs-correction-toggle" onClick={() => setCorrectionOpen(true)} disabled={(result.reanalysisRemaining ?? 2) <= 0}>{t.correctEstimate}</button>
-                  ) : (
-                    <>
-                      <div className="fs-correction-title">{t.correctionTitle}</div>
-                      <label className="fs-correction-entry"><span>{t.correctionLabel}</span><textarea value={correction} maxLength={700} placeholder={t.correctionPlaceholder} onChange={event => { setCorrection(event.target.value); setConfirmationError(null) }} /><small>{t.correctionHint}</small></label>
-                      <div className="fs-correction-actions">
-                        <button type="button" onClick={() => setCorrectionOpen(false)} disabled={recalculating}>{t.cancelCorrection}</button>
-                        <button type="button" onClick={() => void recalculateEstimate()} disabled={recalculating || correction.trim().length < 3 || (result.reanalysisRemaining ?? 2) <= 0}>{recalculating ? t.recalculating : t.recalculate}</button>
-                      </div>
-                    </>
-                  )}
+                  {!correctionOpen ? <button type="button" className="fs-correction-toggle" onClick={() => setCorrectionOpen(true)} disabled={(result.reanalysisRemaining ?? 2) <= 0}>{t.correctEstimate}</button> : <>
+                    <div className="fs-correction-title">{t.correctionTitle}</div>
+                    <label className="fs-correction-entry"><span>{t.correctionLabel}</span><textarea value={correction} maxLength={700} placeholder={t.correctionPlaceholder} onChange={event => { setCorrection(event.target.value); setConfirmationError(null) }} /><small>{t.correctionHint}</small></label>
+                    <div className="fs-correction-actions"><button type="button" onClick={() => setCorrectionOpen(false)} disabled={recalculating}>{t.cancelCorrection}</button><button type="button" onClick={() => void recalculateEstimate()} disabled={recalculating || correction.trim().length < 3 || (result.reanalysisRemaining ?? 2) <= 0}>{recalculating ? t.recalculating : t.recalculate}</button></div>
+                  </>}
                 </div>
               )}
 
               <div className="fs-confirmation" aria-live="polite">
-                {result.consumptionStatus === 'Unconfirmed' ? (
-                  <><div className="fs-confirmation-title">{t.confirmationTitle}</div><div className="fs-confirmation-detail">{t.confirmationDetail}</div><div className="fs-confirmation-actions"><button type="button" onClick={() => void confirmConsumption('Consumed')} disabled={confirming}>{confirming ? t.confirmationSaving : t.confirmConsumed}</button><button type="button" onClick={() => void confirmConsumption('Reference only')} disabled={confirming}>{t.confirmReference}</button></div></>
-                ) : (
-                  <div className={`fs-confirmation-state fs-confirmation-state--${result.consumptionStatus === 'Consumed' ? 'consumed' : 'reference'}`}>{result.consumptionStatus === 'Consumed' ? t.confirmedConsumed : t.confirmedReference}</div>
-                )}
+                {result.consumptionStatus === 'Unconfirmed' ? <><div className="fs-confirmation-title">{t.confirmationTitle}</div><div className="fs-confirmation-detail">{t.confirmationDetail}</div><div className="fs-confirmation-actions"><button type="button" onClick={() => void confirmConsumption('Consumed')} disabled={confirming}>{confirming ? t.confirmationSaving : t.confirmConsumed}</button><button type="button" onClick={() => void confirmConsumption('Reference only')} disabled={confirming}>{t.confirmReference}</button></div></> : <div className={`fs-confirmation-state fs-confirmation-state--${result.consumptionStatus === 'Consumed' ? 'consumed' : 'reference'}`}>{result.consumptionStatus === 'Consumed' ? t.confirmedConsumed : t.confirmedReference}</div>}
                 {confirmationError && <div className="fs-confirmation-error">{confirmationError}</div>}
               </div>
 
-              <div className="fs-ratio-row">
-                {[
-                  { label: t.carbs, pct: pct(result.carbs, result.carbs + result.fats + result.proteins), color: '#C9A84C' },
-                  { label: t.fats, pct: pct(result.fats, result.carbs + result.fats + result.proteins), color: '#9A9590' },
-                  { label: t.protein, pct: pct(result.proteins, result.carbs + result.fats + result.proteins), color: '#E2C87A' },
-                ].map(m => <div key={m.label} className="fs-ratio-chip" style={{ borderColor: m.color }}><div className="fs-ratio-pct" style={{ color: m.color }}>{m.pct}%</div><div className="fs-ratio-label">{m.label}</div></div>)}
-              </div>
+              <div className="fs-ratio-row">{[
+                { label: t.carbs, pct: pct(result.carbs, result.carbs + result.fats + result.proteins), color: '#C9A84C' },
+                { label: t.fats, pct: pct(result.fats, result.carbs + result.fats + result.proteins), color: '#9A9590' },
+                { label: t.protein, pct: pct(result.proteins, result.carbs + result.fats + result.proteins), color: '#E2C87A' },
+              ].map(m => <div key={m.label} className="fs-ratio-chip" style={{ borderColor: m.color }}><div className="fs-ratio-pct" style={{ color: m.color }}>{m.pct}%</div><div className="fs-ratio-label">{m.label}</div></div>)}</div>
               {feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Escáner de alimentos" language={lang} responseId={feedbackTarget.id} context={feedbackTarget.context} /> : null}
             </div>
-          ) : (
-            <div className="fs-card fs-result-placeholder"><div className="fs-placeholder-icon"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="1.5" opacity=".3"/><path d="M16 24h16M24 16v16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".5"/></svg></div><div className="fs-placeholder-text">{t.placeholder}</div></div>
-          )}
+          ) : <div className="fs-card fs-result-placeholder"><div className="fs-placeholder-icon"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="1.5" opacity=".3"/><path d="M16 24h16M24 16v16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".5"/></svg></div><div className="fs-placeholder-text">{t.placeholder}</div></div>}
         </div>
 
         {logToday && <div className="fs-log-section" id="food-history"><FoodLogWidget logs={logs} today={logToday} weekStart={logWeekStart} monthStart={logMonthStart} lang={lang} onMealTypeChange={updateSavedMealType} /></div>}
-
         {typedPlan === 'free' && <div className="fs-upgrade-banner"><div className="fs-upgrade-text"><strong>{t.wantMore}</strong> {t.upgradeText}</div><a href="/#food-scanner" className="fs-upgrade-btn">{t.viewPlans}</a></div>}
       </main>
     </div>
