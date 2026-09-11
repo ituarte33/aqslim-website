@@ -22,6 +22,12 @@ const FIELDS = {
   PREVIEW_ONLY: 'fldinyQay91CqzNvr',
 } as const
 
+type ReanalysisUsageSnapshot = {
+  used: number
+  limit: typeof REANALYSIS_LIMIT_PER_MEAL
+  remaining: number
+}
+
 function storeEnabled(): boolean {
   return process.env.VERCEL_ENV === 'preview'
     && process.env.VERCEL_GIT_COMMIT_REF === ENTITLEMENT_P3_PREVIEW_BRANCH
@@ -65,7 +71,7 @@ export async function getPreviewReanalysisUsage(subjectId: string, mealLogId: st
 export async function recordPreviewReanalysisCompleted(
   subjectId: string,
   mealLogId: string,
-): Promise<{ used: number; limit: number; remaining: number }> {
+): Promise<ReanalysisUsageSnapshot> {
   if (!storeEnabled()) {
     return { used: 0, limit: REANALYSIS_LIMIT_PER_MEAL, remaining: REANALYSIS_LIMIT_PER_MEAL }
   }
