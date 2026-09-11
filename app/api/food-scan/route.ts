@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {
   countScansBetween,
   createMealLog,
+  getMealLogForUser,
   getMealLogsSince,
   updateUnconfirmedMealLogEstimate,
   updateMealLogMealType,
@@ -26,6 +27,7 @@ import {
   parseMealPortion,
   parseMealType,
 } from '@/lib/meal-entry'
+import { observeUsageShadow, observeUsageShadowUnavailable } from '@/lib/usage-shadow'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -300,6 +302,22 @@ export async function PATCH(req: Request) {
       return Response.json({ error: 'invalid_correction' }, { status: 400 })
     }
 
+    let ownedMealLog
+    try {
+      ownedMealLog = await getMealLogForUser(mealLogId, userId)
+    } catch (error) {
+      const correlationId = crypto.randomUUID()
+      console.error('[food-scan] correction_preflight_failed', {
+        correlationId,
+        errorType: error instanceof Error ? error.name : 'unknown',
+      })
+      return Response.json({ error: 'log_unavailable', correlationId }, { status: 503 })
+    }
+    if (!ownedMealLog) return Response.json({ error: 'not_found' }, { status: 404 })
+    if ((ownedMealLog.fields['Consumption Status'] ?? 'Unconfirmed') !== 'Unconfirmed') {
+      return Response.json({ error: 'not_found_or_confirmed' }, { status: 409 })
+    }
+
     const [shadowUser, shadowPilot] = await Promise.all([
       currentUser().catch(() => null),
       getPilotAccess().catch(() => null),
@@ -312,6 +330,42 @@ export async function PATCH(req: Request) {
       hasPilotAccess: shadowPilot !== null,
       pilotFeatures: shadowPilot?.enabledFeatures,
     })
+
+    const shadowPolicy = foodScanPolicyFor(effectiveFoodScanPlan(
+      shadowUser?.privateMetadata?.plan,
+      shadowPilot !== null,
+    ))
+    const shadowToday = todayPT()
+    const shadowBoundaries = foodScanPeriodBoundaries(shadowToday)
+    try {
+      const [shadowDailyUsed, shadowMonthlyUsed] = await Promise.all([
+        countScansBetween(userId, shadowBoundaries.dayStartUtc, shadowBoundaries.dayEndUtc),
+        countScansBetween(userId, shadowBoundaries.monthStartUtc, shadowBoundaries.monthEndUtc),
+      ])
+      const shadowUsageDecision = evaluateFoodScanUsage(
+        shadowPolicy,
+        shadowDailyUsed,
+        shadowMonthlyUsed,
+      )
+      observeUsageShadow({
+        clerkUserId: userId,
+        capability: 'food_scan:reanalyze',
+        plan: shadowPolicy.plan,
+        dailyUsed: shadowDailyUsed,
+        monthlyUsed: shadowMonthlyUsed,
+        dailyLimit: shadowPolicy.dailyLimit,
+        monthlyLimit: shadowPolicy.monthlyLimit,
+        decision: shadowUsageDecision,
+        currentUsageCounted: false,
+      })
+    } catch {
+      observeUsageShadowUnavailable({
+        clerkUserId: userId,
+        capability: 'food_scan:reanalyze',
+        plan: shadowPolicy.plan,
+        currentUsageCounted: false,
+      })
+    }
 
     let message: Anthropic.Message
     try {
