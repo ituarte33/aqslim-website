@@ -106,10 +106,8 @@ export function ChatWidget() {
   const buddyStateRef  = useRef<BuddyState>('idle')
   const idleBubbleIdx  = useRef(0)
 
-  // Keep ref in sync for use in intervals/timeouts
   useEffect(() => { buddyStateRef.current = buddyState }, [buddyState])
 
-  // Set state with auto-return to idle
   const setStateWithTimeout = useCallback((state: BuddyState, message: string, duration = 5000) => {
     setBuddyState(state)
     setBubble(message)
@@ -126,7 +124,6 @@ export function ChatWidget() {
     }
   }, [])
 
-  // Expose global setAQBuddyState + custom event
   useEffect(() => {
     // @ts-expect-error window extension
     window.setAQBuddyState = (state: BuddyState, message: string) => setStateWithTimeout(state, message)
@@ -142,15 +139,12 @@ export function ChatWidget() {
     }
   }, [setStateWithTimeout])
 
-  // Allow prominent portal actions to open the existing governed chat surface.
   useEffect(() => {
     function openChat() { setOpen(true) }
     window.addEventListener('aq-buddy-open', openChat)
     return () => window.removeEventListener('aq-buddy-open', openChat)
   }, [])
 
-  // Receive only an opaque saved-record reference from the scanner. The chat
-  // API resolves and authorizes the actual meal data on the server.
   useEffect(() => {
     function acceptContext(value: unknown) {
       if (!value || typeof value !== 'object') return
@@ -178,9 +172,15 @@ export function ChatWidget() {
     if (fullScreen) setOpen(true)
   }, [fullScreen])
 
-  // The full-screen patient chat owns the mobile viewport. Locking the page
-  // underneath prevents iOS from scrolling the portal header away when the
-  // text area receives focus.
+  // A Home guidance link may carry a governed phase question. Prefill it for the
+  // patient, but never auto-send: the patient keeps control of the conversation.
+  useEffect(() => {
+    if (!fullScreen) return
+    const prompt = new URLSearchParams(window.location.search).get('prompt')?.trim()
+    if (!prompt) return
+    setInput(prompt.slice(0, 700))
+  }, [fullScreen, pathname])
+
   useEffect(() => {
     if (!fullScreen) return
 
@@ -189,7 +189,6 @@ export function ChatWidget() {
     return () => document.body.classList.remove('aqb-fullscreen-active')
   }, [fullScreen])
 
-  // Sync language with body class
   useEffect(() => {
     function sync() { setLang(getLang()) }
     sync()
@@ -199,7 +198,6 @@ export function ChatWidget() {
     return () => { window.removeEventListener('aqslim-lang', sync); observer.disconnect() }
   }, [])
 
-  // Idle bubble rotation — only when chat is closed and buddy is idle
   useEffect(() => {
     if (open || inDashboard) { setBubble(''); return }
     function showBubble() {
@@ -214,7 +212,6 @@ export function ChatWidget() {
     return () => { clearTimeout(first); clearInterval(interval) }
   }, [open, lang, inDashboard])
 
-  // Welcome message on first open
   useEffect(() => {
     if (open && messages.length === 0) {
       const welcome = foodScannerContext ? LABELS[lang].contextWelcome : LABELS[lang].welcome
@@ -223,9 +220,6 @@ export function ChatWidget() {
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep a new question visible while a long streamed answer grows below it.
-  // Scrolling the message container directly also prevents the page-level demo
-  // banner from being pushed out of view by Element.scrollIntoView().
   useEffect(() => {
     const container = messagesRef.current
     if (!container) return
@@ -242,7 +236,6 @@ export function ChatWidget() {
     }
   }, [messages.length])
 
-  // Focus input on open
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 80)
   }, [open])
@@ -322,7 +315,6 @@ export function ChatWidget() {
   return (
     <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${compactLauncher ? ' aqb-wrap--compact' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>
 
-      {/* Dashboard and scanner surfaces keep AQ Buddy visible without covering the work area. */}
       {compactLauncher ? (
         !open && !fullScreen ? (
           <button
@@ -380,7 +372,6 @@ export function ChatWidget() {
         </>
       )}
 
-      {/* Speech bubble — only when chat is closed */}
       {bubble && !open && !compactLauncher && (
         <div className="aqb-bubble">
           <div className="aqb-bubble-text">{bubble}</div>
@@ -388,7 +379,6 @@ export function ChatWidget() {
         </div>
       )}
 
-      {/* Chat panel — opens below mascot */}
       {open && (
         <div className="aqb-panel">
           <div className="aqb-panel-header">
