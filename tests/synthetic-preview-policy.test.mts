@@ -4,6 +4,7 @@ import {
   AQ_BUDDY_OPENAI_PREVIEW_BRANCH,
   canReviewSyntheticPreview,
   ENTITLEMENT_P2_PREVIEW_BRANCH,
+  ENTITLEMENT_P3_PREVIEW_BRANCH,
   ENTITLEMENT_PREVIEW_BRANCH,
   isSyntheticPreviewEnvironment,
   SYNTHETIC_PREVIEW_BRANCH,
@@ -28,6 +29,10 @@ test('the synthetic plan remains limited to the approved Preview branches', () =
   assert.equal(isSyntheticPreviewEnvironment({
     ...previewEnvironment,
     VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P2_PREVIEW_BRANCH,
+  }), true)
+  assert.equal(isSyntheticPreviewEnvironment({
+    ...previewEnvironment,
+    VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P3_PREVIEW_BRANCH,
   }), true)
   assert.equal(isSyntheticPreviewEnvironment({
     VERCEL_ENV: 'production',
@@ -72,6 +77,11 @@ test('an allowlisted internal reviewer can enter only in an approved Preview env
     role: 'patient',
     email: 'reviewer.two@example.test',
     environment: { ...previewEnvironment, VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P2_PREVIEW_BRANCH },
+  }), true)
+  assert.equal(canReviewSyntheticPreview({
+    role: 'patient',
+    email: 'reviewer.two@example.test',
+    environment: { ...previewEnvironment, VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P3_PREVIEW_BRANCH },
   }), true)
   assert.equal(canReviewSyntheticPreview({
     role: 'patient',
