@@ -1,7 +1,18 @@
 export type ConsultationVisitLike = {
   fields: {
     'Fecha Consulta'?: string
+    'Tipo de Consulta'?: string
   }
+}
+
+export const QUALIFYING_CLINIC_VISIT_TYPES = new Set([
+  'Cliente Nuevo',
+  'Cliente subsecuente',
+  'Cliente Re-Inicio',
+])
+
+export function isQualifyingClinicVisitType(value: unknown): boolean {
+  return typeof value === 'string' && QUALIFYING_CLINIC_VISIT_TYPES.has(value.trim())
 }
 
 function normalizedVisitDate(value: unknown): string | null {
@@ -16,6 +27,7 @@ export function lastCompletedVisitFromConsultations(
   consultations: readonly ConsultationVisitLike[],
 ): string | null {
   const dates = consultations
+    .filter(consultation => isQualifyingClinicVisitType(consultation.fields['Tipo de Consulta']))
     .map(consultation => normalizedVisitDate(consultation.fields['Fecha Consulta']))
     .filter((value): value is string => Boolean(value))
     .sort()
