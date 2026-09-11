@@ -11,10 +11,11 @@ import {
   type ConsumptionStatus,
   type MealType,
 } from '@/lib/airtable'
-import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
+import { evaluateAiEntitlementAccess, type AiEntitlementAccessResult } from '@/lib/ai-entitlement-access'
+import type { AccessTier } from '@/lib/entitlement-record'
+import { usagePolicyForEntitlementTier } from '@/lib/entitlement-usage-policy'
 import {
   effectiveFoodScanPlan,
-  evaluateFoodScanUsage,
   foodScanPeriodBoundaries,
   foodScanPolicyFor,
 } from '@/lib/food-scan-policy'
@@ -27,6 +28,7 @@ import {
   parseMealPortion,
   parseMealType,
 } from '@/lib/meal-entry'
+import { evaluateUsageGate } from '@/lib/usage-gate'
 import { observeUsageShadow, observeUsageShadowUnavailable } from '@/lib/usage-shadow'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -60,17 +62,62 @@ function todayPT(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
 }
 
+function authenticatedPatientRecordId(privateMetadata: unknown): string | null {
+  if (!privateMetadata || typeof privateMetadata !== 'object') return null
+  const value = (privateMetadata as Record<string, unknown>).aqslimPatientId
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function p3Tier(access: AiEntitlementAccessResult): AccessTier | null {
+  if (!access.p3Gate.enforced || !access.p3Gate.tier) return null
+  return access.p3Gate.tier as AccessTier
+}
+
+function effectiveUsageContext(
+  legacyPolicy: ReturnType<typeof foodScanPolicyFor>,
+  access: AiEntitlementAccessResult,
+) {
+  const tier = p3Tier(access)
+  if (tier) {
+    return {
+      plan: tier,
+      ...usagePolicyForEntitlementTier(tier, 'food_scan'),
+    }
+  }
+  return {
+    plan: legacyPolicy.plan,
+    dailyLimit: legacyPolicy.dailyLimit,
+    monthlyLimit: legacyPolicy.monthlyLimit,
+  }
+}
+
 export async function POST(req: Request) {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = await currentUser()
+  const [user, pilot] = await Promise.all([
+    currentUser(),
+    getPilotAccess(),
+  ])
   const privateMetadata = user?.privateMetadata
-  const pilot = await getPilotAccess()
-  const policy = foodScanPolicyFor(effectiveFoodScanPlan(
+  const legacyPolicy = foodScanPolicyFor(effectiveFoodScanPlan(
     privateMetadata?.plan,
     pilot !== null,
   ))
+
+  // D09 ordering: identity -> entitlement/lifecycle -> usage -> provider.
+  const access = await evaluateAiEntitlementAccess({
+    clerkUserId: userId,
+    capability: 'food_scan:analyze',
+    currentAccessAllowed: true,
+    rawPlan: privateMetadata?.plan,
+    hasPilotAccess: pilot !== null,
+    pilotFeatures: pilot?.enabledFeatures,
+    authenticatedPatientRecordId: authenticatedPatientRecordId(privateMetadata),
+  })
+  if (!access.allowed) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
+  const usagePolicy = effectiveUsageContext(legacyPolicy, access)
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
@@ -83,24 +130,24 @@ export async function POST(req: Request) {
       countScansBetween(userId, boundaries.monthStartUtc, boundaries.monthEndUtc),
     ])
   } catch {
-    // Can't verify count — deny to prevent bypass on infra errors
+    // Can't verify count — deny to prevent bypass on infra errors.
     return Response.json({
       error: 'usage_unavailable',
-      used: policy.dailyLimit,
-      limit: policy.dailyLimit,
-      monthlyUsed: policy.monthlyLimit,
-      monthlyLimit: policy.monthlyLimit,
+      used: usagePolicy.dailyLimit,
+      limit: usagePolicy.dailyLimit,
+      monthlyUsed: usagePolicy.monthlyLimit,
+      monthlyLimit: usagePolicy.monthlyLimit,
     }, { status: 503 })
   }
-  const decision = evaluateFoodScanUsage(policy, dailyUsed, monthlyUsed)
+  const decision = evaluateUsageGate(usagePolicy, { dailyUsed, monthlyUsed })
   if (!decision.allowed) {
     return Response.json({
       error: 'limit_reached',
       period: decision.reason === 'monthly_limit' ? 'month' : 'day',
       used: dailyUsed,
-      limit: policy.dailyLimit,
+      limit: usagePolicy.dailyLimit,
       monthlyUsed,
-      monthlyLimit: policy.monthlyLimit,
+      monthlyLimit: usagePolicy.monthlyLimit,
     }, { status: 429 })
   }
 
@@ -127,15 +174,6 @@ export async function POST(req: Request) {
   if (hasImage && (!ALLOWED_IMAGE_TYPES.has(mimeType) || imageBase64.length > MAX_BASE64_LENGTH)) {
     return Response.json({ error: 'invalid_image' }, { status: 400 })
   }
-
-  observeEntitlementShadow({
-    clerkUserId: userId,
-    capability: 'food_scan:analyze',
-    currentAccessAllowed: true,
-    rawPlan: privateMetadata?.plan,
-    hasPilotAccess: pilot !== null,
-    pilotFeatures: pilot?.enabledFeatures,
-  })
 
   let message: Anthropic.Message
   try {
@@ -223,7 +261,7 @@ Write the food name and notes in ${responseLanguage}. All numeric values are non
       carbs:           result.carbs,
       fats:            result.fats,
       proteins:        result.proteins,
-      plan:            policy.plan,
+      plan:            usagePolicy.plan,
       notes:           result.notes,
       mealType,
     })
@@ -235,11 +273,11 @@ Write the food name and notes in ${responseLanguage}. All numeric values are non
       mealLogId:       mealLog.id,
       consumptionStatus: mealLog.fields['Consumption Status'] ?? 'Unconfirmed',
       used:             dailyUsed + 1,
-      limit:            policy.dailyLimit,
-      remaining:        Math.max(0, policy.dailyLimit - dailyUsed - 1),
+      limit:            usagePolicy.dailyLimit,
+      remaining:        Math.max(0, usagePolicy.dailyLimit - dailyUsed - 1),
       monthlyUsed:      monthlyUsed + 1,
-      monthlyLimit:     policy.monthlyLimit,
-      monthlyRemaining: Math.max(0, policy.monthlyLimit - monthlyUsed - 1),
+      monthlyLimit:     usagePolicy.monthlyLimit,
+      monthlyRemaining: Math.max(0, usagePolicy.monthlyLimit - monthlyUsed - 1),
     })
   } catch (error) {
     const correlationId = crypto.randomUUID()
@@ -249,7 +287,6 @@ Write the food name and notes in ${responseLanguage}. All numeric values are non
     })
     return Response.json({ error: 'log_unavailable', correlationId }, { status: 503 })
   }
-
 }
 
 export async function PATCH(req: Request) {
@@ -318,23 +355,27 @@ export async function PATCH(req: Request) {
       return Response.json({ error: 'not_found_or_confirmed' }, { status: 409 })
     }
 
-    const [shadowUser, shadowPilot] = await Promise.all([
+    const [user, pilot] = await Promise.all([
       currentUser().catch(() => null),
       getPilotAccess().catch(() => null),
     ])
-    observeEntitlementShadow({
+    const privateMetadata = user?.privateMetadata
+    const access = await evaluateAiEntitlementAccess({
       clerkUserId: userId,
       capability: 'food_scan:reanalyze',
       currentAccessAllowed: true,
-      rawPlan: shadowUser?.privateMetadata?.plan,
-      hasPilotAccess: shadowPilot !== null,
-      pilotFeatures: shadowPilot?.enabledFeatures,
+      rawPlan: privateMetadata?.plan,
+      hasPilotAccess: pilot !== null,
+      pilotFeatures: pilot?.enabledFeatures,
+      authenticatedPatientRecordId: authenticatedPatientRecordId(privateMetadata),
     })
+    if (!access.allowed) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
-    const shadowPolicy = foodScanPolicyFor(effectiveFoodScanPlan(
-      shadowUser?.privateMetadata?.plan,
-      shadowPilot !== null,
+    const legacyPolicy = foodScanPolicyFor(effectiveFoodScanPlan(
+      privateMetadata?.plan,
+      pilot !== null,
     ))
+    const shadowPolicy = effectiveUsageContext(legacyPolicy, access)
     const shadowToday = todayPT()
     const shadowBoundaries = foodScanPeriodBoundaries(shadowToday)
     try {
@@ -342,10 +383,9 @@ export async function PATCH(req: Request) {
         countScansBetween(userId, shadowBoundaries.dayStartUtc, shadowBoundaries.dayEndUtc),
         countScansBetween(userId, shadowBoundaries.monthStartUtc, shadowBoundaries.monthEndUtc),
       ])
-      const shadowUsageDecision = evaluateFoodScanUsage(
+      const shadowUsageDecision = evaluateUsageGate(
         shadowPolicy,
-        shadowDailyUsed,
-        shadowMonthlyUsed,
+        { dailyUsed: shadowDailyUsed, monthlyUsed: shadowMonthlyUsed },
       )
       observeUsageShadow({
         clerkUserId: userId,
@@ -466,13 +506,27 @@ export async function GET() {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = await currentUser()
+  const [user, pilot] = await Promise.all([
+    currentUser(),
+    getPilotAccess(),
+  ])
   const privateMetadata = user?.privateMetadata
-  const pilot = await getPilotAccess()
-  const policy = foodScanPolicyFor(effectiveFoodScanPlan(
+  const legacyPolicy = foodScanPolicyFor(effectiveFoodScanPlan(
     privateMetadata?.plan,
     pilot !== null,
   ))
+  const access = await evaluateAiEntitlementAccess({
+    clerkUserId: userId,
+    capability: 'food_scan:analyze',
+    currentAccessAllowed: true,
+    rawPlan: privateMetadata?.plan,
+    hasPilotAccess: pilot !== null,
+    pilotFeatures: pilot?.enabledFeatures,
+    authenticatedPatientRecordId: authenticatedPatientRecordId(privateMetadata),
+  })
+  if (!access.allowed) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
+  const policy = effectiveUsageContext(legacyPolicy, access)
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
 
