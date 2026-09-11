@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { saveConsultaSubsecuente } from '@/app/dashboard/consulta-subsecuente/actions'
 import { getLinkedClinicConsultationsByPatientId } from '@/lib/clinic-consultation-source'
+import { buildCanonicalEntitlementContext } from '@/lib/entitlement-context'
 import { pendingPatientSubjectId } from '@/lib/p4-provisioning-policy'
 import { getPreviewEntitlementSourceRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
 import { ENTITLEMENT_P4_PREVIEW_BRANCH } from '@/lib/nutrition/synthetic-preview-policy'
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic'
 
 const FOUNDER_EMAIL = 'rom@ituarteconsulting.com'
 const CANARY_PATIENT_RECORD_ID = 'rec8xIB7hf1XzLucs'
+const CANARY_CLAIM_SUBJECT = 'user_p4_synthetic_claim_001'
 const CANARY_PATH = '/my-aqslim/pilot/p4-provisioning-canary'
 
 const SCENARIOS = {
@@ -65,6 +67,27 @@ async function runP4CanaryScenario(formData: FormData) {
   revalidatePath(CANARY_PATH)
 }
 
+async function runP4ClaimCanary() {
+  'use server'
+  assertP4Preview()
+  const user = await currentUser()
+  if (!user || primaryEmail(user) !== FOUNDER_EMAIL) redirect('/my-aqslim')
+
+  const context = await buildCanonicalEntitlementContext({
+    subjectId: CANARY_CLAIM_SUBJECT,
+    rawPlan: null,
+    hasPilotAccess: false,
+    authenticatedPatientRecordId: CANARY_PATIENT_RECORD_ID,
+    now: new Date('2026-09-13T12:00:00.000Z'),
+  })
+
+  if (!context.record || context.sourceKind !== 'preview_store') {
+    throw new Error('P4 claim canary failed to resolve Preview entitlement')
+  }
+
+  revalidatePath(CANARY_PATH)
+}
+
 function cardStyle(): React.CSSProperties {
   return {
     border: '1px solid #444',
@@ -82,7 +105,7 @@ export default async function P4ProvisioningCanaryPage() {
   const consultations = await getLinkedClinicConsultationsByPatientId(CANARY_PATIENT_RECORD_ID)
   const entitlement = await getPreviewEntitlementSourceRecordByPatientRecordId({
     patientRecordId: CANARY_PATIENT_RECORD_ID,
-    canonicalSubjectId: pendingPatientSubjectId(CANARY_PATIENT_RECORD_ID),
+    canonicalSubjectId: CANARY_CLAIM_SUBJECT,
   })
 
   const hasScenario = (key: ScenarioKey) => {
@@ -119,8 +142,19 @@ export default async function P4ProvisioningCanaryPage() {
     && record.lastCompletedVisit === '2026-09-12'
   )
 
-  const allDone = newDone && subsequentDone && supplementDone
-  const allPass = allDone && newPass && subsequentPass && supplementPass
+  const claimDone = entitlement?.storedSubjectId === CANARY_CLAIM_SUBJECT
+  const claimPass = !claimDone || Boolean(
+    record
+    && record.subjectId === CANARY_CLAIM_SUBJECT
+    && record.tier === 'clinic_ai'
+    && record.status === 'trial'
+    && record.trialStarts === '2026-09-11T00:00:00.000Z'
+    && record.trialEnds === '2026-10-11T00:00:00.000Z'
+    && record.lastCompletedVisit === '2026-09-12'
+  )
+
+  const allDone = newDone && subsequentDone && supplementDone && claimDone
+  const allPass = allDone && newPass && subsequentPass && supplementPass && claimPass
 
   return (
     <main style={{ minHeight: '100vh', background: '#101010', color: '#eee', padding: 32, fontFamily: 'system-ui' }}>
@@ -131,14 +165,17 @@ export default async function P4ProvisioningCanaryPage() {
           {allPass ? 'PASS' : allDone ? 'REVIEW REQUIRED' : 'READY FOR NEXT STEP'}
         </p>
         <p>
-          Synthetic patient only. Each button uses the real consultation save action. No billing,
-          Square, Production, or real-user entitlement is modified.
+          Synthetic patient only. Consultation buttons use the real save action and the final claim
+          uses the real canonical entitlement resolver. No billing, Square, Production, or real-user
+          entitlement is modified.
         </p>
 
         <section style={cardStyle()}>
           <h2>Current Preview entitlement</h2>
           <p>Patient: <strong>{CANARY_PATIENT_RECORD_ID}</strong></p>
           <p>Stored subject: <strong>{entitlement?.storedSubjectId ?? 'NONE'}</strong></p>
+          <p>Expected pending subject: <strong>{pendingPatientSubjectId(CANARY_PATIENT_RECORD_ID)}</strong></p>
+          <p>Synthetic claimed subject: <strong>{CANARY_CLAIM_SUBJECT}</strong></p>
           <p>Tier: <strong>{record?.tier ?? 'NONE'}</strong></p>
           <p>Status: <strong>{record?.status ?? 'NONE'}</strong></p>
           <p>Source: <strong>{record?.source ?? 'NONE'}</strong></p>
@@ -173,6 +210,18 @@ export default async function P4ProvisioningCanaryPage() {
           <form action={runP4CanaryScenario}>
             <input type="hidden" name="scenario" value="supplement" />
             <button type="submit" disabled={!subsequentDone || supplementDone}>Run Suplementos</button>
+          </form>
+        </section>
+
+        <section style={cardStyle()}>
+          <h2>4. Pending entitlement → authenticated subject claim</h2>
+          <p>
+            Expected: stored subject changes from <code>{pendingPatientSubjectId(CANARY_PATIENT_RECORD_ID)}</code>
+            {' '}to <code>{CANARY_CLAIM_SUBJECT}</code> while preserving the same clinic_ai trial.
+          </p>
+          <p>Status: <strong>{claimDone ? (claimPass ? 'PASS' : 'FAIL') : 'NOT RUN'}</strong></p>
+          <form action={runP4ClaimCanary}>
+            <button type="submit" disabled={!supplementDone || claimDone}>Run entitlement claim</button>
           </form>
         </section>
 
