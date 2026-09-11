@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
+import { evaluateAiEntitlementAccess } from '@/lib/ai-entitlement-access'
+import { getActor } from '@/lib/auth'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { pilotHasFeature } from '@/lib/pilot-policy'
 import { getPatientPortalData } from '@/lib/patient-portal'
@@ -15,8 +16,21 @@ export async function POST(request: Request) {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const pilot = await getPilotAccess()
-  if (!pilot || !pilotHasFeature(pilot, 'restaurant_advisor')) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  const [pilot, actor] = await Promise.all([
+    getPilotAccess(),
+    getActor(),
+  ])
+  const currentAccessAllowed = Boolean(pilot && pilotHasFeature(pilot, 'restaurant_advisor'))
+  const access = await evaluateAiEntitlementAccess({
+    clerkUserId: userId,
+    capability: 'restaurant_menu:analyze',
+    currentAccessAllowed,
+    rawPlan: actor?.rawPlan,
+    hasPilotAccess: pilot !== null,
+    pilotFeatures: pilot?.enabledFeatures,
+    authenticatedPatientRecordId: actor?.boundPatientId ?? null,
+  })
+  if (!access.allowed) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const patient = await getPatientPortalData()
   if (!patient?.phase) return Response.json({ error: 'phase_required' }, { status: 409 })
@@ -25,14 +39,6 @@ export async function POST(request: Request) {
   if (!body.imageBase64 || !body.mimeType || !ALLOWED_TYPES.has(body.mimeType) || body.imageBase64.length > MAX_BASE64_LENGTH) {
     return Response.json({ error: 'invalid_image' }, { status: 400 })
   }
-
-  observeEntitlementShadow({
-    clerkUserId: userId,
-    capability: 'restaurant_menu:analyze',
-    currentAccessAllowed: true,
-    hasPilotAccess: true,
-    pilotFeatures: pilot.enabledFeatures,
-  })
 
   const language = body.language === 'en' ? 'English' : 'Spanish'
   const restaurant = body.restaurant?.trim().slice(0, 100) || 'not provided'
