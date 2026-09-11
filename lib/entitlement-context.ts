@@ -1,6 +1,7 @@
 import 'server-only'
 
-import { getClienteById, getConsultasByPatientId } from './airtable'
+import { getClienteById } from './airtable'
+import { getLinkedClinicConsultationsByPatientId } from './clinic-consultation-source'
 import { lastCompletedVisitFromConsultations } from './clinic-visit-policy'
 import { clinicGraceEndDate } from './entitlement-windows'
 import {
@@ -58,17 +59,7 @@ async function hydrateClinicLifecycleAuthority({
     }
   }
 
-  const patientName = patient.fields['Nombre Completo']?.trim() ?? ''
-  if (!patientName) {
-    return {
-      ...record,
-      lastCompletedVisit: null,
-      graceEnds: null,
-      entitlementReason: `${record.entitlementReason}; clinic patient name unavailable`,
-    }
-  }
-
-  const consultations = await getConsultasByPatientId(authenticatedPatientRecordId, patientName)
+  const consultations = await getLinkedClinicConsultationsByPatientId(authenticatedPatientRecordId)
   const lastCompletedVisit = lastCompletedVisitFromConsultations(consultations)
 
   return {
