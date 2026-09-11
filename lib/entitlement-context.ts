@@ -13,6 +13,8 @@ import {
   getPreviewEntitlementSourceRecord,
   getPreviewEntitlementSourceRecordByPatientRecordId,
 } from './preview-entitlement-store'
+import { pendingPatientSubjectId } from './p4-provisioning-policy'
+import { claimPendingPreviewEntitlementSubject } from './p4-preview-entitlement-provisioning'
 
 export type CanonicalEntitlementContext = {
   record: CanonicalEntitlementRecord | null
@@ -110,10 +112,47 @@ export async function buildCanonicalEntitlementContext({
 
   let previewSource = await getPreviewEntitlementSourceRecord(subjectId)
   if (!previewSource && authenticatedPatientRecordId) {
-    previewSource = await getPreviewEntitlementSourceRecordByPatientRecordId({
+    const patientSource = await getPreviewEntitlementSourceRecordByPatientRecordId({
       patientRecordId: authenticatedPatientRecordId,
       canonicalSubjectId: subjectId,
     })
+
+    if (patientSource) {
+      const pendingSubject = pendingPatientSubjectId(authenticatedPatientRecordId)
+      if (
+        patientSource.storedSubjectId !== pendingSubject
+        && patientSource.storedSubjectId !== subjectId
+      ) {
+        // The patient record has an entitlement already claimed by another identity.
+        // Never bypass that binding through email/patient fallback.
+        previewSource = null
+      } else {
+        previewSource = patientSource
+        if (patientSource.storedSubjectId === pendingSubject) {
+          try {
+            const claim = await claimPendingPreviewEntitlementSubject({
+              patientRecordId: authenticatedPatientRecordId,
+              clerkUserId: subjectId,
+              now,
+            })
+            console.info('[p4-entitlement-claim]', {
+              patientRecordId: authenticatedPatientRecordId,
+              subjectId,
+              result: claim,
+            })
+          } catch (error) {
+            // The entitlement remains resolvable by the authenticated patient record for this
+            // request. Log the failed audit binding rather than converting a valid login into
+            // a false clinical denial after the identity match already passed.
+            console.error('[p4-entitlement-claim] failed', {
+              patientRecordId: authenticatedPatientRecordId,
+              subjectId,
+              error: error instanceof Error ? error.message : 'unknown',
+            })
+          }
+        }
+      }
+    }
   }
 
   if (previewSource) {
