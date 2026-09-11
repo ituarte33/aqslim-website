@@ -98,10 +98,15 @@ async function getP5FounderCanarySource({
     VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
     MYAQ_P5_FOUNDER_CANARY: process.env.MYAQ_P5_FOUNDER_CANARY,
   })
-  if (!enabled || !authenticatedPatientRecordId) return null
+  if (!enabled) return null
 
+  // A claimed P5 entitlement is already bound to the authenticated Clerk subject.
+  // Resolve that exact binding before consulting patient metadata so routes such as Food Scan
+  // do not fall back to internal_pilot merely because Clerk lacks aqslimPatientId metadata.
   const bySubject = await getPreviewEntitlementSourceRecord(subjectId)
   if (bySubject && isP5FounderCanaryRecord(bySubject.record)) return bySubject
+
+  if (!authenticatedPatientRecordId) return null
 
   const byPatient = await getPreviewEntitlementSourceRecordByPatientRecordId({
     patientRecordId: authenticatedPatientRecordId,
@@ -130,12 +135,16 @@ export async function buildCanonicalEntitlementContext({
     authenticatedPatientRecordId,
   })
   if (founderCanarySource) {
+    // If the entitlement was found by exact authenticated subject, its stored patient record is
+    // the governed binding for this isolated P5 canary. This does not modify Clerk metadata and
+    // applies only to the P5-marked Preview record.
+    const founderPatientRecordId = authenticatedPatientRecordId ?? founderCanarySource.patientRecordId
     return {
       sourceKind: 'founder_canary_preview_store',
       record: await hydrateClinicLifecycleAuthority({
         record: founderCanarySource.record,
         sourcePatientRecordId: founderCanarySource.patientRecordId,
-        authenticatedPatientRecordId,
+        authenticatedPatientRecordId: founderPatientRecordId,
         useStoredLifecycleSnapshot: true,
       }),
     }
