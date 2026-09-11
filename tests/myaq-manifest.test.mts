@@ -28,3 +28,14 @@ test('My AQSLIM welcome sends pilot and regular patient entry to Home', async ()
   assert.doesNotMatch(source, /destination="\/my-aqslim\/pilot"/)
   assert.doesNotMatch(source, /destination="\/food-scanner"/)
 })
+
+test('public patient authentication always lands on My AQSLIM Home', async () => {
+  const [signIn, signUp] = await Promise.all([
+    readFile(new URL('../app/sign-in/[[...sign-in]]/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/sign-up/[[...sign-up]]/page.tsx', import.meta.url), 'utf8'),
+  ])
+  for (const source of [signIn, signUp]) {
+    assert.match(source, /forceRedirectUrl="\/my-aqslim"/)
+    assert.doesNotMatch(source, /forceRedirectUrl="\/food-scanner"/)
+  }
+})
