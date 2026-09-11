@@ -3,6 +3,7 @@ export const ENTITLEMENT_PREVIEW_BRANCH = 'myaq-entitlement-preview-001'
 export const AQ_BUDDY_OPENAI_PREVIEW_BRANCH = 'myaq-ai-001-aq-buddy-openai-preview'
 export const ENTITLEMENT_P2_PREVIEW_BRANCH = 'myaq-ent-p2-preenforcement-preview'
 export const ENTITLEMENT_P3_PREVIEW_BRANCH = 'myaq-ent-p3-preview-enforcement-candidate'
+export const ENTITLEMENT_P4_PREVIEW_BRANCH = 'myaq-ent-p4-preview-provisioning'
 export const SYNTHETIC_PREVIEW_CLIENT_ID = 'SYN-CLIENT-001'
 export const SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID = 'appuUHRs26ATXnZjf'
 
@@ -12,6 +13,12 @@ const ALLOWED_PREVIEW_BRANCHES = new Set([
   AQ_BUDDY_OPENAI_PREVIEW_BRANCH,
   ENTITLEMENT_P2_PREVIEW_BRANCH,
   ENTITLEMENT_P3_PREVIEW_BRANCH,
+  ENTITLEMENT_P4_PREVIEW_BRANCH,
+])
+
+const ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES = new Set([
+  ENTITLEMENT_P3_PREVIEW_BRANCH,
+  ENTITLEMENT_P4_PREVIEW_BRANCH,
 ])
 
 export function isSyntheticPreviewEnvironment(environment: {
@@ -21,6 +28,10 @@ export function isSyntheticPreviewEnvironment(environment: {
   return environment.VERCEL_ENV === 'preview'
     && Boolean(environment.VERCEL_GIT_COMMIT_REF)
     && ALLOWED_PREVIEW_BRANCHES.has(environment.VERCEL_GIT_COMMIT_REF as string)
+}
+
+export function isEntitlementEnforcementPreviewBranch(branch?: string): boolean {
+  return Boolean(branch) && ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES.has(branch as string)
 }
 
 export function hasSyntheticPreviewStorageConfiguration(environment: {
