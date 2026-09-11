@@ -19,6 +19,7 @@ import {
   type PilotFeature,
 } from '@/lib/pilot-policy'
 import { canReviewSyntheticPreview } from '@/lib/nutrition/synthetic-preview-policy'
+import { isP5FounderCanaryIdentity } from '@/lib/p5-founder-canary-policy'
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .split(',')
@@ -74,11 +75,21 @@ export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
     ? metadataPatientId.trim()
     : null
 
+  const founderCanaryIdentity = isP5FounderCanaryIdentity({
+    email,
+    environment: {
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+      MYAQ_P5_FOUNDER_CANARY: process.env.MYAQ_P5_FOUNDER_CANARY,
+    },
+  })
+
   // A patient may complete a qualifying clinic visit before ever creating a Clerk account.
   // If no explicit metadata binding exists, reuse the portal's governed unique-email identity
   // resolution so entitlement can bind to the stable Airtable patient record. Zero or duplicate
-  // matches fail closed. Admin identities never use this fallback.
-  if (role === 'patient' && !boundPatientId) {
+  // matches fail closed. Admin identities never use this fallback except the exact Founder identity
+  // inside the isolated P5 Preview canary.
+  if ((role === 'patient' || founderCanaryIdentity) && !boundPatientId) {
     try {
       const matches = await getClientesByEmail(email)
       boundPatientId = resolveAuthenticatedPatientScope({
