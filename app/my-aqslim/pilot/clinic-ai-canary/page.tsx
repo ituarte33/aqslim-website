@@ -34,7 +34,6 @@ export default async function ClinicAiCanaryPage() {
   if (
     process.env.VERCEL_ENV !== 'preview'
     || process.env.VERCEL_GIT_COMMIT_REF !== ENTITLEMENT_P3_PREVIEW_BRANCH
-    || process.env.MYAQ_P3_ENFORCEMENT !== 'enabled'
   ) {
     redirect('/my-aqslim')
   }
