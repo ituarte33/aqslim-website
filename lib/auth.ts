@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
 import { getClienteById, getClientesByEmail, type Cliente } from '@/lib/airtable'
-import { observeEntitlementShadow } from '@/lib/entitlement-shadow'
+import { runEntitlementGateShadow } from '@/lib/entitlement-gate'
 import {
   AuthorizationError,
   assertPatientOwnership,
@@ -96,7 +96,7 @@ export async function requireCapability(capability: Capability): Promise<Authent
   assertRoleCapability(actor.role, capability)
 
   if (capability === 'buddy:chat') {
-    observeEntitlementShadow({
+    runEntitlementGateShadow({
       clerkUserId: actor.clerkUserId,
       capability: 'buddy:chat',
       currentAccessAllowed: true,
