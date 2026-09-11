@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getFast36SessionsByPatient, getMealLogsBetween } from '@/lib/airtable'
+import { evaluateAiEntitlementAccess } from '@/lib/ai-entitlement-access'
+import { getActor } from '@/lib/auth'
 import { getPatientPortalData } from '@/lib/patient-portal'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { normalizeFast36Status, type Fast36Session } from '@/lib/fast36-policy'
@@ -12,16 +14,28 @@ export const metadata = {
 }
 
 export default async function WeeklySummaryPage() {
-  const [pilot, patient] = await Promise.all([
+  const [pilot, patient, actor] = await Promise.all([
     getPilotAccess(),
     getPatientPortalData(),
+    getActor(),
   ])
-  if (!pilot) redirect('/my-aqslim')
+  if (!actor) redirect('/my-aqslim')
+
+  const access = await evaluateAiEntitlementAccess({
+    clerkUserId: actor.clerkUserId,
+    capability: 'weekly_summary:generate',
+    currentAccessAllowed: pilot !== null,
+    rawPlan: actor.rawPlan,
+    hasPilotAccess: pilot !== null,
+    pilotFeatures: pilot?.enabledFeatures,
+    authenticatedPatientRecordId: actor.boundPatientId,
+  })
+  if (!access.allowed) redirect('/my-aqslim')
   if (!patient) redirect('/my-aqslim/pilot')
 
   const period = weeklySummaryPeriod()
   const [mealLogs, fast36Records] = await Promise.all([
-    getMealLogsBetween(pilot.clerkUserId, period.startUtc, period.endUtc).catch(() => []),
+    getMealLogsBetween(actor.clerkUserId, period.startUtc, period.endUtc).catch(() => []),
     getFast36SessionsByPatient(patient.clienteId).catch(() => []),
   ])
   const fast36Sessions: Fast36Session[] = fast36Records.flatMap(record => {
@@ -44,7 +58,7 @@ export default async function WeeklySummaryPage() {
       firstName={patient.firstName}
       profileId={patient.clienteId}
       phase={patient.phase}
-      initialLanguage={patient.language ?? pilot.language}
+      initialLanguage={patient.language ?? pilot?.language ?? 'es'}
       summary={buildWeeklySummary(mealLogs, fast36Sessions)}
     />
   )
