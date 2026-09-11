@@ -49,12 +49,7 @@ export async function getLinkedClinicConsultationsByPatientId(
 
   if (linkedIds.length === 0) return []
 
-  return Promise.all(linkedIds.map(async consultationId => {
-    const params = new URLSearchParams()
-    params.append('fields[]', 'Fecha Consulta')
-    params.append('fields[]', 'Tipo de Consulta')
-    params.append('fields[]', 'ID Cliente')
-
-    return airtableGet(`/${CONSULTAS_TABLE}/${consultationId}?${params}`) as Promise<LinkedClinicConsultation>
-  }))
+  return Promise.all(linkedIds.map(async consultationId => (
+    airtableGet(`/${CONSULTAS_TABLE}/${consultationId}`) as Promise<LinkedClinicConsultation>
+  )))
 }
