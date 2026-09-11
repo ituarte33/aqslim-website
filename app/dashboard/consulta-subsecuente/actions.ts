@@ -6,6 +6,7 @@ import {
   type Consulta, type CuestionarioSintoma,
 } from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
+import { provisionClinicEntitlementForCompletedVisit } from '@/lib/p4-preview-entitlement-provisioning'
 
 export async function fetchPatientConsultations(nombreCliente: string): Promise<Consulta[]> {
   await requireCapability('consultations:read:any')
@@ -52,7 +53,6 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   if (notasSuplemento) fields['Notas del Terapeuta'] = notasSuplemento
   if (responsableReactivacion) fields['Responsable de Reactivación'] = responsableReactivacion
 
-
   const peso             = num('pesoKg')
   const grasaCorporal    = num('grasaCorporal')
   const cintura          = num('cintura')
@@ -89,7 +89,34 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   if (recomendaciones) fields['Recomendaciones al Cliente'] = recomendaciones
   if (metodoPago)      fields['Método de Pago']             = metodoPago
 
+  // Consultation is the clinical source of truth. P4 entitlement provisioning runs only
+  // after this write succeeds, never before it.
   const consulta = await createConsulta(fields)
+
+  try {
+    const provisioning = await provisionClinicEntitlementForCompletedVisit({
+      patientRecordId: clienteRecordId,
+      visitType: tipoConsulta,
+      visitDate: fechaConsulta,
+    })
+    console.info('[p4-entitlement-provisioning]', {
+      consultationId: consulta.id,
+      patientRecordId: clienteRecordId,
+      visitType: tipoConsulta,
+      action: provisioning.action,
+      write: provisioning.write,
+      reason: provisioning.reason,
+    })
+  } catch (error) {
+    // Do not turn a successfully committed consultation into a false save failure.
+    // The entitlement write is Preview-only and separately auditable/recoverable.
+    console.error('[p4-entitlement-provisioning] failed_after_consultation_commit', {
+      consultationId: consulta.id,
+      patientRecordId: clienteRecordId,
+      visitType: tipoConsulta,
+      error: error instanceof Error ? error.message : 'unknown',
+    })
+  }
 
   // Próxima Cita lives on the Cliente record (the Consultas field is a lookup — read-only).
   if (proximaCita) {
