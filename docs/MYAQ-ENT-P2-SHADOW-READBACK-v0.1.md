@@ -16,8 +16,8 @@ D01–D09 remain proposed and are not implemented by this phase.
 
 | Operation | Current control | Shadow / P2 observation | P2 status |
 |---|---|---|---|
-| AQ Buddy | generic authenticated patient role currently includes `buddy:chat`; governed pilot reviewer access also remains valid | entitlement shadow logs current ALLOW vs pilot/Kenkho/unresolved policy signal | REVIEW — centralized entitlement enforcement not activated |
-| Food Scan initial | authenticated + existing plan/pilot daily/monthly usage limits, fail-closed on usage-source failure | shared usage gate now reproduces the same existing decision semantics | MATCH / FOUNDATION READY |
+| AQ Buddy | generic authenticated patient role currently includes `buddy:chat`; governed pilot reviewer access also remains valid | centralized entitlement gate runs in shadow mode before provider execution | GATE PREPARED / ENFORCEMENT OFF |
+| Food Scan initial | authenticated + existing plan/pilot daily/monthly usage limits, fail-closed on usage-source failure | shared usage gate reproduces the same existing decision semantics | MATCH / FOUNDATION READY |
 | Food Scan reanalysis | authenticated + valid payload + user-scoped meal-log preflight + unconfirmed-state preflight | entitlement shadow + non-enforcing usage shadow | OWNERSHIP REMEDIATED / USAGE REVIEW |
 | Fridge detection | existing governed pilot feature | entitlement shadow | MATCH for pilot |
 | Fridge generation | existing governed pilot feature | entitlement shadow | MATCH for pilot |
@@ -70,9 +70,27 @@ The result does not block reanalysis and does not increment usage.
 
 This data is intended to support the later decision about whether and how reanalysis should consume quota.
 
+### P2-F04 — Central entitlement gate prepared for AQ Buddy
+
+Added `lib/entitlement-gate.ts` as the future server-side decision boundary.
+
+AQ Buddy now passes through `runEntitlementGateShadow(...)` after current role authorization and before provider execution.
+
+The gate contract explicitly returns:
+
+- `mode: shadow`
+- `enforced: false`
+- current access result
+- shadow decision
+- MATCH / MISMATCH / REVIEW comparison
+- policy version
+- reason
+
+No shadow result can currently deny an otherwise-authorized user.
+
 ## 4. AQ Buddy readback
 
-AQ Buddy is now OpenAI-first in Preview and entitlement shadow observation remains active before the model call through `requireCapability('buddy:chat')`.
+AQ Buddy is OpenAI-first in Preview and now reaches entitlement observation through the centralized gate contract.
 
 Current role authorization still grants `buddy:chat` to the generic patient role. Therefore:
 
@@ -117,19 +135,23 @@ Structurally verifies:
 - reanalysis usage observation is present;
 - no branch enforces `shadowUsageDecision.allowed`.
 
+### `tests/entitlement-gate-wiring.test.mts`
+
+Structurally verifies:
+
+- centralized gate remains shadow-only;
+- no `enforced: true` path exists;
+- AQ Buddy capability path calls the centralized gate.
+
 ### Preview branch tests
 
 The P2 branch is covered by `synthetic-preview-policy.test.mts` while Production and `main` remain rejected.
 
-## 8. Build and diff verification
+## 8. Build verification
 
-Vercel build for commit `5a292a0` completed successfully and deployment reached `READY`.
+Vercel build for commit `cd4a2c2` completed successfully and deployment reached `READY`.
 
-Comparison against `myaq-ai-001-aq-buddy-openai-preview`:
-
-- 9 commits ahead
-- 0 commits behind
-- changes limited to Food Scan reanalysis, shared usage gate/shadow, Preview branch guard, package test scripts, tests, and this P2 workstream documentation.
+`main` and Production remain unchanged.
 
 ## 9. Remaining P2 work before PASS
 
@@ -149,21 +171,17 @@ Do not attempt this through another real user's record.
 
 Use a controlled synthetic/unit route test or dedicated synthetic record to verify a non-owned record is rejected before provider execution.
 
-### P2-R03 — Central entitlement gate preparation for AQ Buddy
-
-Prepare a shared server-side entitlement-gate contract that can later sit between authentication and provider execution.
-
-During P2 it must remain shadow/non-enforcing for commercial rules.
-
-### P2-R04 — Do not resolve commercial policy implicitly
+### P2-R03 — Commercial policy remains intentionally unresolved
 
 `portal_basic`, `clinic_ai`, 30-day trial, clinic lifecycle, Restart, billing suspension, and the candidate `$12.99` price remain outside P2 enforcement until separately approved.
 
-## 10. P2A determination
+## 10. P2 determination
 
 `MYAQ-ENT-P2A — OWNERSHIP REMEDIATION + SHARED USAGE GATE FOUNDATION = PASS`
 
-`MYAQ-ENT-P2 — FULL PHASE = LIVE CANARY + CENTRAL GATE PREPARATION PENDING`
+`MYAQ-ENT-P2B — CENTRAL AQ BUDDY ENTITLEMENT GATE PREPARATION = PASS`
+
+`MYAQ-ENT-P2 — FULL PHASE = LIVE REANALYSIS CANARY + CONTROLLED NEGATIVE OWNERSHIP CANARY PENDING`
 
 Production: unchanged.
 `main`: unchanged.
