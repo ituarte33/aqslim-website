@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import {
+  P5_FOUNDER_CANARY_EMAIL,
   P5_FOUNDER_CANARY_REASON_MARKER,
   isP5FounderCanaryEnvironment,
+  isP5FounderCanaryIdentity,
   isP5FounderCanaryRecord,
 } from '../lib/p5-founder-canary-policy.ts'
 import { createCanonicalEntitlementRecord } from '../lib/entitlement-record.ts'
@@ -27,26 +29,34 @@ const clinicAiCanary = createCanonicalEntitlementRecord({
   overrideReason: null,
 })
 
+const P5_ENV = {
+  VERCEL_ENV: 'preview',
+  VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_PREVIEW_BRANCH,
+  MYAQ_P5_FOUNDER_CANARY: 'enabled',
+} as const
+
 test('P5 Founder canary requires Preview, exact branch, and explicit flag', () => {
+  assert.equal(isP5FounderCanaryEnvironment(P5_ENV), true)
   assert.equal(isP5FounderCanaryEnvironment({
-    VERCEL_ENV: 'preview',
-    VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_PREVIEW_BRANCH,
-    MYAQ_P5_FOUNDER_CANARY: 'enabled',
-  }), true)
-  assert.equal(isP5FounderCanaryEnvironment({
+    ...P5_ENV,
     VERCEL_ENV: 'production',
-    VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_PREVIEW_BRANCH,
-    MYAQ_P5_FOUNDER_CANARY: 'enabled',
   }), false)
   assert.equal(isP5FounderCanaryEnvironment({
-    VERCEL_ENV: 'preview',
+    ...P5_ENV,
     VERCEL_GIT_COMMIT_REF: 'main',
-    MYAQ_P5_FOUNDER_CANARY: 'enabled',
   }), false)
   assert.equal(isP5FounderCanaryEnvironment({
-    VERCEL_ENV: 'preview',
-    VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_PREVIEW_BRANCH,
+    ...P5_ENV,
     MYAQ_P5_FOUNDER_CANARY: 'off',
+  }), false)
+})
+
+test('P5 Founder identity is exact and cannot widen admin email fallback', () => {
+  assert.equal(isP5FounderCanaryIdentity({ email: P5_FOUNDER_CANARY_EMAIL, environment: P5_ENV }), true)
+  assert.equal(isP5FounderCanaryIdentity({ email: 'another-admin@example.com', environment: P5_ENV }), false)
+  assert.equal(isP5FounderCanaryIdentity({
+    email: P5_FOUNDER_CANARY_EMAIL,
+    environment: { ...P5_ENV, VERCEL_GIT_COMMIT_REF: 'main' },
   }), false)
 })
 
@@ -70,6 +80,13 @@ test('P5 entitlement context checks Founder canary before internal pilot priorit
   assert.ok(founderLookup >= 0 && pilotFallback > founderLookup)
   assert.match(source, /sourceKind: 'founder_canary_preview_store'/)
   assert.match(source, /useStoredLifecycleSnapshot: true/)
+})
+
+test('P5 Founder binding fallback remains branch-and-identity scoped', async () => {
+  const source = await readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8')
+  assert.match(source, /isP5FounderCanaryIdentity\(/)
+  assert.match(source, /if \(\(role === 'patient' \|\| founderCanaryIdentity\) && !boundPatientId\)/)
+  assert.match(source, /Admin identities never use this fallback except the exact Founder identity/)
 })
 
 test('P5 branch keeps P3 enforcement and P5 canary flag isolated in vercel.json', async () => {
