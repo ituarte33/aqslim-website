@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AuthorizationError, requireCapability } from '@/lib/auth'
 import { getFast36SessionsByPatient, getMealLogForUser, getMealLogsBetween } from '@/lib/airtable'
 import { getPatientPortalData } from '@/lib/patient-portal'
+import { buildAQBuddyPortalContext } from '@/lib/aq-buddy-portal-context'
 import { buildFast36BuddyContext, normalizeFast36Status, type Fast36Session } from '@/lib/fast36-policy'
 import { foodScanPeriodBoundaries } from '@/lib/food-scan-policy'
 import { buildFoodScanContextPrompt, parseBuddyContextReference } from '@/lib/aq-buddy-context'
@@ -258,6 +259,7 @@ export async function POST(req: Request) {
     }]
   })
   const fastingContext = buildFast36BuddyContext(fastingSessions)
+  const portalContext = buildAQBuddyPortalContext(portal)
   const latestUserText = messageText(
     [...messages].reverse().find((message) => message.role === 'user')
   )
@@ -275,6 +277,7 @@ export async function POST(req: Request) {
 
   const systemPrompt = [
     SYSTEM_PROMPT,
+    portalContext,
     verifiedContext,
     fastingContext,
     requiredSafetyBlocks.length > 0 ? MEDICAL_SAFETY_RESPONSE_BOUNDARY : '',
