@@ -4,9 +4,13 @@ import {
   ENTITLEMENT_P3_PREVIEW_BRANCH,
   SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID,
 } from './nutrition/synthetic-preview-policy'
+import {
+  evaluateReanalysisUsage,
+  REANALYSIS_LIMIT_PER_MEAL,
+} from './reanalysis-policy'
 
+export { REANALYSIS_LIMIT_PER_MEAL }
 export const PREVIEW_REANALYSIS_TABLE = 'tblvbgakurEZYnNys'
-export const REANALYSIS_LIMIT_PER_MEAL = 2
 
 const FIELDS = {
   ENTRY_KEY: 'fld13sccoPDgtPJ8u',
@@ -55,13 +59,7 @@ async function fetchCompletedEvents(subjectId: string, mealLogId: string) {
 
 export async function getPreviewReanalysisUsage(subjectId: string, mealLogId: string) {
   const completed = await fetchCompletedEvents(subjectId, mealLogId)
-  const used = completed.length
-  return {
-    used,
-    limit: REANALYSIS_LIMIT_PER_MEAL,
-    remaining: Math.max(0, REANALYSIS_LIMIT_PER_MEAL - used),
-    allowed: used < REANALYSIS_LIMIT_PER_MEAL,
-  }
+  return evaluateReanalysisUsage(completed.length)
 }
 
 export async function recordPreviewReanalysisCompleted(
