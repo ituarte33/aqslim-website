@@ -109,6 +109,8 @@ test('FAST 36 context reports an explicitly completed latest week', () => {
   const context = buildFast36BuddyContext([completed], Date.parse('2026-09-10T18:00:00Z'))
   assert.match(context, /Program week: 6 of 6/)
   assert.match(context, /Documented status: completed/)
+  assert.match(context, /FAST 36 program week and the patient's Kenkho phase\/week are separate dimensions/)
+  assert.match(context, /does not by itself end, advance, invalidate, or conflict with the current Kenkho phase/)
 })
 
 test('only an elapsed schedule can be confirmed as completed', () => {
