@@ -49,13 +49,22 @@ async function hydrateClinicLifecycleAuthority({
   }
 
   const patient = await getClienteById(authenticatedPatientRecordId)
+  if (!patient) {
+    return {
+      ...record,
+      lastCompletedVisit: null,
+      graceEnds: null,
+      entitlementReason: `${record.entitlementReason}; clinic patient record unavailable`,
+    }
+  }
+
   const patientName = patient.fields['Nombre Completo']?.trim() ?? ''
   if (!patientName) {
     return {
       ...record,
       lastCompletedVisit: null,
       graceEnds: null,
-      entitlementReason: `${record.entitlementReason}; clinic patient record unavailable`,
+      entitlementReason: `${record.entitlementReason}; clinic patient name unavailable`,
     }
   }
 
