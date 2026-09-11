@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'My AQSLIM',
     short_name: 'My AQSLIM',
     description: 'Tu portal personal y acompañamiento AQSLIM.',
-    start_url: '/my-aqslim/welcome',
+    start_url: '/my-aqslim',
     scope: '/',
     display: 'standalone',
     background_color: '#161513',
