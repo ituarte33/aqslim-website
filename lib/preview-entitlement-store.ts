@@ -1,7 +1,7 @@
 import 'server-only'
 
 import {
-  ENTITLEMENT_P3_PREVIEW_BRANCH,
+  isEntitlementEnforcementPreviewBranch,
   SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID,
 } from './nutrition/synthetic-preview-policy'
 import {
@@ -16,7 +16,7 @@ import {
 
 export const PREVIEW_ENTITLEMENTS_TABLE = 'tblkAuEOcCA5sek4n'
 
-const FIELDS = {
+export const PREVIEW_ENTITLEMENT_FIELDS = {
   SUBJECT_ID: 'fld0AFNM2RZBMbapg',
   PATIENT_RECORD_ID: 'fld0KoazUqb9iLMLV',
   TIER: 'fldnqcayvpmGUbCVE',
@@ -68,11 +68,18 @@ const SOURCES = new Set<EntitlementSource>([
 export type PreviewEntitlementSourceRecord = {
   record: CanonicalEntitlementRecord
   patientRecordId: string | null
+  airtableRecordId: string
+  storedSubjectId: string
 }
 
-function isP3PreviewStoreEnabled(): boolean {
+type AirtableEntitlementRecord = {
+  id: string
+  fields: Record<string, unknown>
+}
+
+function isPreviewStoreEnabled(): boolean {
   return process.env.VERCEL_ENV === 'preview'
-    && process.env.VERCEL_GIT_COMMIT_REF === ENTITLEMENT_P3_PREVIEW_BRANCH
+    && isEntitlementEnforcementPreviewBranch(process.env.VERCEL_GIT_COMMIT_REF)
     && process.env.AIRTABLE_BASE_ID === SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID
     && Boolean(process.env.AIRTABLE_PAT)
 }
@@ -102,20 +109,17 @@ function escapeFormulaString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-export async function getPreviewEntitlementSourceRecord(
-  subjectId: string,
-): Promise<PreviewEntitlementSourceRecord | null> {
-  if (!isP3PreviewStoreEnabled()) return null
-  if (!subjectId.trim()) return null
+async function queryPreviewEntitlementRecords(filterByFormula: string): Promise<AirtableEntitlementRecord[]> {
+  if (!isPreviewStoreEnabled()) return []
 
   const baseId = process.env.AIRTABLE_BASE_ID as string
   const pat = process.env.AIRTABLE_PAT as string
   const params = new URLSearchParams({
     maxRecords: '2',
     returnFieldsByFieldId: 'true',
-    filterByFormula: `AND({Subject ID} = "${escapeFormulaString(subjectId)}", {Preview Only} = TRUE())`,
+    filterByFormula,
   })
-  Object.values(FIELDS).forEach(fieldId => params.append('fields[]', fieldId))
+  Object.values(PREVIEW_ENTITLEMENT_FIELDS).forEach(fieldId => params.append('fields[]', fieldId))
 
   const response = await fetch(
     `https://api.airtable.com/v0/${baseId}/${PREVIEW_ENTITLEMENTS_TABLE}?${params}`,
@@ -126,52 +130,108 @@ export async function getPreviewEntitlementSourceRecord(
   )
   if (!response.ok) throw new Error('Preview entitlement source unavailable')
 
-  const payload = await response.json() as {
-    records?: Array<{ id: string; fields: Record<string, unknown> }>
-  }
-  const records = payload.records ?? []
-  if (records.length === 0) return null
-  if (records.length > 1) throw new Error('Duplicate Preview entitlement source records')
+  const payload = await response.json() as { records?: AirtableEntitlementRecord[] }
+  return payload.records ?? []
+}
 
-  const fields = records[0].fields
-  const storedSubjectId = text(fields, FIELDS.SUBJECT_ID)
-  const storedTier = tier(text(fields, FIELDS.TIER))
-  const storedStatus = status(text(fields, FIELDS.STATUS))
-  const storedSource = source(text(fields, FIELDS.SOURCE))
-  const recordVersion = text(fields, FIELDS.RECORD_VERSION)
+function parsePreviewEntitlementRecord({
+  airtableRecord,
+  canonicalSubjectId,
+  expectedStoredSubjectId,
+  expectedPatientRecordId,
+}: {
+  airtableRecord: AirtableEntitlementRecord
+  canonicalSubjectId: string
+  expectedStoredSubjectId?: string
+  expectedPatientRecordId?: string
+}): PreviewEntitlementSourceRecord {
+  const fields = airtableRecord.fields
+  const storedSubjectId = text(fields, PREVIEW_ENTITLEMENT_FIELDS.SUBJECT_ID)
+  const patientRecordId = text(fields, PREVIEW_ENTITLEMENT_FIELDS.PATIENT_RECORD_ID)
+  const storedTier = tier(text(fields, PREVIEW_ENTITLEMENT_FIELDS.TIER))
+  const storedStatus = status(text(fields, PREVIEW_ENTITLEMENT_FIELDS.STATUS))
+  const storedSource = source(text(fields, PREVIEW_ENTITLEMENT_FIELDS.SOURCE))
+  const recordVersion = text(fields, PREVIEW_ENTITLEMENT_FIELDS.RECORD_VERSION)
 
   if (
-    storedSubjectId !== subjectId
+    !storedSubjectId
+    || (expectedStoredSubjectId && storedSubjectId !== expectedStoredSubjectId)
+    || (expectedPatientRecordId && patientRecordId !== expectedPatientRecordId)
     || !storedTier
     || !storedStatus
     || !storedSource
     || recordVersion !== ENTITLEMENT_RECORD_VERSION
-    || fields[FIELDS.PREVIEW_ONLY] !== true
+    || fields[PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY] !== true
   ) {
     throw new Error('Invalid Preview entitlement source record')
   }
 
-  const lastAccessChange = text(fields, FIELDS.LAST_ACCESS_CHANGE)
+  const lastAccessChange = text(fields, PREVIEW_ENTITLEMENT_FIELDS.LAST_ACCESS_CHANGE)
   if (!lastAccessChange) throw new Error('Preview entitlement source missing Last Access Change')
 
   return {
-    patientRecordId: text(fields, FIELDS.PATIENT_RECORD_ID),
+    airtableRecordId: airtableRecord.id,
+    storedSubjectId,
+    patientRecordId,
     record: createCanonicalEntitlementRecord({
-      subjectId,
+      subjectId: canonicalSubjectId,
       tier: storedTier,
       status: storedStatus,
       source: storedSource,
-      trialStarts: text(fields, FIELDS.TRIAL_STARTS),
-      trialEnds: text(fields, FIELDS.TRIAL_ENDS),
-      paidThrough: text(fields, FIELDS.PAID_THROUGH),
-      lastCompletedVisit: text(fields, FIELDS.LAST_COMPLETED_VISIT),
-      graceEnds: text(fields, FIELDS.GRACE_ENDS),
-      accessExpires: text(fields, FIELDS.ACCESS_EXPIRES),
-      squareSubscriptionId: text(fields, FIELDS.SQUARE_SUBSCRIPTION_ID),
-      entitlementReason: text(fields, FIELDS.REASON) ?? 'Preview entitlement source',
+      trialStarts: text(fields, PREVIEW_ENTITLEMENT_FIELDS.TRIAL_STARTS),
+      trialEnds: text(fields, PREVIEW_ENTITLEMENT_FIELDS.TRIAL_ENDS),
+      paidThrough: text(fields, PREVIEW_ENTITLEMENT_FIELDS.PAID_THROUGH),
+      lastCompletedVisit: text(fields, PREVIEW_ENTITLEMENT_FIELDS.LAST_COMPLETED_VISIT),
+      graceEnds: text(fields, PREVIEW_ENTITLEMENT_FIELDS.GRACE_ENDS),
+      accessExpires: text(fields, PREVIEW_ENTITLEMENT_FIELDS.ACCESS_EXPIRES),
+      squareSubscriptionId: text(fields, PREVIEW_ENTITLEMENT_FIELDS.SQUARE_SUBSCRIPTION_ID),
+      entitlementReason: text(fields, PREVIEW_ENTITLEMENT_FIELDS.REASON) ?? 'Preview entitlement source',
       lastAccessChange,
-      override: override(text(fields, FIELDS.OVERRIDE)),
-      overrideReason: text(fields, FIELDS.OVERRIDE_REASON),
+      override: override(text(fields, PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE)),
+      overrideReason: text(fields, PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE_REASON),
     }),
   }
+}
+
+export async function getPreviewEntitlementSourceRecord(
+  subjectId: string,
+): Promise<PreviewEntitlementSourceRecord | null> {
+  if (!isPreviewStoreEnabled()) return null
+  if (!subjectId.trim()) return null
+
+  const records = await queryPreviewEntitlementRecords(
+    `AND({Subject ID} = "${escapeFormulaString(subjectId)}", {Preview Only} = TRUE())`,
+  )
+  if (records.length === 0) return null
+  if (records.length > 1) throw new Error('Duplicate Preview entitlement source records')
+
+  return parsePreviewEntitlementRecord({
+    airtableRecord: records[0],
+    canonicalSubjectId: subjectId,
+    expectedStoredSubjectId: subjectId,
+  })
+}
+
+export async function getPreviewEntitlementSourceRecordByPatientRecordId({
+  patientRecordId,
+  canonicalSubjectId,
+}: {
+  patientRecordId: string
+  canonicalSubjectId: string
+}): Promise<PreviewEntitlementSourceRecord | null> {
+  if (!isPreviewStoreEnabled()) return null
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientRecordId)) return null
+  if (!canonicalSubjectId.trim()) return null
+
+  const records = await queryPreviewEntitlementRecords(
+    `AND({Patient Record ID} = "${escapeFormulaString(patientRecordId)}", {Preview Only} = TRUE())`,
+  )
+  if (records.length === 0) return null
+  if (records.length > 1) throw new Error('Duplicate Preview entitlement patient records')
+
+  return parsePreviewEntitlementRecord({
+    airtableRecord: records[0],
+    canonicalSubjectId,
+    expectedPatientRecordId: patientRecordId,
+  })
 }
