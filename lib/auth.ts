@@ -70,9 +70,26 @@ export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
   if (!email) return null
   const role: AppRole = ADMIN_EMAILS.includes(email) ? 'admin' : 'patient'
   const metadataPatientId = user.privateMetadata?.aqslimPatientId
-  const boundPatientId = typeof metadataPatientId === 'string' && metadataPatientId.trim()
+  let boundPatientId = typeof metadataPatientId === 'string' && metadataPatientId.trim()
     ? metadataPatientId.trim()
     : null
+
+  // A patient may complete a qualifying clinic visit before ever creating a Clerk account.
+  // If no explicit metadata binding exists, reuse the portal's governed unique-email identity
+  // resolution so entitlement can bind to the stable Airtable patient record. Zero or duplicate
+  // matches fail closed. Admin identities never use this fallback.
+  if (role === 'patient' && !boundPatientId) {
+    try {
+      const matches = await getClientesByEmail(email)
+      boundPatientId = resolveAuthenticatedPatientScope({
+        role,
+        boundPatientId: null,
+        matchingPatientIds: matches.map(patient => patient.id),
+      })
+    } catch {
+      boundPatientId = null
+    }
+  }
 
   return {
     clerkUserId: user.id,
