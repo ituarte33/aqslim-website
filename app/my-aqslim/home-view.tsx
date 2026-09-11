@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
+import { buildDailyAQBuddyGuidance } from '@/lib/daily-aq-buddy-guidance'
 import { demoProfilePath } from '@/lib/demo-profile-route'
 import { CalendarIcon, ChevronIcon, MaterialsIcon } from './portal-icons'
 import { PortalShell } from './portal-shell'
@@ -50,6 +51,13 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
   const plan = data.planName || data.phase || (es ? 'Por confirmar' : 'To be confirmed')
   const isFast36Hypocaloric = plan.toLowerCase().includes('fast 36') && plan.toLowerCase().includes('hipocal')
   const planTitle = isFast36Hypocaloric ? 'FAST 36' : plan
+  const guidance = buildDailyAQBuddyGuidance({
+    phase: data.phase,
+    weekInPhase: data.weekInPhase,
+    planName: data.planName,
+  })[language]
+  const buddyPath = demoProfilePath(demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy', demo, demoProfileId)
+  const guidanceHref = `${buddyPath}${buddyPath.includes('?') ? '&' : '?'}prompt=${encodeURIComponent(guidance.buddyPrompt)}`
 
   return (
     <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={demoProfileId}>
@@ -77,6 +85,29 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
           <span>{planTitle.slice(0, 1).toUpperCase()}</span>
           <small>MY AQSLIM</small>
         </div>
+      </section>
+
+      <section className={`${styles.panel} ${styles.dailyGuidancePanel}`}>
+        <div className={styles.dailyGuidanceHeading}>
+          <Image
+            src="/Aqslim_Buddy_Pics/aqslim_buddy_thumbs_up.png"
+            alt="AQ Buddy"
+            width={88}
+            height={88}
+          />
+          <div>
+            <p className={styles.eyebrow}>{es ? 'AQ Buddy para hoy' : 'AQ Buddy for today'}</p>
+            <h2>{es ? 'Tus recomendaciones de hoy' : 'Your recommendations for today'}</h2>
+            <span>{guidance.phaseLabel}</span>
+          </div>
+        </div>
+        <ul className={styles.dailyGuidanceList}>
+          {guidance.bullets.map(item => <li key={item}>{item}</li>)}
+        </ul>
+        <p className={styles.dailyGuidanceNote}>{guidance.note}</p>
+        <Link href={guidanceHref} className={styles.dailyGuidanceLink}>
+          {es ? 'Ver recomendaciones completas' : 'View full recommendations'} <ChevronIcon />
+        </Link>
       </section>
 
       <section className={`${styles.panel} ${styles.mealHub}`}>
@@ -150,7 +181,7 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
         <div>
           <p className={styles.eyebrow}>AQ Buddy</p>
           <h2>{es ? '¿Cómo puedo ayudarte hoy?' : 'How can I help you today?'}</h2>
-          <Link href={demoProfilePath(demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy', demo, demoProfileId)} className={styles.goldButton}>{es ? 'Hablar con AQ Buddy' : 'Talk to AQ Buddy'}</Link>
+          <Link href={buddyPath} className={styles.goldButton}>{es ? 'Hablar con AQ Buddy' : 'Talk to AQ Buddy'}</Link>
         </div>
       </section>
 
