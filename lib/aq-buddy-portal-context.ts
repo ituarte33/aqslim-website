@@ -1,4 +1,4 @@
-import { buildAQSLIMPhaseFoodPolicyContext } from '@/lib/aqslim-phase-food-policy'
+import { buildAQSLIMPhaseFoodPolicyContext } from './aqslim-phase-food-policy'
 
 export type AQBuddyPortalContextInput = {
   firstName?: string | null
