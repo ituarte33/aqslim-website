@@ -9,7 +9,10 @@ import {
   isP5FounderCanaryRecord,
 } from '../lib/p5-founder-canary-policy.ts'
 import { createCanonicalEntitlementRecord } from '../lib/entitlement-record.ts'
-import { ENTITLEMENT_P5_PREVIEW_BRANCH } from '../lib/nutrition/synthetic-preview-policy.ts'
+import {
+  ENTITLEMENT_P5_1_PREVIEW_BRANCH,
+  ENTITLEMENT_P5_PREVIEW_BRANCH,
+} from '../lib/nutrition/synthetic-preview-policy.ts'
 
 const clinicAiCanary = createCanonicalEntitlementRecord({
   subjectId: 'patient:synthetic',
@@ -35,8 +38,14 @@ const P5_ENV = {
   MYAQ_P5_FOUNDER_CANARY: 'enabled',
 } as const
 
-test('P5 Founder canary requires Preview, exact branch, and explicit flag', () => {
+const P5_1_ENV = {
+  ...P5_ENV,
+  VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_1_PREVIEW_BRANCH,
+} as const
+
+test('P5 Founder canary requires Preview, an approved P5 branch, and explicit flag', () => {
   assert.equal(isP5FounderCanaryEnvironment(P5_ENV), true)
+  assert.equal(isP5FounderCanaryEnvironment(P5_1_ENV), true)
   assert.equal(isP5FounderCanaryEnvironment({
     ...P5_ENV,
     VERCEL_ENV: 'production',
@@ -53,6 +62,7 @@ test('P5 Founder canary requires Preview, exact branch, and explicit flag', () =
 
 test('P5 Founder identity is exact and cannot widen admin email fallback', () => {
   assert.equal(isP5FounderCanaryIdentity({ email: P5_FOUNDER_CANARY_EMAIL, environment: P5_ENV }), true)
+  assert.equal(isP5FounderCanaryIdentity({ email: P5_FOUNDER_CANARY_EMAIL, environment: P5_1_ENV }), true)
   assert.equal(isP5FounderCanaryIdentity({ email: 'another-admin@example.com', environment: P5_ENV }), false)
   assert.equal(isP5FounderCanaryIdentity({
     email: P5_FOUNDER_CANARY_EMAIL,
