@@ -61,6 +61,10 @@ export function SavedScanEditor({ mealLogId }: { mealLogId: string }) {
           setError('Ya utilizaste las 2 correcciones disponibles para este escaneo.')
           return
         }
+        if (data.error === 'portion_instruction_in_text') {
+          setError(`No escribas el porcentaje de consumo dentro de la corrección. El sistema detectó ${data.mentionedPortionPercent}%. Selecciona ese porcentaje en el campo Porción y usa el texto sólo para corregir ingredientes o cantidades. Este intento no consume una corrección.`)
+          return
+        }
         throw new Error(data.error || 'correction_failed')
       }
       setSnapshot(current => current ? { ...current, ...data } : data)
@@ -109,6 +113,9 @@ export function SavedScanEditor({ mealLogId }: { mealLogId: string }) {
               disabled={correctionDisabled || saving}
               style={{ width: '100%', minHeight: 120, boxSizing: 'border-box', background: '#0d0d0d', color: '#eee', border: '1px solid #555', padding: 12 }}
             />
+            <small style={{ display: 'block', marginTop: 8, color: '#8f8a83', lineHeight: 1.5 }}>
+              Describe aquí sólo ingredientes o cantidades. Para indicar cuánto vas a consumir, usa exclusivamente el campo Porción de abajo.
+            </small>
           </label>
 
           <label style={{ display: 'block', marginTop: 16 }}>
