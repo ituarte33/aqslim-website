@@ -1,9 +1,17 @@
 import type { CanonicalEntitlementRecord } from './entitlement-record'
-import { ENTITLEMENT_P5_PREVIEW_BRANCH } from './nutrition/synthetic-preview-policy'
+import {
+  ENTITLEMENT_P5_1_PREVIEW_BRANCH,
+  ENTITLEMENT_P5_PREVIEW_BRANCH,
+} from './nutrition/synthetic-preview-policy'
 
 export const P5_FOUNDER_CANARY_FLAG = 'MYAQ_P5_FOUNDER_CANARY' as const
 export const P5_FOUNDER_CANARY_REASON_MARKER = 'P5_FOUNDER_REAL_USER_CANARY' as const
 export const P5_FOUNDER_CANARY_EMAIL = 'rom@ituarteconsulting.com' as const
+
+const P5_FOUNDER_CANARY_BRANCHES = new Set([
+  ENTITLEMENT_P5_PREVIEW_BRANCH,
+  ENTITLEMENT_P5_1_PREVIEW_BRANCH,
+])
 
 export function isP5FounderCanaryEnvironment(environment: {
   VERCEL_ENV?: string
@@ -11,7 +19,8 @@ export function isP5FounderCanaryEnvironment(environment: {
   MYAQ_P5_FOUNDER_CANARY?: string
 }): boolean {
   return environment.VERCEL_ENV === 'preview'
-    && environment.VERCEL_GIT_COMMIT_REF === ENTITLEMENT_P5_PREVIEW_BRANCH
+    && Boolean(environment.VERCEL_GIT_COMMIT_REF)
+    && P5_FOUNDER_CANARY_BRANCHES.has(environment.VERCEL_GIT_COMMIT_REF as string)
     && environment.MYAQ_P5_FOUNDER_CANARY?.trim().toLowerCase() === 'enabled'
 }
 
