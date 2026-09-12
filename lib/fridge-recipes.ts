@@ -1,3 +1,5 @@
+import { buildAQSLIMPhaseFoodPolicyContext } from './aqslim-phase-food-policy'
+
 export type FridgeDetectionResult = {
   observedIngredients: string[]
   uncertainItems: string[]
@@ -134,10 +136,16 @@ export function canonicalFridgePhase(phase: string | null): string | null {
   return phase && PHASE_RULES[phase] ? phase : null
 }
 
-export function fridgePhaseInstruction(phase: string | null): string {
+export function fridgePhaseInstruction(phase: string | null, weekInPhase: number | null = null): string {
   const canonicalPhase = canonicalFridgePhase(phase)
   if (!canonicalPhase) {
     return 'No nutritional phase is confirmed. Do not call any recipe phase-compatible and do not choose or infer a phase. The phaseFit field must clearly say that compatibility is pending confirmation by AQSLIM.'
   }
-  return `The canonical phase confirmed by AQSLIM is ${PHASE_RULES[canonicalPhase]} Adapt suggestions conservatively to that phase without changing it or claiming exact daily compliance from a single recipe.`
+
+  const governedPolicy = buildAQSLIMPhaseFoodPolicyContext({
+    phase: canonicalPhase,
+    weekInPhase,
+  })
+
+  return `${governedPolicy}\nFridge-recipe rules: phase compatibility outranks ingredient coverage. Do not force a confirmed ingredient into a recipe when it is a poor fit for the governed phase. If you omit a confirmed ingredient because of phase compatibility, say so briefly in confidenceNote. Do not claim exact daily compliance from a single recipe.`
 }
