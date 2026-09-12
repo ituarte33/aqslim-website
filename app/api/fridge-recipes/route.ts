@@ -192,7 +192,7 @@ Respond in ${responseLanguage}. Return ONLY concise valid JSON:
     ? body.servings as number
     : 2
   const confirmedPhase = canonicalFridgePhase(patient.phase)
-  const phaseInstruction = fridgePhaseInstruction(confirmedPhase)
+  const phaseInstruction = fridgePhaseInstruction(confirmedPhase, patient.weekInPhase)
 
   const generation = await requestValidatedJson(
     [{
@@ -204,9 +204,10 @@ ${JSON.stringify(ingredients)}
 
 Requested servings: ${servings}
 Ingredients or preferences to avoid: ${JSON.stringify(exclusions || 'none')}
-Patient phase rule: ${phaseInstruction}
+Patient phase policy:
+${phaseInstruction}
 
-Create exactly three practical recipes. Use only confirmed ingredients as available food. Pantry basics or missing items must appear only in optionalExtras. Use every confirmed ingredient in at least one recipe when culinarily reasonable, and make the first recipe combine as many confirmed ingredients as reasonably work together. Never invent that an optional item is present. Respect exclusions. Do not diagnose, prescribe, change phase, or claim exact nutrition or food-safety certainty. Include ordinary safe-cooking guidance when appropriate. Respond in ${responseLanguage}.
+Create exactly three practical recipes. Use only confirmed ingredients as available food. Pantry basics or missing items must appear only in optionalExtras. Phase compatibility outranks ingredient coverage: use confirmed ingredients only when they fit the governed phase, and do not force every visible ingredient into a recipe. If a confirmed ingredient is a poor fit for the phase, omit it and mention that omission briefly in confidenceNote. Make the first recipe combine as many phase-compatible confirmed ingredients as reasonably work together. Never invent that an optional item is present. Respect exclusions. Do not diagnose, prescribe, change phase, or claim exact nutrition or food-safety certainty. Include ordinary safe-cooking guidance when appropriate. Respond in ${responseLanguage}.
 
 Return ONLY concise valid JSON:
 {
@@ -214,7 +215,7 @@ Return ONLY concise valid JSON:
     {
       "name": "recipe name",
       "summary": "one short sentence",
-      "ingredients": [{ "item": "confirmed ingredient", "amount": "amount for ${servings} serving(s)" }],
+      "ingredients": [{ "item": "confirmed phase-compatible ingredient", "amount": "amount for ${servings} serving(s)" }],
       "optionalExtras": ["optional or missing pantry item"],
       "steps": ["short preparation action"],
       "minutes": 20,
@@ -222,7 +223,7 @@ Return ONLY concise valid JSON:
       "phaseFit": "honest phase note or pending-confirmation statement"
     }
   ],
-  "confidenceNote": "brief limitation based on the confirmed list",
+  "confidenceNote": "brief limitation based on the confirmed list, including any confirmed ingredient intentionally omitted for phase fit",
   "safetyNote": "brief cooking, allergy, and label-verification reminder"
 }`,
     }],
@@ -233,7 +234,7 @@ Return ONLY concise valid JSON:
     const correlationId = crypto.randomUUID()
     console.error('[fridge-recipes] generation_failed', { correlationId, failure: generation.failure })
     return Response.json({
-      error: generation.failure === 'provider_unavailable' ? 'provider_unavailable' : 'recipes_incomplete',
+      error: analysisFailureToError(generation.failure),
       correlationId,
     }, { status: 502 })
   }
@@ -251,4 +252,8 @@ Return ONLY concise valid JSON:
     phase: confirmedPhase,
     phaseConfirmed: Boolean(confirmedPhase),
   })
+}
+
+function analysisFailureToError(failure: ValidatedResponse<unknown>['failure']) {
+  return failure === 'provider_unavailable' ? 'provider_unavailable' : 'recipes_incomplete'
 }
