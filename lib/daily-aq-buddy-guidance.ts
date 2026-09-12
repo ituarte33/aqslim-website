@@ -1,4 +1,4 @@
-import { phaseHomeReminder } from '@/lib/aqslim-phase-food-policy'
+import { phaseHomeReminder } from './aqslim-phase-food-policy'
 
 export type GuidanceLanguage = 'es' | 'en'
 
