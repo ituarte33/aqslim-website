@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { buildAQSLIMPhaseFoodPolicyContext } from '@/lib/aqslim-phase-food-policy'
 import { evaluateAiEntitlementAccess } from '@/lib/ai-entitlement-access'
 import { getActor } from '@/lib/auth'
 import { getPilotAccess } from '@/lib/pilot-access'
@@ -42,6 +43,11 @@ export async function POST(request: Request) {
 
   const language = body.language === 'en' ? 'English' : 'Spanish'
   const restaurant = body.restaurant?.trim().slice(0, 100) || 'not provided'
+  const phasePolicy = buildAQSLIMPhaseFoodPolicyContext({
+    phase: patient.phase,
+    weekInPhase: patient.weekInPhase,
+  })
+
   const message = await client.messages.create({
     model: MODEL,
     max_tokens: 900,
@@ -49,9 +55,12 @@ export async function POST(request: Request) {
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: body.mimeType as 'image/jpeg' | 'image/png' | 'image/webp', data: body.imageBase64 } },
-        { type: 'text', text: `You are AQ Buddy's restaurant-menu analysis component. The authenticated patient's canonical AQSLIM phase is "${patient.phase}". Restaurant name: "${restaurant}".
+        { type: 'text', text: `You are AQ Buddy's restaurant-menu analysis component. Restaurant name: "${restaurant}".
 
-Read only what is visible in the menu image. Give practical, phase-compatible educational guidance; do not diagnose, prescribe, change the patient's phase, or claim certainty about hidden ingredients or portions. Prefer simple preparation, identify sauces/sides that may change suitability, and explicitly acknowledge uncertainty. Respond in ${language}.
+The authenticated patient's governed AQSLIM food policy is:
+${phasePolicy}
+
+Read only what is visible in the menu image. The governed AQSLIM phase policy overrides generic keto or low-carb advice. Give practical phase-compatible educational guidance; do not diagnose, prescribe, change the patient's phase, or invent an allowance or prohibition that is not supported by the policy or visible menu text. Prefer simple preparation, identify sauces/sides that may change suitability, and explicitly acknowledge uncertainty. Respond in ${language}.
 
 Return ONLY valid JSON:
 {
