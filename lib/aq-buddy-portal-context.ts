@@ -1,3 +1,5 @@
+import { buildAQSLIMPhaseFoodPolicyContext } from '@/lib/aqslim-phase-food-policy'
+
 export type AQBuddyPortalContextInput = {
   firstName?: string | null
   language?: 'es' | 'en' | null
@@ -46,9 +48,15 @@ export function buildAQBuddyPortalContext(portal: AQBuddyPortalContextInput | nu
 
   if (facts.length === 0) return ''
 
+  const phaseFoodPolicy = buildAQSLIMPhaseFoodPolicyContext({
+    phase: portal.phase ?? null,
+    weekInPhase: portal.weekInPhase ?? null,
+  })
+
   return [
     'VERIFIED PATIENT PORTAL CONTEXT — AUTHENTICATED AQSLIM DATA',
     'Use these values as the patient’s current canonical portal facts when answering. Do not infer or invent any field that is not listed. If a value conflicts with user-provided text, acknowledge the discrepancy and prefer the verified portal value for AQSLIM phase/plan status unless the user is reporting a newer event that requires AQSLIM review.',
     ...facts,
-  ].join('\n')
+    phaseFoodPolicy,
+  ].filter(Boolean).join('\n')
 }
