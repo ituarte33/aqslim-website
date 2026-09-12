@@ -1,3 +1,5 @@
+import { phaseHomeReminder } from '@/lib/aqslim-phase-food-policy'
+
 export type GuidanceLanguage = 'es' | 'en'
 
 type DailyGuidanceInput = {
@@ -63,21 +65,21 @@ export function buildDailyAQBuddyGuidance({ phase, weekInPhase, planName }: Dail
       phaseLabel: phaseEs,
       bullets: [
         target?.es ?? 'Confirma tu fase antes de hacer cambios importantes en carbohidratos.',
-        'Prefiere preparaciones simples, proteína y vegetales compatibles; revisa azúcares ocultos, empanizados, salsas y porciones.',
+        phaseHomeReminder(phase, 'es'),
         planBullet(planName, 'es'),
       ],
       note: 'Si tienes una indicación especial registrada, esa tiene prioridad. No cambies de fase por tu cuenta.',
-      buddyPrompt: `Estoy en ${phaseEs}. ¿Cuáles son mis recomendaciones para hoy, qué alimentos debo priorizar y qué debo evitar?`,
+      buddyPrompt: `Estoy en ${phaseEs}. Dame mis recomendaciones AQSLIM para hoy usando las reglas autorizadas de mi fase. ¿Qué debo priorizar y qué debo evitar? No uses una lista keto genérica.`,
     },
     en: {
       phaseLabel: phaseEn,
       bullets: [
         target?.en ?? 'Confirm your phase before making major carbohydrate changes.',
-        'Prefer simple preparations, protein, and phase-compatible vegetables; watch for hidden sugars, breading, sauces, and portions.',
+        phaseHomeReminder(phase, 'en'),
         planBullet(planName, 'en'),
       ],
       note: 'If you have a recorded special instruction, it takes priority. Do not change phases on your own.',
-      buddyPrompt: `I am in ${phaseEn}. What are my recommendations for today, what foods should I prioritize, and what should I avoid?`,
+      buddyPrompt: `I am in ${phaseEn}. Give me today's AQSLIM recommendations using the authorized rules for my phase. What should I prioritize and avoid? Do not use a generic keto list.`,
     },
   }
 }
