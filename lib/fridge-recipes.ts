@@ -146,6 +146,9 @@ export function fridgePhaseInstruction(phase: string | null, weekInPhase: number
     phase: canonicalPhase,
     weekInPhase,
   })
+  const terminologyRule = typeof weekInPhase === 'number'
+    ? `Terminology rule: ${canonicalPhase} is the phase name and ${weekInPhase} is the week within that phase. Never call it "phase ${weekInPhase}". If you mention both, write "${canonicalPhase} · Week ${weekInPhase}" (or the equivalent in the response language).`
+    : `Terminology rule: ${canonicalPhase} is the phase name. Do not invent a phase number.`
 
-  return `${governedPolicy}\nFridge-recipe rules: phase compatibility outranks ingredient coverage. Do not force a confirmed ingredient into a recipe when it is a poor fit for the governed phase. If you omit a confirmed ingredient because of phase compatibility, say so briefly in confidenceNote. Do not claim exact daily compliance from a single recipe.`
+  return `${governedPolicy}\n${terminologyRule}\nFridge-recipe rules: phase compatibility outranks ingredient coverage. Do not force a confirmed ingredient into a recipe when it is a poor fit for the governed phase. If you omit a confirmed ingredient because of phase compatibility, say so briefly in confidenceNote. Do not claim exact daily compliance from a single recipe.`
 }
