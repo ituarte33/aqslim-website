@@ -22,6 +22,21 @@ test('verified portal context exposes canonical phase and week when present', ()
   assert.match(context, /Do not infer or invent any field that is not listed/)
 })
 
+test('Jing portal context includes governed AQSLIM food rules', () => {
+  const context = buildAQBuddyPortalContext({
+    firstName: 'Test',
+    phase: 'Jing',
+    weekInPhase: 3,
+  })
+
+  assert.match(context, /AQSLIM PHASE FOOD POLICY/)
+  assert.match(context, /Less than 20 g carbohydrate per day/)
+  assert.match(context, /do NOT recommend avocado or nuts as default or priority foods/i)
+  assert.match(context, /Cheese is easy to overconsume/)
+  assert.match(context, /Do not categorically classify corn tortillas as always forbidden/)
+  assert.match(context, /generic low-carb, keto, or internet-style food advice/i)
+})
+
 test('missing phase is omitted rather than inferred', () => {
   const context = buildAQBuddyPortalContext({
     firstName: 'Test',
@@ -29,6 +44,7 @@ test('missing phase is omitted rather than inferred', () => {
   })
 
   assert.equal(context.includes('Current phase:'), false)
+  assert.equal(context.includes('AQSLIM PHASE FOOD POLICY'), false)
   assert.match(context, /Week in current phase: 6/)
 })
 
