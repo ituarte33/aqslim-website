@@ -55,6 +55,20 @@ function portionFromNotes(notes: string): number {
   return Number.isInteger(parsed) && parsed >= 10 && parsed <= 100 ? parsed : 100
 }
 
+function portionMentionFromCorrection(value: string): number | null {
+  const patterns = [
+    /(?:consum(?:ir|iré|ire|o)|comer(?:é|e|emos)?|voy\s+a\s+comer|porci[oó]n|serving|consume|eat)[^.!?\n]{0,60}?(\d{1,3})\s*%/i,
+    /(\d{1,3})\s*%[^.!?\n]{0,60}?(?:de\s+(?:la\s+)?porci[oó]n|del\s+plato|of\s+(?:the\s+)?(?:portion|serving|plate))/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern)
+    const parsed = match?.[1] ? Number(match[1]) : NaN
+    if (Number.isInteger(parsed) && parsed >= 10 && parsed <= 100) return parsed
+  }
+  return null
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ mealLogId: string }> },
@@ -108,6 +122,15 @@ export async function PATCH(
   const portionPercent = parseMealPortion(body.portionPercent ?? 100)
   const language = body.language === 'en' ? 'en' : 'es'
   if (!correction || !portionPercent) return Response.json({ error: 'invalid_correction' }, { status: 400 })
+
+  const mentionedPortionPercent = portionMentionFromCorrection(correction)
+  if (mentionedPortionPercent !== null) {
+    return Response.json({
+      error: 'portion_instruction_in_text',
+      mentionedPortionPercent,
+      selectedPortionPercent: portionPercent,
+    }, { status: 409 })
+  }
 
   const usage = await getPreviewReanalysisUsage(userId, mealLogId)
   if (!usage.allowed) {
