@@ -72,7 +72,9 @@ test('normalizes visual and patient-entered ingredients without duplicates', () 
 })
 
 test('uses only a canonical confirmed phase and otherwise requires confirmation', () => {
-  assert.match(fridgePhaseInstruction('Jing'), /less than 20 g/)
+  assert.match(fridgePhaseInstruction('Jing', 3), /Less than 20 g carbohydrate per day/)
+  assert.match(fridgePhaseInstruction('Jing', 3), /do NOT recommend avocado or nuts as default or priority foods/)
+  assert.match(fridgePhaseInstruction('Jing', 3), /phase compatibility outranks ingredient coverage/i)
   assert.match(fridgePhaseInstruction('Qi'), /25–45 g/)
   assert.match(fridgePhaseInstruction(null), /No nutritional phase is confirmed/)
   assert.match(fridgePhaseInstruction('FAST 36'), /No nutritional phase is confirmed/)
