@@ -21,12 +21,38 @@ const VAGUE_ITEM_PATTERNS = [
   /\bbreaded\/?fried items\b/i,
 ]
 
+const JING_HIGH_RISK_BEST_PATTERNS = [
+  /\bparmigiana\b/i,
+  /\bparmesan\b/i,
+  /\balfredo\b/i,
+  /\blasagna\b/i,
+  /\bcannelloni\b/i,
+  /\bravioli\b/i,
+  /\bpasta\b/i,
+  /\bbreaded\b/i,
+  /\bfried\b/i,
+  /\bfritta\b/i,
+]
+
+const JING_CHEESE_OVERSTATEMENT_PATTERNS = [
+  /cheese is (?:appropriate|compatible|fine|free)/i,
+  /queso es (?:apropiado|compatible|libre)/i,
+]
+
 export function isSpecificRestaurantMenuItemLabel(value: string): boolean {
   const item = value.trim()
   if (!item) return false
   const lower = item.toLowerCase()
   if (lower.includes('unreadable') || lower.includes('ilegible')) return true
   return VAGUE_ITEM_PATTERNS.every(pattern => !pattern.test(item))
+}
+
+export function isJingBestRestaurantItemLabel(value: string): boolean {
+  const item = value.trim()
+  if (!item) return false
+  const lower = item.toLowerCase()
+  if (lower.includes('unreadable') || lower.includes('ilegible')) return true
+  return JING_HIGH_RISK_BEST_PATTERNS.every(pattern => !pattern.test(item))
 }
 
 function isRecommendation(value: unknown): value is RestaurantRecommendation {
@@ -53,6 +79,24 @@ export function isRestaurantAdvisorResult(value: unknown): value is RestaurantAd
     && typeof result.confidenceNote === 'string'
     && result.confidenceNote.trim().length > 0
   )
+}
+
+export function isRestaurantAdvisorResultForPhase(value: unknown, phase: string | null): value is RestaurantAdvisorResult {
+  if (!isRestaurantAdvisorResult(value)) return false
+  if (phase !== 'Jing') return true
+
+  if (!isJingBestRestaurantItemLabel(value.best.item)) return false
+
+  const combinedText = [
+    value.best.reason,
+    value.best.modification,
+    value.adjusted.reason,
+    value.adjusted.modification,
+    value.avoid.reason,
+    value.avoid.modification,
+  ].join(' ')
+
+  return JING_CHEESE_OVERSTATEMENT_PATTERNS.every(pattern => !pattern.test(combinedText))
 }
 
 export function parseRestaurantAdvisorJson(raw: string): unknown {
