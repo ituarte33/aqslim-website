@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  isJingBestRestaurantItemLabel,
   isRestaurantAdvisorResult,
+  isRestaurantAdvisorResultForPhase,
   isSpecificRestaurantMenuItemLabel,
   parseRestaurantAdvisorJson,
 } from '../lib/restaurant-advisor.ts'
@@ -15,6 +17,7 @@ const validResult = {
 
 test('accepts a complete, non-empty restaurant analysis', () => {
   assert.equal(isRestaurantAdvisorResult(validResult), true)
+  assert.equal(isRestaurantAdvisorResultForPhase(validResult, 'Jing'), true)
 })
 
 test('rejects missing, empty, or malformed recommendation fields', () => {
@@ -34,6 +37,38 @@ test('rejects vague or invented-style menu item labels', () => {
     ...validResult,
     adjusted: { ...validResult.adjusted, item: 'Carne Asada or similar grilled meat entrée' },
   }), false)
+})
+
+test('prevents obvious high-risk composed dishes from being Jing best option', () => {
+  assert.equal(isJingBestRestaurantItemLabel('Grilled Chicken Marsala'), true)
+  assert.equal(isJingBestRestaurantItemLabel('Chicken Parmigiana'), false)
+  assert.equal(isJingBestRestaurantItemLabel('Eggplant Parmesan'), false)
+  assert.equal(isJingBestRestaurantItemLabel('Seafood Cannelloni'), false)
+  assert.equal(isJingBestRestaurantItemLabel('Chicken Alfredo'), false)
+  assert.equal(isJingBestRestaurantItemLabel('Lasagna Classico'), false)
+
+  const parmigianaBest = {
+    ...validResult,
+    best: {
+      item: 'Chicken Parmigiana',
+      reason: 'Pollo con salsa',
+      modification: 'Pide la salsa al lado',
+    },
+  }
+  assert.equal(isRestaurantAdvisorResult(parmigianaBest), true)
+  assert.equal(isRestaurantAdvisorResultForPhase(parmigianaBest, 'Jing'), false)
+})
+
+test('rejects Jing cheese overstatements', () => {
+  const cheeseOverstatement = {
+    ...validResult,
+    adjusted: {
+      ...validResult.adjusted,
+      reason: 'El queso es apropiado en Jing si controlas la porción.',
+    },
+  }
+  assert.equal(isRestaurantAdvisorResult(cheeseOverstatement), true)
+  assert.equal(isRestaurantAdvisorResultForPhase(cheeseOverstatement, 'Jing'), false)
 })
 
 test('parses clean, fenced, or wrapped restaurant JSON', () => {
