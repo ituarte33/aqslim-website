@@ -11,11 +11,35 @@ export type RestaurantAdvisorResult = {
   confidenceNote: string
 }
 
+const VAGUE_ITEM_PATTERNS = [
+  /\bor similar\b/i,
+  /\bsection\b/i,
+  /\bvisible in (?:the )?menu\b/i,
+  /\bitems visible\b/i,
+  /\bmenu items\b/i,
+  /\bgrilled meat entr(?:e|é)e\b/i,
+  /\bbreaded\/?fried items\b/i,
+]
+
+export function isSpecificRestaurantMenuItemLabel(value: string): boolean {
+  const item = value.trim()
+  if (!item) return false
+  const lower = item.toLowerCase()
+  if (lower.includes('unreadable') || lower.includes('ilegible')) return true
+  return VAGUE_ITEM_PATTERNS.every(pattern => !pattern.test(item))
+}
+
 function isRecommendation(value: unknown): value is RestaurantRecommendation {
   if (!value || typeof value !== 'object') return false
   const recommendation = value as Record<string, unknown>
-  return ['item', 'reason', 'modification'].every(
-    field => typeof recommendation[field] === 'string' && recommendation[field].trim().length > 0,
+  const item = recommendation.item
+  return (
+    typeof item === 'string'
+    && isSpecificRestaurantMenuItemLabel(item)
+    && typeof recommendation.reason === 'string'
+    && recommendation.reason.trim().length > 0
+    && typeof recommendation.modification === 'string'
+    && recommendation.modification.trim().length > 0
   )
 }
 
