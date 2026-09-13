@@ -25,7 +25,7 @@ test('rejects missing, empty, or malformed recommendation fields', () => {
 test('parses clean, fenced, or wrapped restaurant JSON', () => {
   const raw = JSON.stringify(validResult)
   assert.deepEqual(parseRestaurantAdvisorJson(raw), validResult)
-  assert.deepEqual(parseRestaurantAdvisorJson(````json\n${raw}\n````.replace(/````/g, '```')), validResult)
+  assert.deepEqual(parseRestaurantAdvisorJson('```json\n' + raw + '\n```'), validResult)
   assert.deepEqual(parseRestaurantAdvisorJson(`Menu analysis:\n${raw}\nDone.`), validResult)
   assert.equal(parseRestaurantAdvisorJson('{"best":'), null)
   assert.equal(parseRestaurantAdvisorJson(''), null)
