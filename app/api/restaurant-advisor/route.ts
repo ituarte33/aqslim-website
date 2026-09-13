@@ -30,7 +30,7 @@ async function requestRestaurantAnalysis(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const retryInstruction = attempt === 1
-        ? '\n\nRetry requirement: return one complete valid JSON object only. Every item field must be the exact name of one individually named menu item visible in the image. Do not use section names, generic categories, "or similar", or invented dish names. For Jing, the BEST item must not be an obvious Parmigiana/Parmesan, Alfredo, Lasagna, Cannelloni, Ravioli, pasta, breaded, fried, or fritta item when a simpler visible grilled/non-breaded option exists. Respect every Jing-specific ranking rule and never call cheese automatically appropriate or compatible. Do not use markdown, code fences, commentary, or trailing text.'
+        ? '\n\nRetry requirement: return one complete valid JSON object only. Every item field must be the exact name of one individually named menu item visible in the image. Do not use section names, generic categories, "or similar", or invented dish names. For Jing, the BEST item must not be an obvious Parmigiana/Parmesan, Alfredo, Lasagna, Cannelloni, Ravioli, pasta, breaded, fried, or fritta item when a simpler visible grilled/non-breaded option exists. Respect every Jing-specific ranking rule and never call cheese automatically appropriate or compatible. Do not invent numeric nutrition estimates. The only numeric carbohydrate target you may mention is the governed Jing target of less than 20 g/day. Do not use markdown, code fences, commentary, or trailing text.'
         : ''
       const message = await client.messages.create({
         model: MODEL,
@@ -122,6 +122,8 @@ GROUNDING RULES — REQUIRED:
 - If the visible description mentions breading, frying, pasta, cream sauce, sweet sauce, or a high-carbohydrate side, do NOT call that dish a simple protein.
 - For Jing, do not describe cheese as inherently appropriate or compatible. Treat cheese as a portion-control concern unless the patient's recorded plan explicitly authorizes it.
 - Do not assume a restaurant can transform a composed dish into a completely different preparation. Suggested modifications must be plausible, limited changes such as sauce on the side, omit a side, remove croutons, or ask about an available substitution.
+- Do NOT invent numeric nutrition estimates from general knowledge. Unless a nutrition number is clearly printed beside the exact menu item in the image, do not state grams of carbohydrate/sugar, calories, kcal, or mg. Say the amount cannot be verified from the image instead.
+- The governed phase target is not a menu estimate: for Jing you may state only the recorded target of less than 20 g carbohydrate per day.
 
 If only part of the menu is readable, analyze the readable items rather than failing the whole request. If the menu is truly unreadable, return a valid JSON object that says the image is unreadable in each item field and in confidenceNote; never invent dishes.
 
