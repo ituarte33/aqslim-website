@@ -29,7 +29,7 @@ async function requestRestaurantAnalysis(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const retryInstruction = attempt === 1
-        ? '\n\nRetry requirement: return one complete valid JSON object only. Do not use markdown, code fences, commentary, or trailing text.'
+        ? '\n\nRetry requirement: return one complete valid JSON object only. Every item field must be the exact name of one individually named menu item visible in the image. Do not use section names, generic categories, "or similar", or invented dish names. Do not use markdown, code fences, commentary, or trailing text.'
         : ''
       const message = await client.messages.create({
         model: MODEL,
@@ -107,18 +107,25 @@ export async function POST(request: Request) {
 The authenticated patient's governed AQSLIM food policy is:
 ${phasePolicy}
 
-Read only what is reasonably visible in the menu image. The governed AQSLIM phase policy overrides generic keto or low-carb advice. Give practical phase-compatible educational guidance; do not diagnose, prescribe, change the patient's phase, or invent an allowance or prohibition that is not supported by the policy or visible menu text. Prefer simple preparation, identify sauces/sides that may change suitability, and explicitly acknowledge uncertainty. Respond in ${language}.
+Read only what is reasonably visible in the menu image. The governed AQSLIM phase policy overrides generic keto or low-carb advice. Give practical phase-compatible educational guidance; do not diagnose, prescribe, change the patient's phase, or invent an allowance or prohibition that is not supported by the policy or visible menu text. Prefer simple preparation, identify sauces/sides that may change suitability, and explicitly acknowledge uncertainty.
+
+GROUNDING RULES — REQUIRED:
+- Each item field must be copied from one individually named menu item that is reasonably visible in the image.
+- Never substitute a section heading, category, generic dish type, or phrase such as "or similar" for an exact menu item name.
+- Do not invent a dish merely because it would fit the phase.
+- Use three distinct visible menu items when three are legible.
+- If fewer than three distinct named items are legible, use "Menú parcialmente ilegible" (Spanish) or "Menu partially unreadable" (English) for the unavailable slot instead of inventing a dish.
+- Preserve proper menu-item names as printed, even when they are in English. All reasons, modifications, and confidenceNote must be written in ${language}.
 
 If only part of the menu is readable, analyze the readable items rather than failing the whole request. If the menu is truly unreadable, return a valid JSON object that says the image is unreadable in each item field and in confidenceNote; never invent dishes.
 
 Return ONLY valid JSON:
 {
-  "best": { "item": "visible menu item or unreadable notice", "reason": "short reason", "modification": "specific way to order it or request a clearer image" },
-  "adjusted": { "item": "visible menu item or unreadable notice", "reason": "short reason", "modification": "specific adjustment or request a clearer image" },
-  "avoid": { "item": "visible menu item or unreadable notice", "reason": "short reason", "modification": "safer alternative, what to ask, or request a clearer image" },
+  "best": { "item": "exact visible menu item name or unreadable notice", "reason": "short reason", "modification": "specific way to order it or request a clearer image" },
+  "adjusted": { "item": "exact visible menu item name or unreadable notice", "reason": "short reason", "modification": "specific adjustment or request a clearer image" },
+  "avoid": { "item": "exact visible menu item name or unreadable notice", "reason": "short reason", "modification": "safer alternative, what to ask, or request a clearer image" },
   "confidenceNote": "brief statement about image readability, hidden ingredients, portions, and approximate guidance"
-}
-Each recommended menu item must be grounded in text reasonably visible in the supplied image.`
+}`
 
   const analysis = await requestRestaurantAnalysis(body.imageBase64, mimeType, prompt)
   if (analysis.value) return Response.json(analysis.value)
