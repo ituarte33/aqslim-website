@@ -48,7 +48,7 @@ export function buildAQSLIMPhaseFoodPolicyContext({ phase, weekInPhase }: AQSLIM
     lines.push(
       'JING-SPECIFIC RULES:',
       '- In early Jing, do NOT recommend avocado or nuts as default or priority foods. If a patient-specific recorded plan explicitly authorizes them, defer to that recorded plan.',
-      '- Cheese is easy to overconsume; do not present cheese as unlimited or as a default "free" food.',
+      '- Cheese is easy to overconsume. Do not describe cheese as inherently "appropriate," "compatible," unlimited, or a default free food in Jing. If cheese appears in a dish, treat it as a portion-control concern unless a patient-specific recorded plan explicitly authorizes it.',
       '- Do not categorically classify corn tortillas as always forbidden. When corn tortillas are part of the authorized AQSLIM plan, keep them within the recorded allowance, never more than two portions, and count them within the daily carbohydrate target.',
       '- Prefer simple protein and phase-compatible low-carbohydrate vegetables. Watch hidden sugars, breading, sauces, sweetened drinks, and oversized portions.',
       '- If an exact approved-food list or individual allowance is not available in the current runtime, say it cannot be verified instead of filling the gap with generic keto advice.'
