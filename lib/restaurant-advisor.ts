@@ -39,6 +39,10 @@ const JING_CHEESE_OVERSTATEMENT_PATTERNS = [
   /queso es (?:apropiado|compatible|libre)/i,
 ]
 
+const UNVERIFIED_NUMERIC_NUTRITION_PATTERNS = [
+  /(?:~|≈)?\s*\d+(?:\s*[-–]\s*\d+)?\s*(?:g|grams?|gramos?|kcal|calories|calorías|mg)\b/i,
+]
+
 export function isSpecificRestaurantMenuItemLabel(value: string): boolean {
   const item = value.trim()
   if (!item) return false
@@ -81,6 +85,12 @@ export function isRestaurantAdvisorResult(value: unknown): value is RestaurantAd
   )
 }
 
+function containsUnverifiedNumericNutrition(text: string): boolean {
+  const withoutGovernedJingTarget = text
+    .replace(/(?:less than|menos de|<)\s*20\s*g(?:\s*(?:of|de)\s*carbohydrates?|\s*de\s*carbohidratos?)?/gi, '')
+  return UNVERIFIED_NUMERIC_NUTRITION_PATTERNS.some(pattern => pattern.test(withoutGovernedJingTarget))
+}
+
 export function isRestaurantAdvisorResultForPhase(value: unknown, phase: string | null): value is RestaurantAdvisorResult {
   if (!isRestaurantAdvisorResult(value)) return false
   if (phase !== 'Jing') return true
@@ -94,9 +104,12 @@ export function isRestaurantAdvisorResultForPhase(value: unknown, phase: string 
     value.adjusted.modification,
     value.avoid.reason,
     value.avoid.modification,
+    value.confidenceNote,
   ].join(' ')
 
-  return JING_CHEESE_OVERSTATEMENT_PATTERNS.every(pattern => !pattern.test(combinedText))
+  if (JING_CHEESE_OVERSTATEMENT_PATTERNS.some(pattern => pattern.test(combinedText))) return false
+  if (containsUnverifiedNumericNutrition(combinedText)) return false
+  return true
 }
 
 export function parseRestaurantAdvisorJson(raw: string): unknown {
