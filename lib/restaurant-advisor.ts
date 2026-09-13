@@ -30,3 +30,21 @@ export function isRestaurantAdvisorResult(value: unknown): value is RestaurantAd
     && result.confidenceNote.trim().length > 0
   )
 }
+
+export function parseRestaurantAdvisorJson(raw: string): unknown {
+  const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  if (!trimmed) return null
+
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    if (start < 0 || end <= start) return null
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1))
+    } catch {
+      return null
+    }
+  }
+}
