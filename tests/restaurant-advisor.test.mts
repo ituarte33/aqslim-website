@@ -71,6 +71,27 @@ test('rejects Jing cheese overstatements', () => {
   assert.equal(isRestaurantAdvisorResultForPhase(cheeseOverstatement, 'Jing'), false)
 })
 
+test('rejects unverified numeric nutrition estimates while allowing the governed Jing target', () => {
+  const inventedEstimate = {
+    ...validResult,
+    adjusted: {
+      ...validResult.adjusted,
+      reason: 'Los tomates aportan ~3-4 g de carbohidratos y la salsa puede añadir más.',
+    },
+  }
+  assert.equal(isRestaurantAdvisorResult(inventedEstimate), true)
+  assert.equal(isRestaurantAdvisorResultForPhase(inventedEstimate, 'Jing'), false)
+
+  const governedTarget = {
+    ...validResult,
+    best: {
+      ...validResult.best,
+      reason: 'Compatible con el objetivo gobernado de menos de 20 g de carbohidratos al día, sujeto a verificar ingredientes.',
+    },
+  }
+  assert.equal(isRestaurantAdvisorResultForPhase(governedTarget, 'Jing'), true)
+})
+
 test('parses clean, fenced, or wrapped restaurant JSON', () => {
   const raw = JSON.stringify(validResult)
   assert.deepEqual(parseRestaurantAdvisorJson(raw), validResult)
