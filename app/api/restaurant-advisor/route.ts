@@ -7,7 +7,7 @@ import { getPilotAccess } from '@/lib/pilot-access'
 import { pilotHasFeature } from '@/lib/pilot-policy'
 import { getPatientPortalData } from '@/lib/patient-portal'
 import {
-  isRestaurantAdvisorResult,
+  isRestaurantAdvisorResultForPhase,
   parseRestaurantAdvisorJson,
   type RestaurantAdvisorResult,
 } from '@/lib/restaurant-advisor'
@@ -23,13 +23,14 @@ async function requestRestaurantAnalysis(
   imageBase64: string,
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp',
   prompt: string,
+  phase: string | null,
 ): Promise<{ value: RestaurantAdvisorResult | null; failure: AnalysisFailure | null }> {
   let successfulCalls = 0
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const retryInstruction = attempt === 1
-        ? '\n\nRetry requirement: return one complete valid JSON object only. Every item field must be the exact name of one individually named menu item visible in the image. Do not use section names, generic categories, "or similar", or invented dish names. Respect every Jing-specific ranking rule and do not call breaded/fried/cream-sauce dishes simple protein. Do not use markdown, code fences, commentary, or trailing text.'
+        ? '\n\nRetry requirement: return one complete valid JSON object only. Every item field must be the exact name of one individually named menu item visible in the image. Do not use section names, generic categories, "or similar", or invented dish names. For Jing, the BEST item must not be an obvious Parmigiana/Parmesan, Alfredo, Lasagna, Cannelloni, Ravioli, pasta, breaded, fried, or fritta item when a simpler visible grilled/non-breaded option exists. Respect every Jing-specific ranking rule and never call cheese automatically appropriate or compatible. Do not use markdown, code fences, commentary, or trailing text.'
         : ''
       const message = await client.messages.create({
         model: MODEL,
@@ -45,7 +46,7 @@ async function requestRestaurantAnalysis(
       successfulCalls += 1
       const raw = message.content[0]?.type === 'text' ? message.content[0].text.trim() : ''
       const parsed = parseRestaurantAdvisorJson(raw)
-      if (isRestaurantAdvisorResult(parsed)) return { value: parsed, failure: null }
+      if (isRestaurantAdvisorResultForPhase(parsed, phase)) return { value: parsed, failure: null }
     } catch (error) {
       console.error('[restaurant-advisor] provider_attempt_failed', {
         attempt: attempt + 1,
@@ -116,7 +117,9 @@ GROUNDING RULES — REQUIRED:
 - Use three distinct visible menu items when three are legible.
 - If fewer than three distinct named items are legible, use "Menú parcialmente ilegible" (Spanish) or "Menu partially unreadable" (English) for the unavailable slot instead of inventing a dish.
 - Preserve proper menu-item names as printed, even when they are in English. All reasons, modifications, and confidenceNote must be written in ${language}.
-- Base ranking on the visible dish description, not just the protein word in the dish name. If the visible description mentions breading, frying, pasta, cream sauce, sweet sauce, or a high-carbohydrate side, do NOT call that dish a simple protein and do NOT rank it as the best option unless the visible menu itself offers a clearly simpler preparation.
+- Base ranking on the visible dish description, not just the protein word in the dish name.
+- For Jing, an item whose name or visible description signals Parmigiana/Parmesan, Alfredo, Lasagna, Cannelloni, Ravioli, pasta, breading, frying, or fritta is a high-risk composed dish and must NOT be ranked as BEST when any simpler visible grilled/non-breaded option is available.
+- If the visible description mentions breading, frying, pasta, cream sauce, sweet sauce, or a high-carbohydrate side, do NOT call that dish a simple protein.
 - For Jing, do not describe cheese as inherently appropriate or compatible. Treat cheese as a portion-control concern unless the patient's recorded plan explicitly authorizes it.
 - Do not assume a restaurant can transform a composed dish into a completely different preparation. Suggested modifications must be plausible, limited changes such as sauce on the side, omit a side, remove croutons, or ask about an available substitution.
 
@@ -130,7 +133,7 @@ Return ONLY valid JSON:
   "confidenceNote": "brief statement about image readability, hidden ingredients, portions, and approximate guidance"
 }`
 
-  const analysis = await requestRestaurantAnalysis(body.imageBase64, mimeType, prompt)
+  const analysis = await requestRestaurantAnalysis(body.imageBase64, mimeType, prompt, patient.phase)
   if (analysis.value) return Response.json(analysis.value)
 
   const correlationId = crypto.randomUUID()
