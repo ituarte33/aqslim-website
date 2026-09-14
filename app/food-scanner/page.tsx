@@ -1,6 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { ScannerClient } from './scanner-client'
+import './mobile-usage-fix.css'
 import { effectiveFoodScanPlan } from '@/lib/food-scan-policy'
 import { getPilotAccess } from '@/lib/pilot-access'
 
