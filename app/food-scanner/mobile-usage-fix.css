@@ -1,0 +1,48 @@
+@media (max-width: 640px) {
+  .fs-usage-bar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "label remain"
+      "pips remain";
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: center;
+  }
+
+  .fs-usage-label {
+    grid-area: label;
+    min-width: 0;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .fs-usage-pips {
+    grid-area: pips;
+    min-width: 0;
+    justify-self: start;
+  }
+
+  .fs-usage-remain {
+    grid-area: remain;
+    justify-self: end;
+    max-width: 100%;
+    white-space: nowrap;
+    text-align: right;
+  }
+}
+
+@media (max-width: 390px) {
+  .fs-usage-bar {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "label"
+      "pips"
+      "remain";
+  }
+
+  .fs-usage-remain {
+    justify-self: start;
+    white-space: normal;
+  }
+}
