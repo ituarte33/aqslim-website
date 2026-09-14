@@ -6,6 +6,7 @@ import './chat-layout-fix.css'
 import { LanguageModal } from './language-modal'
 import { ChatWidget } from './chat-widget'
 import { NavAuthLinks } from './nav-auth-links'
+import { MobileImagePickerCompatibility } from './mobile-image-picker-compatibility'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="lang-es">
         <ClerkLanguageProvider>
+          <MobileImagePickerCompatibility />
           <LanguageModal />
           {children}
           <ClientSignedIn><ChatWidget /></ClientSignedIn>
