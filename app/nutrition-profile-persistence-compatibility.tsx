@@ -66,8 +66,6 @@ function populate(profile: Profile) {
   setValue('planStyle', profile.planStyle)
   setMulti('goals', profile.goals)
   setValue('notes', profile.notes)
-
-  // "Other" detail inputs are inserted conditionally after their controls update.
   window.setTimeout(() => fillOtherFields(profile), 80)
 }
 
@@ -137,6 +135,12 @@ function updatePreviewCopy() {
     if (text.startsWith('Preview: for now these answers are stored only on this device')) {
       element.textContent = 'Preview: these answers are stored in your controlled Preview profile. They do not feed AQ Buddy or change your plan yet.'
     }
+    if (text === '✓ Perfil de prueba guardado en este dispositivo.') {
+      element.textContent = 'Borrador local detectado. Pulsa Guardar para confirmarlo en tu perfil Preview.'
+    }
+    if (text === '✓ Test profile saved on this device.') {
+      element.textContent = 'Local draft detected. Press Save to confirm it in your Preview profile.'
+    }
     if (text === 'Preview local · todavía no cambia tu plan.') {
       element.textContent = 'Preview · guardado controlado · todavía no cambia tu plan.'
     }
@@ -152,7 +156,7 @@ export function NutritionProfilePersistenceCompatibility() {
 
     let disposed = false
     let form: HTMLFormElement | null = null
-    let submitHandler: ((event: Event) => void) | null = null
+    let saving = false
 
     const setup = async () => {
       form = document.querySelector<HTMLFormElement>('form')
@@ -168,58 +172,70 @@ export function NutritionProfilePersistenceCompatibility() {
             populate(result.profile)
             status.style.display = 'block'
             status.textContent = document.documentElement.lang === 'en'
-              ? '✓ Your saved Preview profile was loaded.'
-              : '✓ Cargamos tu perfil Preview guardado.'
+              ? '✓ Your saved Preview profile was loaded from controlled storage.'
+              : '✓ Cargamos tu perfil Preview desde el guardado controlado.'
           }
         }
       } catch {
         // Keep the form usable; saving will surface any provider error.
       }
-
-      submitHandler = async (event: Event) => {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        if (!form) return
-
-        const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')
-        const originalText = button?.textContent ?? ''
-        if (button) {
-          button.disabled = true
-          button.textContent = document.documentElement.lang === 'en' ? 'Saving…' : 'Guardando…'
-        }
-        status.style.display = 'block'
-        status.textContent = document.documentElement.lang === 'en'
-          ? 'Saving your Preview profile…'
-          : 'Guardando tu perfil Preview…'
-
-        try {
-          const response = await fetch('/api/preview/nutrition-profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyFromForm(form)),
-          })
-          if (!response.ok) throw new Error('save_failed')
-          const result = await response.json()
-          status.textContent = document.documentElement.lang === 'en'
-            ? '✓ Preview profile saved successfully. You can close this page and return later.'
-            : '✓ Perfil Preview guardado correctamente. Puedes cerrar esta página y regresar después.'
-          status.dataset.savedAt = result.updatedAt ?? ''
-          window.scrollTo({ top: status.offsetTop - 110, behavior: 'smooth' })
-        } catch {
-          status.textContent = document.documentElement.lang === 'en'
-            ? 'We could not save your Preview profile. Please try again.'
-            : 'No pudimos guardar tu perfil Preview. Intenta nuevamente.'
-        } finally {
-          if (button) {
-            button.disabled = false
-            button.textContent = originalText || (document.documentElement.lang === 'en' ? 'Save Preview profile' : 'Guardar perfil Preview')
-          }
-        }
-      }
-
-      form.addEventListener('submit', submitHandler, true)
     }
 
+    const submitHandler = async (event: Event) => {
+      if (window.location.pathname !== PREVIEW_PATH) return
+      const target = event.target
+      if (!(target instanceof HTMLFormElement)) return
+      const currentForm = target
+      if (saving) return
+
+      // Window capture runs before React's delegated submit handler, so the old
+      // local-only handler cannot consume the event first.
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      saving = true
+      form = currentForm
+
+      const status = statusNode(currentForm)
+      const button = currentForm.querySelector<HTMLButtonElement>('button[type="submit"]')
+      const originalText = button?.textContent ?? ''
+      if (button) {
+        button.disabled = true
+        button.textContent = document.documentElement.lang === 'en' ? 'Saving…' : 'Guardando…'
+      }
+      status.style.display = 'block'
+      status.textContent = document.documentElement.lang === 'en'
+        ? 'Saving your Preview profile…'
+        : 'Guardando tu perfil Preview…'
+
+      try {
+        const response = await fetch('/api/preview/nutrition-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyFromForm(currentForm)),
+        })
+        if (!response.ok) throw new Error('save_failed')
+        const result = await response.json()
+        status.textContent = document.documentElement.lang === 'en'
+          ? '✓ Preview profile saved in controlled storage. You can close this page and return later.'
+          : '✓ Perfil Preview guardado en almacenamiento controlado. Puedes cerrar esta página y regresar después.'
+        status.dataset.savedAt = result.updatedAt ?? ''
+        window.scrollTo({ top: status.offsetTop - 110, behavior: 'smooth' })
+      } catch {
+        status.textContent = document.documentElement.lang === 'en'
+          ? 'We could not save your Preview profile. Please try again.'
+          : 'No pudimos guardar tu perfil Preview. Intenta nuevamente.'
+      } finally {
+        saving = false
+        if (button) {
+          button.disabled = false
+          button.textContent = originalText || (document.documentElement.lang === 'en' ? 'Save Preview profile' : 'Guardar perfil Preview')
+        }
+      }
+    }
+
+    // Register on window in capture phase so this runs before React's root listener.
+    window.addEventListener('submit', submitHandler, true)
     const timer = window.setTimeout(setup, 0)
     const copyObserver = new MutationObserver(updatePreviewCopy)
     copyObserver.observe(document.body, { childList: true, subtree: true })
@@ -228,7 +244,7 @@ export function NutritionProfilePersistenceCompatibility() {
       disposed = true
       window.clearTimeout(timer)
       copyObserver.disconnect()
-      if (form && submitHandler) form.removeEventListener('submit', submitHandler, true)
+      window.removeEventListener('submit', submitHandler, true)
     }
   }, [])
 
