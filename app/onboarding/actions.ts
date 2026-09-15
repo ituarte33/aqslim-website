@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 import { updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
 import { getOwnPatient, requireCapability } from '@/lib/auth'
 
-const CUESTIONARIO_URL  = 'https://aqslim.com/cuestionario'
+const WELLNESS_PROFILE_URL = 'https://aqslim-git-myaq-ent-p5-1-extended-ai-7a53b6-ituarte33s-projects.vercel.app/my-aqslim/nutrition-profile-preview'
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
 function mmddyyyyToISO(date: string): string | undefined {
@@ -23,17 +23,17 @@ function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
     : 'Your profile has been successfully registered. Please complete the following two steps before your first consultation:'
   const footer  = es ? 'Si tienes preguntas, responde a este correo.' : 'If you have any questions, reply to this email.'
 
-  const step1Label = es ? 'Paso 1 — Agenda tu cita'         : 'Step 1 — Book your appointment'
+  const step1Label = es ? 'Paso 1 — Agenda tu cita' : 'Step 1 — Book your appointment'
   const step1Desc  = es
     ? 'Selecciona el día y horario que mejor se adapte a ti a través de nuestro sistema de citas en línea.'
     : 'Choose the day and time that works best for you through our online booking system.'
   const step1Btn   = es ? 'Agendar cita →' : 'Book appointment →'
 
-  const step2Label = es ? 'Paso 2 — Cuestionario de síntomas' : 'Step 2 — Symptom questionnaire'
+  const step2Label = es ? 'Paso 2 — Perfil de bienestar y alimentación' : 'Step 2 — Wellness & food profile'
   const step2Desc  = es
-    ? 'Cuéntanos cómo te has sentido. Este cuestionario nos ayuda a personalizar tu programa antes de tu cita. Intenta completarlo al menos 24 horas antes.'
-    : 'Tell us how you have been feeling. This questionnaire helps us tailor your program before your appointment. Try to complete it at least 24 hours beforehand.'
-  const step2Btn   = es ? 'Completar cuestionario →' : 'Complete questionnaire →'
+    ? 'Cuéntanos brevemente sobre tu salud, tus hábitos y los alimentos que te gustan. Esto nos ayuda a personalizar mejor tu programa antes de tu cita.'
+    : 'Tell us briefly about your health, eating habits, and the foods you enjoy. This helps us personalize your program before your appointment.'
+  const step2Btn   = es ? 'Completar mi perfil →' : 'Complete my profile →'
 
   const stepCardStyle = 'background:#1A1A1A;border:1px solid rgba(201,168,76,0.18);padding:24px;margin-bottom:16px;'
   const stepNumStyle  = 'font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A84C;font-family:Arial,sans-serif;margin:0 0 6px;'
@@ -49,14 +49,12 @@ function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 
-        <!-- Logo -->
         <tr><td style="padding-bottom:32px;text-align:center;">
           <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:0.1em;color:#FAFAF8;">
             AQ<span style="color:#C9A84C;">SLIM</span>
           </span>
         </td></tr>
 
-        <!-- Card -->
         <tr><td style="background:#111111;border:1px solid rgba(201,168,76,0.25);padding:40px;">
 
           <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A84C;font-family:Arial,sans-serif;">
@@ -69,7 +67,6 @@ function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
             ${intro}
           </p>
 
-          <!-- Step 1 -->
           <div style="${stepCardStyle}">
             <p style="${stepNumStyle}">${step1Label}</p>
             <p style="${stepTitleStyle}">${es ? 'Reserva tu consulta inicial' : 'Reserve your initial consultation'}</p>
@@ -77,17 +74,15 @@ function cuestionarioEmailHtml(nombre: string, lang: 'es' | 'en'): string {
             <a href="${SQUARE_BOOKING_URL}" style="${btnStyle}">${step1Btn}</a>
           </div>
 
-          <!-- Step 2 -->
           <div style="${stepCardStyle}margin-bottom:0;">
             <p style="${stepNumStyle}">${step2Label}</p>
-            <p style="${stepTitleStyle}">${es ? 'Completa tu cuestionario' : 'Complete your questionnaire'}</p>
+            <p style="${stepTitleStyle}">${es ? 'Completa tu perfil personalizado' : 'Complete your personalized profile'}</p>
             <p style="${stepDescStyle}">${step2Desc}</p>
-            <a href="${CUESTIONARIO_URL}" style="${btnStyle}">${step2Btn}</a>
+            <a href="${WELLNESS_PROFILE_URL}" style="${btnStyle}">${step2Btn}</a>
           </div>
 
         </td></tr>
 
-        <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
           <p style="margin:0;font-size:12px;color:#6A6560;font-family:Arial,sans-serif;">${footer}</p>
           <p style="margin:8px 0 0;font-size:11px;color:#3A3530;font-family:Arial,sans-serif;">© AQSLIM · aqslim.com</p>
@@ -193,12 +188,12 @@ export async function saveProfile(formData: FormData) {
 
   await updateCliente(cliente.id, fields)
 
-  // Send questionnaire invitation email — non-blocking, profile save must not fail if email fails
+  // Send wellness and food profile invitation email — non-blocking, profile save must not fail if email fails
   const nombre = [firstName, lastName].filter(Boolean).join(' ')
   const lang: 'es' | 'en' = idioma === 'English' ? 'en' : 'es'
   const subject = lang === 'es'
-    ? 'Tu cuestionario de síntomas — AQSLIM'
-    : 'Your symptom questionnaire — AQSLIM'
+    ? 'Tu perfil de bienestar y alimentación — AQSLIM'
+    : 'Your wellness & food profile — AQSLIM'
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
@@ -208,9 +203,9 @@ export async function saveProfile(formData: FormData) {
       subject,
       html: cuestionarioEmailHtml(nombre, lang),
     })
-    console.log('[saveProfile] questionnaire_email_sent')
+    console.log('[saveProfile] wellness_food_profile_email_sent')
   } catch (err) {
-    console.error('[saveProfile] questionnaire_email_failed', {
+    console.error('[saveProfile] wellness_food_profile_email_failed', {
       errorType: err instanceof Error ? err.name : 'UnknownError',
     })
   }
