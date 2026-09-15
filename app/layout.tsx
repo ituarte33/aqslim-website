@@ -9,6 +9,7 @@ import { NavAuthLinks } from './nav-auth-links'
 import { MobileImagePickerCompatibility } from './mobile-image-picker-compatibility'
 import { NutritionProfileOtherCompatibility } from './nutrition-profile-other-compatibility'
 import { NutritionProfilePersistenceCompatibility } from './nutrition-profile-persistence-compatibility'
+import { OnboardingNutritionProfileEntryCompatibility } from './onboarding-nutrition-profile-entry-compatibility'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MobileImagePickerCompatibility />
           <NutritionProfileOtherCompatibility />
           <NutritionProfilePersistenceCompatibility />
+          <OnboardingNutritionProfileEntryCompatibility />
           <LanguageModal />
           {children}
           <ClientSignedIn><ChatWidget /></ClientSignedIn>
