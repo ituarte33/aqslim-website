@@ -89,8 +89,11 @@ function targetFor(spec: OtherSpec): HTMLElement | null {
   const matching = controls.find(control => control instanceof HTMLSelectElement || control.value === spec.controlValue)
   if (!matching) return null
 
-  if (matching instanceof HTMLSelectElement) return matching.closest('label')?.parentElement ?? null
-  return matching.closest('div')?.parentElement ?? matching.parentElement
+  // Keep the conditional detail field inside the same visual section.
+  // For selects, insert immediately after that label. For checkbox groups,
+  // insert immediately after the choice grid rather than after the section.
+  if (matching instanceof HTMLSelectElement) return matching.closest('label') as HTMLElement | null
+  return matching.closest('div') as HTMLElement | null
 }
 
 export function NutritionProfileOtherCompatibility() {
