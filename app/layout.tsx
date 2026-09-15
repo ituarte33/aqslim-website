@@ -8,6 +8,7 @@ import { ChatWidget } from './chat-widget'
 import { NavAuthLinks } from './nav-auth-links'
 import { MobileImagePickerCompatibility } from './mobile-image-picker-compatibility'
 import { NutritionProfileOtherCompatibility } from './nutrition-profile-other-compatibility'
+import { NutritionProfilePersistenceCompatibility } from './nutrition-profile-persistence-compatibility'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkLanguageProvider>
           <MobileImagePickerCompatibility />
           <NutritionProfileOtherCompatibility />
+          <NutritionProfilePersistenceCompatibility />
           <LanguageModal />
           {children}
           <ClientSignedIn><ChatWidget /></ClientSignedIn>
