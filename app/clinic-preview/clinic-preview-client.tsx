@@ -49,6 +49,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   }, [patients, query])
 
   const selected = patients.find(patient => patient.id === selectedId) ?? null
+  const latestNote = notes[0] ?? null
+  const pendingFollowups = notes.filter(note => note.followupRequired)
 
   async function loadNotes(patientId: string) {
     setNotesLoading(true)
@@ -66,8 +68,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   }
 
   useEffect(() => {
-    if (selectedId && activeTab === 'Notas') void loadNotes(selectedId)
-  }, [selectedId, activeTab])
+    if (selectedId) void loadNotes(selectedId)
+    else setNotes([])
+  }, [selectedId])
 
   async function saveNote() {
     if (!selected || !noteText.trim()) return
@@ -196,6 +199,19 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     <div style={{ marginTop: 18, display: 'grid', gap: 14 }}>
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Meta</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{selected.goal || 'Sin meta registrada'}</div></div>
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Próxima cita</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{selected.nextAppointment || 'Sin cita registrada'}</div></div>
+                      <div>
+                        <div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Última nota</div>
+                        {notesLoading ? <div style={{ marginTop: 5, color: '#8E8881' }}>Cargando notas…</div> : latestNote ? <>
+                          <div style={{ marginTop: 6, color: '#D9D5CF', lineHeight: 1.55 }}>{latestNote.note}</div>
+                          <div style={{ marginTop: 6, color: '#77716A', fontSize: 11 }}>{latestNote.noteType}{latestNote.noteAt ? ` · ${new Date(latestNote.noteAt).toLocaleString('es-US')}` : ''}</div>
+                          {latestNote.followupRequired && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 12 }}>Seguimiento pendiente{latestNote.followupDate ? ` · ${latestNote.followupDate}` : ''}</div>}
+                          <button onClick={openNotes} style={{ marginTop: 10, padding: 0, border: 0, background: 'transparent', color: '#C9A84C', cursor: 'pointer', fontSize: 12 }}>Ver historial / continuar seguimiento →</button>
+                        </> : <div style={{ marginTop: 5, color: '#8E8881' }}>Sin notas registradas.</div>}
+                      </div>
+                      {pendingFollowups.length > 0 && <div style={{ border: '1px solid rgba(201,168,76,.20)', borderRadius: 10, padding: 12, background: 'rgba(201,168,76,.04)' }}>
+                        <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Seguimiento</div>
+                        <div style={{ marginTop: 5, color: '#D9D5CF' }}>{pendingFollowups.length} nota{pendingFollowups.length === 1 ? '' : 's'} marcada{pendingFollowups.length === 1 ? '' : 's'} para seguimiento.</div>
+                      </div>}
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Uso de alimentos</div><div style={{ marginTop: 5, color: '#8E8881' }}>Food Scanner y registro de comidas permanecen exclusivamente dentro de My AQSLIM.</div></div>
                     </div>
                   </div>
