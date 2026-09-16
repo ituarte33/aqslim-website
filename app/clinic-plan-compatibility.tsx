@@ -24,6 +24,12 @@ type PlanData = {
 
 type PatientIdentity = { name: string; email: string; phone: string }
 
+type PlanPrepareDetail = {
+  livePlan?: PlanData | null
+  phase?: string
+  phaseWeek?: number | null
+}
+
 const emptyPlan: PlanData = {
   status: 'Draft',
   planLabel: '',
@@ -131,6 +137,25 @@ export function ClinicPlanCompatibility() {
   }, [pathname])
 
   useEffect(() => {
+    if (pathname !== '/clinic-preview') return
+    const handlePrepare = (event: Event) => {
+      const detail = (event as CustomEvent<PlanPrepareDetail>).detail
+      if (!detail?.livePlan) return
+      setDraft(prev => ({
+        ...emptyPlan,
+        ...detail.livePlan,
+        status: 'Draft',
+        phase: detail.phase && detail.phase !== 'Sin fase' ? detail.phase : (detail.livePlan?.phase || 'Sin fase'),
+        phaseWeek: detail.phaseWeek && detail.phaseWeek > 0 ? detail.phaseWeek : (detail.livePlan?.phaseWeek ?? null),
+        visitCadenceDays: prev.visitCadenceDays ?? detail.livePlan?.visitCadenceDays ?? 7,
+      }))
+      setMessage('Actualización preparada desde la última consulta. Revisa y guarda el borrador Preview.')
+    }
+    window.addEventListener('clinic-plan-prepare-update', handlePrepare as EventListener)
+    return () => window.removeEventListener('clinic-plan-prepare-update', handlePrepare as EventListener)
+  }, [pathname])
+
+  useEffect(() => {
     if (!active || !identity) return
     let cancelled = false
     setLoading(true)
@@ -171,10 +196,16 @@ export function ClinicPlanCompatibility() {
       })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('save_failed')
-      setDraft({ ...emptyPlan, ...data.draft })
-      setMessage('✓ Borrador de plan guardado en Clinic Preview. Todavía no modifica My AQSLIM.')
+
+      const verifyResponse = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const verifyData = await verifyResponse.json()
+      if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft) throw new Error('verify_failed')
+
+      setDraft({ ...emptyPlan, ...verifyData.draft })
+      setLivePlan(verifyData.livePlan ?? livePlan)
+      setMessage('✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
     } catch {
-      setMessage('No se pudo guardar el borrador. Intenta de nuevo.')
+      setMessage('No se pudo guardar y verificar el borrador. Intenta de nuevo.')
     } finally {
       setSaving(false)
     }
