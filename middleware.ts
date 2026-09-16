@@ -14,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 const isPatientPortalRoute = createRouteMatcher(['/my-aqslim(.*)'])
+const MYAQ_CLINIC_PREVIEW_BRANCH = 'myaq-ent-p5-1-extended-ai-live-canary'
 
 function isOperationalRoute(pathname: string) {
   if (pathname === '/dashboard/plan-preview' || pathname.startsWith('/dashboard/plan-preview/')) {
@@ -29,6 +30,16 @@ function isOperationalRoute(pathname: string) {
 export default clerkMiddleware(async (auth, req) => {
   const isRecipePreview = process.env.VERCEL_ENV === 'preview'
     && process.env.VERCEL_GIT_COMMIT_REF === 'myaq-rec-001-preview-010'
+
+  const isClinicPreview = process.env.VERCEL_ENV === 'preview'
+    && process.env.VERCEL_GIT_COMMIT_REF === MYAQ_CLINIC_PREVIEW_BRANCH
+
+  // This branch is now the working AQSLIM Clinic Preview. Opening a Vercel
+  // deployment at its root should take the Founder directly into Clinic instead
+  // of requiring a manual /clinic-preview path edit. Production is unchanged.
+  if (isClinicPreview && req.nextUrl.pathname === '/') {
+    return NextResponse.redirect(new URL('/clinic-preview', req.url))
+  }
 
   if (isRecipePreview && isOperationalRoute(req.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/dashboard/plan-preview', req.url))
