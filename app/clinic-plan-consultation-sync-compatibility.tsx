@@ -3,21 +3,6 @@
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
-function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
-  const proto = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
-  const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
-  descriptor?.set?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
-  element.dispatchEvent(new Event('change', { bubbles: true }))
-}
-
-function findDraftControl(label: string) {
-  const labelNode = [...document.querySelectorAll('div')].find(el => el.textContent?.trim() === label)
-  const parent = labelNode?.parentElement
-  if (!parent) return null
-  return parent.querySelector('input,select') as HTMLInputElement | HTMLSelectElement | null
-}
-
 export function ClinicPlanConsultationSyncCompatibility() {
   const pathname = usePathname()
 
@@ -124,30 +109,16 @@ export function ClinicPlanConsultationSyncCompatibility() {
         button.style.cursor = 'pointer'
 
         const apply = () => {
-          // Always begin from the complete published plan so diet, dates, weights,
-          // instructions and other plan fields remain intact. Then apply only the
-          // phase/week recorded in the latest consultation.
-          const copyButton = [...planHost.querySelectorAll('button')].find(el => el.textContent?.trim().startsWith('Copiar al borrador')) as HTMLButtonElement | undefined
-          if (!copyButton) {
-            title.textContent = 'No se pudo preparar el borrador'
-            detail.textContent = 'No encontré el plan publicado para copiarlo completo. No se hizo ningún cambio.'
-            return
-          }
-
-          copyButton.click()
-          title.textContent = 'Preparando actualización…'
-          detail.textContent = 'Copiando el plan publicado completo y aplicando únicamente la fase/semana de la última consulta.'
-          button.disabled = true
-
-          window.setTimeout(() => {
-            const phaseControl = findDraftControl('Fase')
-            const weekControl = findDraftControl('Semana en fase')
-            if (phaseControl && consultPhase && consultPhase !== 'Sin fase') setNativeValue(phaseControl, consultPhase)
-            if (weekControl && consultWeek !== null && consultWeek > 0) setNativeValue(weekControl, String(consultWeek))
-            title.textContent = 'Actualización preparada en el borrador'
-            detail.textContent = `Se conservó el plan publicado completo y sólo se aplicó ${consultPhase || 'la fase registrada'}${consultWeek ? ` · semana ${consultWeek}` : ''}. Revisa y pulsa “Guardar borrador Preview”. My AQSLIM sigue sin cambios.`
-            button.remove()
-          }, 120)
+          window.dispatchEvent(new CustomEvent('clinic-plan-prepare-update', {
+            detail: {
+              livePlan: live,
+              phase: consultPhase,
+              phaseWeek: consultWeek,
+            },
+          }))
+          title.textContent = 'Actualización preparada en el borrador'
+          detail.textContent = `Se conservó el plan publicado completo y sólo se aplicó ${consultPhase || 'la fase registrada'}${consultWeek ? ` · semana ${consultWeek}` : ''}. Revisa y pulsa “Guardar borrador Preview”. My AQSLIM sigue sin cambios.`
+          button.remove()
         }
         button.addEventListener('click', apply)
         cleanupAlert = () => button.removeEventListener('click', apply)
