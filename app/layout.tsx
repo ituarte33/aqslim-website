@@ -10,6 +10,7 @@ import { MobileImagePickerCompatibility } from './mobile-image-picker-compatibil
 import { NutritionProfileOtherCompatibility } from './nutrition-profile-other-compatibility'
 import { NutritionProfilePersistenceCompatibility } from './nutrition-profile-persistence-compatibility'
 import { OnboardingNutritionProfileEntryCompatibility } from './onboarding-nutrition-profile-entry-compatibility'
+import { ClinicAriosLauncher } from './clinic-arios-launcher'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <LanguageModal />
           {children}
           <ClientSignedIn><ChatWidget /></ClientSignedIn>
+          <ClinicAriosLauncher />
           <NavAuthLinks />
         </ClerkLanguageProvider>
       </body>
