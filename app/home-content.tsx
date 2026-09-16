@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-export function HomeContent({ html }: { html: string }) {
+export function HomeContent({ html, showClinic = false }: { html: string; showClinic?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -10,6 +10,25 @@ export function HomeContent({ html }: { html: string }) {
 
     if (!ref.current) return
     const root = ref.current
+
+    if (showClinic && !root.querySelector('[data-aqslim-clinic-entry="true"]')) {
+      const portalLink = Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(link => {
+        const text = (link.textContent ?? '').trim().toLowerCase()
+        const href = link.getAttribute('href') ?? ''
+        return text.includes('portal paciente') || text.includes('patient portal') || href === '/my-aqslim'
+      })
+
+      if (portalLink?.parentElement) {
+        const clinicLink = document.createElement('a')
+        clinicLink.href = '/clinic-preview'
+        clinicLink.textContent = 'AQSLIM CLINIC'
+        clinicLink.className = portalLink.className
+        clinicLink.dataset.aqslimClinicEntry = 'true'
+        clinicLink.style.marginRight = '12px'
+        clinicLink.style.whiteSpace = 'nowrap'
+        portalLink.parentElement.insertBefore(clinicLink, portalLink)
+      }
+    }
 
     // Custom cursor
     const dotEl = root.querySelector<HTMLElement>('#cursorDot > *')
@@ -41,12 +60,10 @@ export function HomeContent({ html }: { html: string }) {
       const msg = root.querySelector<HTMLTextAreaElement>('#message')
       if (msg) msg.placeholder = lang === 'es' ? 'Cuéntanos sobre tus metas de salud...' : 'Tell us about your health goals...'
     }
-    // Apply saved preference on init
     const savedLang = localStorage.getItem(LANG_KEY) ?? 'es'
     setLang(savedLang)
     root.querySelector('#btn-es')?.addEventListener('click', () => setLang('es'))
     root.querySelector('#btn-en')?.addEventListener('click', () => setLang('en'))
-    // Sync when modal fires
     function onModalLang(e: Event) { setLang((e as CustomEvent<string>).detail) }
     window.addEventListener('aqslim-lang', onModalLang)
 
@@ -135,8 +152,7 @@ export function HomeContent({ html }: { html: string }) {
       document.body.classList.remove('marketing')
       obs.disconnect()
     }
-  }, [])
-
+  }, [showClinic])
 
   return <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
 }
