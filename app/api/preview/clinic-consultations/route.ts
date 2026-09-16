@@ -12,13 +12,23 @@ const F = {
   PATIENT_ID: 'fld0XkzcSxuahpefr',
   PATIENT_NAME: 'fldHTblKr2H4k2BQF',
   CONSULTATION_AT: 'fldZR2iJwQaN7SXzi',
+  CONSULTATION_DATE: 'fldrvTUQukYeqYtsi',
   TYPE: 'fldrKPVZUHzJVX2IM',
   WEIGHT: 'fldWZT9PKGJACROwu',
   WEIGHT_UNIT: 'fldocfmCBmCS0Unis',
+  BODY_FAT: 'fldSE9C6O773Npu98',
   WAIST: 'fldqoeDjaM6I9JjCq',
+  HIPS: 'fldi9WdzHLBsgzUdT',
+  ARMS: 'fldmtDQi2ixPZXnY5',
+  THIGHS: 'fldnYwAn8vDMx2UAE',
+  CHEST: 'flduUfZw9N8k9nF3B',
   PHASE: 'fldpuF1T4RN49uUTD',
   PHASE_WEEK: 'fldfE4WKhno0iYKCr',
+  RECOMMENDATIONS: 'fldQahL9JJ3eE20LR',
   NEXT_APPOINTMENT: 'fldp0wOjGdl3zSuT2',
+  CONSULTATION_FEE: 'fldrKPC7ynldWZR6R',
+  AMOUNT_COLLECTED: 'fldv5QvpqHOxpO5xH',
+  PAYMENT_METHOD: 'flde0a6NiApw1ptXT',
   AUTHOR_EMAIL: 'fldXlIbOsf3hLVNLW',
   AUTHOR_LABEL: 'fld48XaY8Cikuh0Tf',
   PREVIEW_ONLY: 'fldPfnVmXSJYFFWc4',
@@ -52,11 +62,12 @@ async function requireFounder() {
   return actor
 }
 
-function safeText(value: unknown, max = 500) {
+function safeText(value: unknown, max = 1000) {
   return typeof value === 'string' ? value.trim().slice(0, max) : ''
 }
 
 function safeNumber(value: unknown) {
+  if (value === '' || value == null) return null
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : null
 }
@@ -85,13 +96,23 @@ export async function GET(request: NextRequest) {
     const consultations = (data.records ?? []).map((record: any) => ({
       id: record.id,
       consultationAt: record.fields?.[F.CONSULTATION_AT] ?? null,
+      consultationDate: record.fields?.[F.CONSULTATION_DATE] ?? null,
       consultationType: record.fields?.[F.TYPE] ?? '',
       weight: record.fields?.[F.WEIGHT] ?? null,
       weightUnit: record.fields?.[F.WEIGHT_UNIT] ?? '',
+      bodyFat: record.fields?.[F.BODY_FAT] ?? null,
       waistCm: record.fields?.[F.WAIST] ?? null,
+      hipsCm: record.fields?.[F.HIPS] ?? null,
+      armsCm: record.fields?.[F.ARMS] ?? null,
+      thighsCm: record.fields?.[F.THIGHS] ?? null,
+      chestCm: record.fields?.[F.CHEST] ?? null,
       phase: record.fields?.[F.PHASE] ?? '',
       phaseWeek: record.fields?.[F.PHASE_WEEK] ?? null,
+      recommendations: record.fields?.[F.RECOMMENDATIONS] ?? '',
       nextAppointment: record.fields?.[F.NEXT_APPOINTMENT] ?? null,
+      consultationFee: record.fields?.[F.CONSULTATION_FEE] ?? null,
+      amountCollected: record.fields?.[F.AMOUNT_COLLECTED] ?? null,
+      paymentMethod: record.fields?.[F.PAYMENT_METHOD] ?? '',
       authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
     }))
     return NextResponse.json({ ok: true, consultations })
@@ -115,14 +136,26 @@ export async function POST(request: NextRequest) {
     const allowedTypes = ['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio', 'Seguimiento']
     const allowedPhases = ['Jing', 'Qi', 'Xue', 'Yang Sheng', 'Sin fase']
     const allowedUnits = ['lb', 'kg']
+    const allowedPayments = ['Efectivo', 'Card', 'Venmo', 'Zelle', 'Transferencia', 'Sin especificar']
 
     const consultationType = allowedTypes.includes(body.consultationType) ? body.consultationType : 'Cliente subsecuente'
     const phase = allowedPhases.includes(body.phase) ? body.phase : 'Sin fase'
     const weightUnit = allowedUnits.includes(body.weightUnit) ? body.weightUnit : 'lb'
+    const paymentMethod = allowedPayments.includes(body.paymentMethod) ? body.paymentMethod : 'Sin especificar'
+
+    const consultationDate = safeText(body.consultationDate, 20)
     const weight = safeNumber(body.weight)
+    const bodyFat = safeNumber(body.bodyFat)
     const waistCm = safeNumber(body.waistCm)
+    const hipsCm = safeNumber(body.hipsCm)
+    const armsCm = safeNumber(body.armsCm)
+    const thighsCm = safeNumber(body.thighsCm)
+    const chestCm = safeNumber(body.chestCm)
     const phaseWeek = safeNumber(body.phaseWeek)
+    const recommendations = safeText(body.recommendations, 5000)
     const nextAppointment = safeText(body.nextAppointment, 40)
+    const consultationFee = safeNumber(body.consultationFee)
+    const amountCollected = safeNumber(body.amountCollected)
 
     const now = new Date().toISOString()
     const fields: Record<string, unknown> = {
@@ -134,14 +167,25 @@ export async function POST(request: NextRequest) {
       [F.TYPE]: consultationType,
       [F.WEIGHT_UNIT]: weightUnit,
       [F.PHASE]: phase,
+      [F.PAYMENT_METHOD]: paymentMethod,
       [F.AUTHOR_EMAIL]: actor.email,
       [F.AUTHOR_LABEL]: 'Rom / Founder',
       [F.PREVIEW_ONLY]: true,
     }
+
+    if (consultationDate) fields[F.CONSULTATION_DATE] = consultationDate
     if (weight !== null) fields[F.WEIGHT] = weight
+    if (bodyFat !== null) fields[F.BODY_FAT] = bodyFat
     if (waistCm !== null) fields[F.WAIST] = waistCm
+    if (hipsCm !== null) fields[F.HIPS] = hipsCm
+    if (armsCm !== null) fields[F.ARMS] = armsCm
+    if (thighsCm !== null) fields[F.THIGHS] = thighsCm
+    if (chestCm !== null) fields[F.CHEST] = chestCm
     if (phaseWeek !== null) fields[F.PHASE_WEEK] = phaseWeek
+    if (recommendations) fields[F.RECOMMENDATIONS] = recommendations
     if (nextAppointment) fields[F.NEXT_APPOINTMENT] = new Date(nextAppointment).toISOString()
+    if (consultationFee !== null) fields[F.CONSULTATION_FEE] = consultationFee
+    if (amountCollected !== null) fields[F.AMOUNT_COLLECTED] = amountCollected
 
     const response = await fetch(baseUrl(), {
       method: 'POST', headers: headers(), cache: 'no-store',
