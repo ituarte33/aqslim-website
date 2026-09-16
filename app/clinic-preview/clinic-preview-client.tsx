@@ -34,7 +34,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 24, letterSpacing: '.08em' }}>AQ<span style={{ color: '#C9A84C' }}>SLIM</span> Clinic</div>
           <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>MYAQ-001-CLINIC-001 · PREVIEW · Founder-only</div>
         </div>
-        <a href="/my-aqslim" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Abrir My AQSLIM ↗</a>
+        <a href="/my-aqslim" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Abrir mi My AQSLIM ↗</a>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', minHeight: 'calc(100vh - 80px)' }}>
@@ -77,7 +77,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
             <div style={{ maxWidth: 760, margin: '70px auto', border: '1px solid rgba(201,168,76,.22)', background: 'rgba(255,255,255,.025)', borderRadius: 18, padding: 34 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>AQSLIM Clinic</div>
               <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 40, fontWeight: 400, margin: '12px 0 14px' }}>Selecciona un paciente</h2>
-              <p style={{ color: '#9A9590', lineHeight: 1.7, margin: 0 }}>Desde aquí podrás revisar entrevista, notas de consulta, mensajes y seguimientos sin entrar al portal personal My AQSLIM del paciente.</p>
+              <p style={{ color: '#9A9590', lineHeight: 1.7, margin: 0 }}>Desde aquí podrás llevar consultas, notas, planes, acceso a My AQSLIM, mensajes y seguimientos sin entrar al portal personal del paciente.</p>
             </div>
           ) : (
             <div style={{ maxWidth: 980, margin: '0 auto' }}>
@@ -92,26 +92,29 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                 </div>
               </div>
 
-              <nav style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>
-                {['Resumen','Perfil de Bienestar','Notas','Mensajes','Seguimiento'].map((label, index) => (
+              <nav style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>
+                {['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'].map((label, index) => (
                   <div key={label} style={{ border: '1px solid rgba(201,168,76,.18)', borderRadius: 10, padding: '12px 10px', textAlign: 'center', color: index === 0 ? '#C9A84C' : '#8E8881', background: index === 0 ? 'rgba(201,168,76,.08)' : 'rgba(255,255,255,.02)', fontSize: 12 }}>{label}</div>
                 ))}
               </nav>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 16 }}>
                 <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                  <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 24, fontWeight: 400 }}>Resumen del paciente</h3>
+                  <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 24, fontWeight: 400 }}>Resumen operativo</h3>
                   <div style={{ marginTop: 18, display: 'grid', gap: 14 }}>
                     <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Meta</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{selected.goal || 'Sin meta registrada'}</div></div>
                     <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Próxima cita</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{selected.nextAppointment || 'Sin cita registrada'}</div></div>
+                    <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Uso de alimentos</div><div style={{ marginTop: 5, color: '#8E8881' }}>Food Scanner y registro de comidas permanecen exclusivamente dentro de My AQSLIM.</div></div>
                   </div>
                 </div>
 
                 <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
                   <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Acciones rápidas</div>
                   <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-                    <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.25)', background: 'rgba(201,168,76,.08)', color: '#C9A84C', textAlign: 'left' }}>Abrir Perfil de Bienestar <span style={{ opacity: .55 }}>· siguiente paso</span></button>
-                    <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Agregar nota de consulta <span style={{ opacity: .55 }}>· siguiente paso</span></button>
+                    <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.25)', background: 'rgba(201,168,76,.08)', color: '#C9A84C', textAlign: 'left' }}>Registrar consulta <span style={{ opacity: .55 }}>· siguiente paso</span></button>
+                    <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Agregar nota / entrevista <span style={{ opacity: .55 }}>· siguiente paso</span></button>
+                    <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Crear o actualizar plan alimentario <span style={{ opacity: .55 }}>· siguiente paso</span></button>
+                    <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Dar acceso / revisar My AQSLIM <span style={{ opacity: .55 }}>· siguiente paso</span></button>
                     <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Ver mensajes del paciente <span style={{ opacity: .55 }}>· siguiente paso</span></button>
                   </div>
                 </div>
