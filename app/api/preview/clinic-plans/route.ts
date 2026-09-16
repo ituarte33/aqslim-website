@@ -83,14 +83,22 @@ async function resolvePatient(request: NextRequest, body?: Record<string, unknow
   if (!patientName) return null
 
   const all = await getClientes()
-  const matches = all.filter(patient => {
-    const name = String(patient.fields['Nombre Completo'] ?? '').trim()
-    if (name !== patientName) return false
-    if (patientEmail) return String(patient.fields['Email'] ?? '').trim().toLowerCase() === patientEmail
-    if (patientPhone) return String(patient.fields['Teléfono'] ?? '').replace(/\D/g, '') === patientPhone.replace(/\D/g, '')
-    return true
-  })
-  return matches.length === 1 ? matches[0] : null
+  const sameName = all.filter(patient => String(patient.fields['Nombre Completo'] ?? '').trim() === patientName)
+  if (sameName.length === 0) return null
+  if (sameName.length === 1) return sameName[0]
+
+  if (patientEmail) {
+    const byEmail = sameName.filter(patient => String(patient.fields['Email'] ?? '').trim().toLowerCase() === patientEmail)
+    if (byEmail.length === 1) return byEmail[0]
+  }
+
+  if (patientPhone) {
+    const normalized = patientPhone.replace(/\D/g, '')
+    const byPhone = sameName.filter(patient => String(patient.fields['Teléfono'] ?? '').replace(/\D/g, '') === normalized)
+    if (byPhone.length === 1) return byPhone[0]
+  }
+
+  return null
 }
 
 function mapDraft(record: any) {
