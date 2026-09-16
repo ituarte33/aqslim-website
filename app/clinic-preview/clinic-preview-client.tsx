@@ -27,18 +27,42 @@ type ClinicNote = {
 type ClinicConsultation = {
   id: string
   consultationAt: string | null
+  consultationDate: string | null
   consultationType: string
   weight: number | null
   weightUnit: string
+  bodyFat: number | null
   waistCm: number | null
+  hipsCm: number | null
+  armsCm: number | null
+  thighsCm: number | null
+  chestCm: number | null
   phase: string
   phaseWeek: number | null
+  recommendations: string
   nextAppointment: string | null
+  consultationFee: number | null
+  amountCollected: number | null
+  paymentMethod: string
   authorLabel: string
 }
 
 const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
 type Tab = typeof tabs[number]
+const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
+
+function todayLocal() {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function feeForType(type: string) {
+  if (type === 'Cliente Nuevo') return '40'
+  if (type === 'Cliente Re-Inicio') return '35'
+  if (type === 'Cliente subsecuente') return '30'
+  return '0'
+}
 
 export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [query, setQuery] = useState('')
@@ -57,12 +81,22 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [consultations, setConsultations] = useState<ClinicConsultation[]>([])
   const [consultationsLoading, setConsultationsLoading] = useState(false)
   const [consultationType, setConsultationType] = useState('Cliente subsecuente')
+  const [consultationDate, setConsultationDate] = useState(todayLocal())
   const [weight, setWeight] = useState('')
   const [weightUnit, setWeightUnit] = useState('lb')
+  const [bodyFat, setBodyFat] = useState('')
   const [waistCm, setWaistCm] = useState('')
+  const [hipsCm, setHipsCm] = useState('')
+  const [armsCm, setArmsCm] = useState('')
+  const [thighsCm, setThighsCm] = useState('')
+  const [chestCm, setChestCm] = useState('')
   const [phase, setPhase] = useState('Sin fase')
   const [phaseWeek, setPhaseWeek] = useState('')
+  const [recommendations, setRecommendations] = useState('')
   const [nextAppointment, setNextAppointment] = useState('')
+  const [consultationFee, setConsultationFee] = useState('30')
+  const [amountCollected, setAmountCollected] = useState('30')
+  const [paymentMethod, setPaymentMethod] = useState('Sin especificar')
   const [consultationSaving, setConsultationSaving] = useState(false)
   const [consultationMessage, setConsultationMessage] = useState('')
 
@@ -126,13 +160,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       const response = await fetch('/api/preview/clinic-notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientId: selected.id,
-          noteType,
-          note: noteText,
-          followupRequired,
-          followupDate,
-        }),
+        body: JSON.stringify({ patientId: selected.id, noteType, note: noteText, followupRequired, followupDate }),
       })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('save_failed')
@@ -159,19 +187,36 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
         body: JSON.stringify({
           patientId: selected.id,
           consultationType,
+          consultationDate,
           weight,
           weightUnit,
+          bodyFat,
           waistCm,
+          hipsCm,
+          armsCm,
+          thighsCm,
+          chestCm,
           phase,
           phaseWeek,
+          recommendations,
           nextAppointment,
+          consultationFee,
+          amountCollected,
+          paymentMethod,
         }),
       })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('save_failed')
+      setConsultationDate(todayLocal())
       setWeight('')
+      setBodyFat('')
       setWaistCm('')
+      setHipsCm('')
+      setArmsCm('')
+      setThighsCm('')
+      setChestCm('')
       setPhaseWeek('')
+      setRecommendations('')
       setNextAppointment('')
       setConsultationMessage('✓ Consulta guardada en AQSLIM Clinic Preview.')
       await loadConsultations(selected.id)
@@ -189,17 +234,19 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setConsultationMessage('')
   }
 
-  function openNotes() {
-    if (!selected) return
-    setActiveTab('Notas')
-  }
+  function openNotes() { if (selected) setActiveTab('Notas') }
+  function openConsultations() { if (selected) setActiveTab('Consultas') }
 
-  function openConsultations() {
-    if (!selected) return
-    setActiveTab('Consultas')
+  function changeConsultationType(type: string) {
+    setConsultationType(type)
+    const fee = feeForType(type)
+    setConsultationFee(fee)
+    setAmountCollected(fee)
   }
 
   const inputStyle = { width: '100%', boxSizing: 'border-box' as const, padding: '11px 12px', borderRadius: 9, background: '#111', color: '#FAFAF8', border: '1px solid rgba(201,168,76,.25)' }
+  const labelStyle = { display: 'block', color: '#8E8881', fontSize: 11, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: '.08em' }
+  const sectionTitle = { color: '#C9A84C', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '.13em', marginTop: 18, marginBottom: 8 }
 
   return (
     <main style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8', fontFamily: 'Montserrat, Arial, sans-serif' }}>
@@ -236,7 +283,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
               <p style={{ color: '#9A9590', lineHeight: 1.7, margin: 0 }}>Desde aquí podrás llevar consultas, notas, planes, acceso a My AQSLIM, mensajes y seguimientos sin entrar al portal personal del paciente.</p>
             </div>
           ) : (
-            <div style={{ maxWidth: 1040, margin: '0 auto' }}>
+            <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ border: '1px solid rgba(201,168,76,.25)', borderRadius: 18, padding: 26, background: 'linear-gradient(135deg, rgba(201,168,76,.07), rgba(255,255,255,.02))', marginBottom: 18 }}>
                 <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Expediente</div>
                 <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 38, margin: '8px 0 10px' }}>{selected.name}</h2>
@@ -252,76 +299,78 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
               {activeTab === 'Notas' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(300px,.75fr)', gap: 16 }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
-                      <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de notas</h3>
-                      <span style={{ color: '#6F6A64', fontSize: 12 }}>{notes.length} notas</span>
-                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de notas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{notes.length} notas</span></div>
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
                       {notesLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : notes.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay notas para este paciente.</div> : notes.map(note => <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-                          <strong style={{ color: '#C9A84C', fontSize: 12 }}>{note.noteType}</strong>
-                          <span style={{ color: '#6F6A64', fontSize: 11 }}>{note.noteAt ? new Date(note.noteAt).toLocaleString('es-US') : ''}</span>
-                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}><strong style={{ color: '#C9A84C', fontSize: 12 }}>{note.noteType}</strong><span style={{ color: '#6F6A64', fontSize: 11 }}>{note.noteAt ? new Date(note.noteAt).toLocaleString('es-US') : ''}</span></div>
                         <div style={{ color: '#D9D5CF', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{note.note}</div>
                         <div style={{ color: '#77716A', fontSize: 11, marginTop: 10 }}>{note.authorLabel || note.authorEmail}{note.followupRequired ? ` · Seguimiento${note.followupDate ? ` ${note.followupDate}` : ' requerido'}` : ''}</div>
                       </div>)}
                     </div>
                   </div>
-
                   <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)', alignSelf: 'start' }}>
                     <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Nueva nota / entrevista</div>
-                    <select value={noteType} onChange={e => setNoteType(e.target.value)} style={{ ...inputStyle, marginTop: 14 }}>
-                      <option>Consulta</option><option>Entrevista</option><option>Seguimiento</option><option>General</option>
-                    </select>
+                    <select value={noteType} onChange={e => setNoteType(e.target.value)} style={{ ...inputStyle, marginTop: 14 }}><option>Consulta</option><option>Entrevista</option><option>Seguimiento</option><option>General</option></select>
                     <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Escribe aquí lo relevante de la consulta…" rows={8} style={{ ...inputStyle, marginTop: 12, resize: 'vertical' }} />
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#9A9590', fontSize: 12, marginTop: 12 }}><input type="checkbox" checked={followupRequired} onChange={e => setFollowupRequired(e.target.checked)} /> Seguimiento requerido</label>
                     {followupRequired && <input type="date" value={followupDate} onChange={e => setFollowupDate(e.target.value)} style={{ ...inputStyle, marginTop: 10 }} />}
                     <button onClick={saveNote} disabled={saving || !noteText.trim()} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || !noteText.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || !noteText.trim() ? '#8E8881' : '#0A0A0A', cursor: saving || !noteText.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar nota'}</button>
-                    {statusMessage && <div style={{ marginTop: 12, color: statusMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{statusMessage}</div>}
+                    {statusMessage && <div style={{ marginTop: 12, color: statusMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{statusMessage}</div>}
                   </div>
                 </div>
               ) : activeTab === 'Consultas' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(320px,.8fr)', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(390px,.9fr)', gap: 16, alignItems: 'start' }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
-                      <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3>
-                      <span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span>
-                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span></div>
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
                       {consultationsLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : consultations.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay consultas registradas en Clinic Preview.</div> : consultations.map(item => <div key={item.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                          <strong style={{ color: '#C9A84C', fontSize: 12 }}>{item.consultationType}</strong>
-                          <span style={{ color: '#6F6A64', fontSize: 11 }}>{item.consultationAt ? new Date(item.consultationAt).toLocaleString('es-US') : ''}</span>
-                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><strong style={{ color: '#C9A84C', fontSize: 12 }}>{item.consultationType}</strong><span style={{ color: '#6F6A64', fontSize: 11 }}>{item.consultationDate || (item.consultationAt ? new Date(item.consultationAt).toLocaleDateString('es-US') : '')}</span></div>
                         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', color: '#D9D5CF', fontSize: 12, marginTop: 10 }}>
-                          {item.weight !== null && <span>Peso: {item.weight} {item.weightUnit}</span>}
-                          {item.waistCm !== null && <span>Cintura: {item.waistCm} cm</span>}
-                          {item.phase && <span>Fase: {item.phase}{item.phaseWeek !== null ? ` · semana ${item.phaseWeek}` : ''}</span>}
+                          {item.weight !== null && <span>Peso: {item.weight} {item.weightUnit}</span>}{item.bodyFat !== null && <span>Grasa: {item.bodyFat}%</span>}{item.waistCm !== null && <span>Cintura: {item.waistCm} cm</span>}{item.hipsCm !== null && <span>Cadera: {item.hipsCm} cm</span>}
                         </div>
-                        {item.nextAppointment && <div style={{ marginTop: 8, color: '#8E8881', fontSize: 11 }}>Próxima cita: {new Date(item.nextAppointment).toLocaleString('es-US')}</div>}
-                        {item.authorLabel && <div style={{ marginTop: 8, color: '#6F6A64', fontSize: 11 }}>{item.authorLabel}</div>}
+                        {item.phase && <div style={{ marginTop: 8, color: '#8E8881', fontSize: 11 }}>Fase: {item.phase}{item.phaseWeek !== null ? ` · semana ${item.phaseWeek}` : ''}</div>}
+                        {item.recommendations && <div style={{ marginTop: 8, color: '#B8B3AD', fontSize: 12, lineHeight: 1.5 }}>{item.recommendations}</div>}
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8, color: '#6F6A64', fontSize: 11 }}>
+                          {item.amountCollected !== null && <span>Cobrado: ${Number(item.amountCollected).toFixed(2)}</span>}{item.paymentMethod && <span>{item.paymentMethod}</span>}{item.authorLabel && <span>{item.authorLabel}</span>}
+                        </div>
                       </div>)}
                     </div>
                   </div>
 
-                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)', alignSelf: 'start' }}>
+                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
                     <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Registrar consulta</div>
-                    <select value={consultationType} onChange={e => setConsultationType(e.target.value)} style={{ ...inputStyle, marginTop: 14 }}>
-                      <option>Cliente Nuevo</option><option>Cliente subsecuente</option><option>Cliente Re-Inicio</option><option>Seguimiento</option>
-                    </select>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8, marginTop: 10 }}>
-                      <input inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value)} placeholder="Peso" style={inputStyle} />
-                      <select value={weightUnit} onChange={e => setWeightUnit(e.target.value)} style={inputStyle}><option>lb</option><option>kg</option></select>
+
+                    <div style={sectionTitle}>Tipo y fecha</div>
+                    <select value={consultationType} onChange={e => changeConsultationType(e.target.value)} style={inputStyle}><option>Cliente Nuevo</option><option>Cliente subsecuente</option><option>Cliente Re-Inicio</option><option>Seguimiento</option></select>
+                    <label style={{ ...labelStyle, marginTop: 10 }}>Fecha de consulta</label><input type="date" value={consultationDate} onChange={e => setConsultationDate(e.target.value)} style={inputStyle} />
+
+                    <div style={sectionTitle}>Mediciones</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 95px', gap: 8 }}><input inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value)} placeholder="Peso" style={inputStyle} /><select value={weightUnit} onChange={e => setWeightUnit(e.target.value)} style={inputStyle}><option>lb</option><option>kg</option></select></div>
+                    <input inputMode="decimal" value={bodyFat} onChange={e => setBodyFat(e.target.value)} placeholder="% Grasa corporal" style={{ ...inputStyle, marginTop: 8 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                      <input inputMode="decimal" value={waistCm} onChange={e => setWaistCm(e.target.value)} placeholder="Cintura cm" style={inputStyle} /><input inputMode="decimal" value={hipsCm} onChange={e => setHipsCm(e.target.value)} placeholder="Cadera cm" style={inputStyle} />
+                      <input inputMode="decimal" value={armsCm} onChange={e => setArmsCm(e.target.value)} placeholder="Brazos cm" style={inputStyle} /><input inputMode="decimal" value={thighsCm} onChange={e => setThighsCm(e.target.value)} placeholder="Muslos cm" style={inputStyle} />
+                      <input inputMode="decimal" value={chestCm} onChange={e => setChestCm(e.target.value)} placeholder="Pecho/Busto cm" style={inputStyle} />
                     </div>
-                    <input inputMode="decimal" value={waistCm} onChange={e => setWaistCm(e.target.value)} placeholder="Cintura (cm)" style={{ ...inputStyle, marginTop: 10 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8, marginTop: 10 }}>
-                      <select value={phase} onChange={e => setPhase(e.target.value)} style={inputStyle}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select>
-                      <input inputMode="numeric" value={phaseWeek} onChange={e => setPhaseWeek(e.target.value)} placeholder="Semana" style={inputStyle} />
-                    </div>
-                    <label style={{ display: 'block', color: '#8E8881', fontSize: 11, marginTop: 12, marginBottom: 5 }}>Próxima cita</label>
+
+                    <div style={sectionTitle}>Plan actual</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8 }}><select value={phase} onChange={e => setPhase(e.target.value)} style={inputStyle}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select><input inputMode="numeric" value={phaseWeek} onChange={e => setPhaseWeek(e.target.value)} placeholder="Semana" style={inputStyle} /></div>
+
+                    <div style={sectionTitle}>Recomendaciones</div>
+                    <textarea value={recommendations} onChange={e => setRecommendations(e.target.value)} placeholder="Instrucciones, observaciones o recomendaciones para esta consulta…" rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
+
+                    <div style={sectionTitle}>Próxima cita</div>
                     <input type="datetime-local" value={nextAppointment} onChange={e => setNextAppointment(e.target.value)} style={inputStyle} />
-                    <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta'}</button>
-                    {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{consultationMessage}</div>}
+                    <a href={SQUARE_BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#C9A84C', textDecoration: 'none', border: '1px solid rgba(201,168,76,.35)', borderRadius: 8, padding: '9px 12px', fontSize: 12 }}>+ Agendar en Square ↗</a>
+
+                    <div style={sectionTitle}>Pago</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><div><label style={labelStyle}>Cargo ($)</label><input inputMode="decimal" value={consultationFee} onChange={e => setConsultationFee(e.target.value)} style={inputStyle} /></div><div><label style={labelStyle}>Monto cobrado ($)</label><input inputMode="decimal" value={amountCollected} onChange={e => setAmountCollected(e.target.value)} style={inputStyle} /></div></div>
+                    <label style={{ ...labelStyle, marginTop: 10 }}>Método de pago</label><select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={inputStyle}><option>Sin especificar</option><option>Efectivo</option><option>Card</option><option>Venmo</option><option>Zelle</option><option>Transferencia</option></select>
+
+                    {consultationType === 'Cliente Re-Inicio' && <div style={{ marginTop: 12, padding: 12, border: '1px solid rgba(201,168,76,.2)', borderRadius: 9, color: '#9A9590', fontSize: 12, lineHeight: 1.5 }}>El email de re-inicio anterior permanece desactivado aquí porque todavía apunta al cuestionario viejo. Lo reconectaremos al nuevo flujo de My AQSLIM/entrevista antes de habilitarlo.</div>}
+
+                    <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta'}</button>
+                    {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
                   </div>
                 </div>
               ) : (
@@ -331,33 +380,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     <div style={{ marginTop: 18, display: 'grid', gap: 14 }}>
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Meta</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{selected.goal || 'Sin meta registrada'}</div></div>
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Próxima cita</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{selected.nextAppointment || 'Sin cita registrada'}</div></div>
-                      <div>
-                        <div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Última nota</div>
-                        {notesLoading ? <div style={{ marginTop: 5, color: '#8E8881' }}>Cargando notas…</div> : latestNote ? <>
-                          <div style={{ marginTop: 6, color: '#D9D5CF', lineHeight: 1.55 }}>{latestNote.note}</div>
-                          <div style={{ marginTop: 6, color: '#77716A', fontSize: 11 }}>{latestNote.noteType}{latestNote.noteAt ? ` · ${new Date(latestNote.noteAt).toLocaleString('es-US')}` : ''}</div>
-                          {latestNote.followupRequired && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 12 }}>Seguimiento pendiente{latestNote.followupDate ? ` · ${latestNote.followupDate}` : ''}</div>}
-                          <button onClick={openNotes} style={{ marginTop: 10, padding: 0, border: 0, background: 'transparent', color: '#C9A84C', cursor: 'pointer', fontSize: 12 }}>Ver historial / continuar seguimiento →</button>
-                        </> : <div style={{ marginTop: 5, color: '#8E8881' }}>Sin notas registradas.</div>}
-                      </div>
-                      {pendingFollowups.length > 0 && <div style={{ border: '1px solid rgba(201,168,76,.20)', borderRadius: 10, padding: 12, background: 'rgba(201,168,76,.04)' }}>
-                        <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Seguimiento</div>
-                        <div style={{ marginTop: 5, color: '#D9D5CF' }}>{pendingFollowups.length} nota{pendingFollowups.length === 1 ? '' : 's'} marcada{pendingFollowups.length === 1 ? '' : 's'} para seguimiento.</div>
-                      </div>}
+                      <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Última nota</div>{notesLoading ? <div style={{ marginTop: 5, color: '#8E8881' }}>Cargando notas…</div> : latestNote ? <><div style={{ marginTop: 6, color: '#D9D5CF', lineHeight: 1.55 }}>{latestNote.note}</div><div style={{ marginTop: 6, color: '#77716A', fontSize: 11 }}>{latestNote.noteType}{latestNote.noteAt ? ` · ${new Date(latestNote.noteAt).toLocaleString('es-US')}` : ''}</div>{latestNote.followupRequired && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 12 }}>Seguimiento pendiente{latestNote.followupDate ? ` · ${latestNote.followupDate}` : ''}</div>}<button onClick={openNotes} style={{ marginTop: 10, padding: 0, border: 0, background: 'transparent', color: '#C9A84C', cursor: 'pointer', fontSize: 12 }}>Ver historial / continuar seguimiento →</button></> : <div style={{ marginTop: 5, color: '#8E8881' }}>Sin notas registradas.</div>}</div>
+                      {pendingFollowups.length > 0 && <div style={{ border: '1px solid rgba(201,168,76,.20)', borderRadius: 10, padding: 12, background: 'rgba(201,168,76,.04)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Seguimiento</div><div style={{ marginTop: 5, color: '#D9D5CF' }}>{pendingFollowups.length} nota{pendingFollowups.length === 1 ? '' : 's'} marcada{pendingFollowups.length === 1 ? '' : 's'} para seguimiento.</div></div>}
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Uso de alimentos</div><div style={{ marginTop: 5, color: '#8E8881' }}>Food Scanner y registro de comidas permanecen exclusivamente dentro de My AQSLIM.</div></div>
                     </div>
                   </div>
-
-                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
-                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Acciones rápidas</div>
-                    <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-                      <button onClick={openConsultations} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', textAlign: 'left' }}>Registrar consulta →</button>
-                      <button onClick={openNotes} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', textAlign: 'left' }}>Agregar nota / entrevista →</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Crear o actualizar plan alimentario · siguiente paso</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Dar acceso / revisar My AQSLIM · siguiente paso</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Ver mensajes del paciente · siguiente paso</button>
-                    </div>
-                  </div>
+                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Acciones rápidas</div><div style={{ display: 'grid', gap: 10, marginTop: 14 }}><button onClick={openConsultations} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', textAlign: 'left' }}>Registrar consulta →</button><button onClick={openNotes} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', textAlign: 'left' }}>Agregar nota / entrevista →</button><button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Crear o actualizar plan alimentario · siguiente paso</button><button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Dar acceso / revisar My AQSLIM · siguiente paso</button><button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#9A9590', textAlign: 'left' }}>Ver mensajes del paciente · siguiente paso</button></div></div>
                 </div>
               )}
             </div>
