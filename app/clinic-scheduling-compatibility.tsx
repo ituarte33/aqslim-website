@@ -18,9 +18,14 @@ function suggestedDate(baseDate: string, days: number) {
   return `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}T${pad(normalizedHour)}:${pad(normalizedMinute)}`
 }
 
-function setNativeInputValue(input: HTMLInputElement, value: string) {
+function setReactInputValue(input: HTMLInputElement, value: string) {
+  const previousValue = input.value
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
   descriptor?.set?.call(input, value)
+
+  const tracker = (input as HTMLInputElement & { _valueTracker?: { setValue: (value: string) => void } })._valueTracker
+  tracker?.setValue(previousValue)
+
   input.dispatchEvent(new Event('input', { bubbles: true }))
   input.dispatchEvent(new Event('change', { bubbles: true }))
 }
@@ -42,7 +47,6 @@ export function ClinicSchedulingCompatibility() {
       const layout = formCard?.parentElement as HTMLDivElement | null
       if (!formCard || !layout) return
 
-      // Make the consultation task the visual center of the workspace.
       layout.style.display = 'flex'
       layout.style.flexDirection = 'column'
       layout.style.gap = '18px'
@@ -83,9 +87,19 @@ export function ClinicSchedulingCompatibility() {
         })
       }
 
+      if (!consultationDate.dataset.clinicCadenceBound) {
+        consultationDate.dataset.clinicCadenceBound = 'true'
+        consultationDate.addEventListener('change', () => {
+          if (userEditedNextAppointment) return
+          nextInput.dataset.programmaticChange = 'true'
+          setReactInputValue(nextInput, suggestedDate(consultationDate.value, 7))
+          nextInput.dataset.programmaticChange = 'false'
+        })
+      }
+
       if (!nextInput.value && !userEditedNextAppointment) {
         nextInput.dataset.programmaticChange = 'true'
-        setNativeInputValue(nextInput, suggestedDate(consultationDate.value, 7))
+        setReactInputValue(nextInput, suggestedDate(consultationDate.value, 7))
         nextInput.dataset.programmaticChange = 'false'
       }
 
@@ -128,7 +142,7 @@ export function ClinicSchedulingCompatibility() {
           button.addEventListener('click', () => {
             userEditedNextAppointment = true
             nextInput.dataset.programmaticChange = 'true'
-            setNativeInputValue(nextInput, suggestedDate(consultationDate.value, option.days))
+            setReactInputValue(nextInput, suggestedDate(consultationDate.value, option.days))
             nextInput.dataset.programmaticChange = 'false'
             caption.textContent = `Fecha preliminar seleccionada: ${option.days} días · puedes cambiarla manualmente`
           })
