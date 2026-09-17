@@ -14,6 +14,7 @@ import { ClinicAriosLauncher } from './clinic-arios-launcher'
 import { ClinicSchedulingCompatibility } from './clinic-scheduling-compatibility'
 import { ClinicPlanCompatibility } from './clinic-plan-compatibility'
 import { ClinicPlanConsultationSyncCompatibility } from './clinic-plan-consultation-sync-compatibility'
+import { ClinicPlanPreparePersistence } from './clinic-plan-prepare-persistence'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ClinicSchedulingCompatibility />
           <ClinicPlanCompatibility />
           <ClinicPlanConsultationSyncCompatibility />
+          <ClinicPlanPreparePersistence />
           <LanguageModal />
           {children}
           <ClientSignedIn><ChatWidget /></ClientSignedIn>
