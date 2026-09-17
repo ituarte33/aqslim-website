@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireActor } from '@/lib/auth'
+import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
-const PREVIEW_BRANCH = 'myaq-ent-p5-1-extended-ai-live-canary'
-
-function previewOnly() {
-  return process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_GIT_COMMIT_REF === PREVIEW_BRANCH
+function clinicEnvironment() {
+  return {
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+  }
 }
 
 function extractText(data: any): string {
@@ -19,10 +21,13 @@ function extractText(data: any): string {
 }
 
 export async function POST(request: NextRequest) {
-  if (!previewOnly()) return NextResponse.json({ ok: false }, { status: 404 })
+  const environment = clinicEnvironment()
+  if (!isClinicPreviewEnvironment(environment)) return NextResponse.json({ ok: false }, { status: 404 })
 
   const actor = await requireActor()
-  if (actor.role !== 'admin') return NextResponse.json({ ok: false }, { status: 403 })
+  if (!isClinicFounderIdentity({ email: actor.email, environment })) {
+    return NextResponse.json({ ok: false }, { status: 403 })
+  }
 
   const body = await request.json().catch(() => ({}))
   const message = typeof body?.message === 'string' ? body.message.trim().slice(0, 6000) : ''

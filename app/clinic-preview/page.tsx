@@ -1,20 +1,23 @@
 import { redirect } from 'next/navigation'
 import { getActor } from '@/lib/auth'
 import { getClientes } from '@/lib/airtable'
+import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { ClinicPreviewClient } from './clinic-preview-client'
 
-const PREVIEW_BRANCH = 'myaq-ent-p5-1-extended-ai-live-canary'
-
-function previewOnly() {
-  return process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_GIT_COMMIT_REF === PREVIEW_BRANCH
+function clinicEnvironment() {
+  return {
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+  }
 }
 
 export default async function ClinicPreviewPage() {
-  if (!previewOnly()) redirect('/my-aqslim')
+  const environment = clinicEnvironment()
+  if (!isClinicPreviewEnvironment(environment)) redirect('/my-aqslim')
 
   const actor = await getActor()
   if (!actor) redirect('/sign-in')
-  if (actor.role !== 'admin') redirect('/my-aqslim')
+  if (!isClinicFounderIdentity({ email: actor.email, environment })) redirect('/my-aqslim')
 
   const patients = await getClientes()
   const items = patients

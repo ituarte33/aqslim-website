@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -14,7 +15,6 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 const isPatientPortalRoute = createRouteMatcher(['/my-aqslim(.*)'])
-const MYAQ_CLINIC_PREVIEW_BRANCH = 'myaq-ent-p5-1-extended-ai-live-canary'
 
 function isOperationalRoute(pathname: string) {
   if (pathname === '/dashboard/plan-preview' || pathname.startsWith('/dashboard/plan-preview/')) {
@@ -31,8 +31,10 @@ export default clerkMiddleware(async (auth, req) => {
   const isRecipePreview = process.env.VERCEL_ENV === 'preview'
     && process.env.VERCEL_GIT_COMMIT_REF === 'myaq-rec-001-preview-010'
 
-  const isClinicPreview = process.env.VERCEL_ENV === 'preview'
-    && process.env.VERCEL_GIT_COMMIT_REF === MYAQ_CLINIC_PREVIEW_BRANCH
+  const isClinicPreview = isClinicPreviewEnvironment({
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+  })
 
   // This branch is now the working AQSLIM Clinic Preview. Opening a Vercel
   // deployment at its root should take the Founder directly into Clinic instead

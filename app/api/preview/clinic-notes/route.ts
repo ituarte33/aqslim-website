@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
-import { isP5FounderCanaryIdentity } from '@/lib/p5-founder-canary-policy'
+import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
-const PREVIEW_BRANCH = 'myaq-ent-p5-1-extended-ai-live-canary'
 const TABLE_ID = 'tbljMLa7RCRzBYZBI'
 
 const F = {
@@ -21,8 +20,11 @@ const F = {
   PREVIEW_ONLY: 'fldXhnn0sn0z3XMSX',
 } as const
 
-function previewOnly() {
-  return process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_GIT_COMMIT_REF === PREVIEW_BRANCH
+function clinicEnvironment() {
+  return {
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+  }
 }
 
 function baseUrl() {
@@ -37,18 +39,11 @@ function headers() {
 }
 
 async function requireFounder() {
-  if (!previewOnly()) throw new Error('NOT_FOUND')
+  const environment = clinicEnvironment()
+  if (!isClinicPreviewEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  const allowed = actor.role === 'admin' || isP5FounderCanaryIdentity({
-    email: actor.email,
-    environment: {
-      VERCEL_ENV: process.env.VERCEL_ENV,
-      VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
-      MYAQ_P5_FOUNDER_CANARY: process.env.MYAQ_P5_FOUNDER_CANARY,
-    },
-  })
-  if (!allowed) throw new Error('FORBIDDEN')
+  if (!isClinicFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 
