@@ -27,6 +27,13 @@ type ClinicNote = {
     priority: 'Normal' | 'Alta' | 'Urgente'
     status: 'Pendiente' | 'En progreso' | 'Completado'
   } | null
+  messageDraft?: {
+    channel: 'SMS' | 'Email' | 'WhatsApp'
+    purpose: 'Seguimiento' | 'Recordatorio' | 'Plan' | 'General'
+    status: 'Borrador' | 'Listo para revisar' | 'Archivado'
+    subject: string
+    body: string
+  } | null
 }
 
 type ClinicConsultation = {
@@ -88,6 +95,13 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [followupSaving, setFollowupSaving] = useState(false)
   const [followupUpdatingId, setFollowupUpdatingId] = useState('')
   const [followupMessage, setFollowupMessage] = useState('')
+  const [messageChannel, setMessageChannel] = useState<'SMS' | 'Email' | 'WhatsApp'>('SMS')
+  const [messagePurpose, setMessagePurpose] = useState<'Seguimiento' | 'Recordatorio' | 'Plan' | 'General'>('Seguimiento')
+  const [messageSubject, setMessageSubject] = useState('')
+  const [messageBody, setMessageBody] = useState('')
+  const [messageSaving, setMessageSaving] = useState(false)
+  const [messageUpdatingId, setMessageUpdatingId] = useState('')
+  const [messageStatus, setMessageStatus] = useState('')
 
   const [consultations, setConsultations] = useState<ClinicConsultation[]>([])
   const [consultationsLoading, setConsultationsLoading] = useState(false)
@@ -123,6 +137,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const latestNote = notes[0] ?? null
   const pendingFollowups = notes.filter(note => note.followupRequired)
   const structuredFollowups = notes.filter(note => note.noteType === 'Seguimiento' && note.followup)
+  const messageDrafts = notes.filter(note => note.messageDraft)
 
   async function loadNotes(patientId: string) {
     setNotesLoading(true)
@@ -252,6 +267,70 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     }
   }
 
+  async function saveMessageDraft() {
+    const draftBody = messageBody.trim()
+    if (!selected || !draftBody) return
+    setMessageSaving(true)
+    setMessageStatus('')
+    try {
+      const response = await fetch('/api/preview/clinic-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'messageDraft',
+          patientId: selected.id,
+          channel: messageChannel,
+          purpose: messagePurpose,
+          messageStatus: 'Borrador',
+          subject: messageSubject,
+          messageBody: draftBody,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error('save_failed')
+      const refreshed = await loadNotes(selected.id)
+      if (!refreshed?.some(note => note.messageDraft?.body === draftBody && note.messageDraft.status === 'Borrador')) throw new Error('verify_failed')
+      setMessageSubject('')
+      setMessageBody('')
+      setMessageStatus('✓ Borrador guardado y verificado en Clinic Preview. No fue enviado.')
+    } catch {
+      setMessageStatus('No se pudo guardar el borrador. Intenta de nuevo.')
+    } finally {
+      setMessageSaving(false)
+    }
+  }
+
+  async function updateMessageDraftStatus(note: ClinicNote, nextStatus: 'Borrador' | 'Listo para revisar' | 'Archivado') {
+    if (!selected || !note.messageDraft) return
+    setMessageUpdatingId(note.id)
+    setMessageStatus('')
+    try {
+      const response = await fetch('/api/preview/clinic-notes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'messageDraft',
+          patientId: selected.id,
+          recordId: note.id,
+          channel: note.messageDraft.channel,
+          purpose: note.messageDraft.purpose,
+          messageStatus: nextStatus,
+          subject: note.messageDraft.subject,
+          messageBody: note.messageDraft.body,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error('update_failed')
+      const refreshed = await loadNotes(selected.id)
+      if (!refreshed?.some(item => item.id === note.id && item.messageDraft?.status === nextStatus)) throw new Error('verify_failed')
+      setMessageStatus('✓ Estado del borrador actualizado y verificado. No fue enviado.')
+    } catch {
+      setMessageStatus('No se pudo actualizar el borrador. Intenta de nuevo.')
+    } finally {
+      setMessageUpdatingId('')
+    }
+  }
+
   async function saveConsultation() {
     if (!selected) return
     setConsultationSaving(true)
@@ -312,6 +391,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setFollowupAction('')
     setFollowupPriority('Normal')
     setFollowupDueDate('')
+    setMessageStatus('')
+    setMessageSubject('')
+    setMessageBody('')
   }
 
   function openNotes() { if (selected) setActiveTab('Notas') }
@@ -451,6 +533,46 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
                     <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta'}</button>
                     {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
+                  </div>
+                </div>
+              ) : activeTab === 'Mensajes' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(360px,.8fr)', gap: 16, alignItems: 'start' }}>
+                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Borradores de mensajes</h3>
+                      <span style={{ color: '#6F6A64', fontSize: 12 }}>{messageDrafts.length} borradores</span>
+                    </div>
+                    <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(226,200,122,.28)', borderRadius: 10, background: 'rgba(201,168,76,.05)', color: '#E2C87A', fontSize: 12, lineHeight: 1.55 }}>Borradores internos del expediente. Esta pantalla no envía SMS, emails ni WhatsApp al paciente.</div>
+                    <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+                      {notesLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : messageDrafts.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay borradores para este paciente.</div> : messageDrafts.map(note => {
+                        const draft = note.messageDraft!
+                        return <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: draft.status === 'Archivado' ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.025)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{draft.channel}</span><span style={{ color: '#8E8881', fontSize: 11 }}>{draft.purpose}</span></div>
+                            <select value={draft.status} disabled={messageUpdatingId === note.id} onChange={event => void updateMessageDraftStatus(note, event.target.value as 'Borrador' | 'Listo para revisar' | 'Archivado')} style={{ ...inputStyle, width: 175, padding: '8px 10px' }}><option>Borrador</option><option>Listo para revisar</option><option>Archivado</option></select>
+                          </div>
+                          {draft.subject && <div style={{ color: '#FAFAF8', fontWeight: 600, marginTop: 12 }}>{draft.subject}</div>}
+                          <div style={{ color: '#D9D5CF', lineHeight: 1.6, marginTop: 10, whiteSpace: 'pre-wrap' }}>{draft.body}</div>
+                          <div style={{ color: '#77716A', fontSize: 11, marginTop: 10 }}>{note.noteAt ? new Date(note.noteAt).toLocaleString('es-US') : ''}{note.authorLabel ? ` · ${note.authorLabel}` : ''}</div>
+                        </div>
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
+                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Nuevo borrador interno</div>
+                    <div style={{ color: '#9A9590', fontSize: 12, lineHeight: 1.55, marginTop: 9 }}>Contacto de referencia: {selected.phone || selected.email || 'sin contacto registrado'}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+                      <div><label style={labelStyle}>Canal previsto</label><select value={messageChannel} onChange={event => setMessageChannel(event.target.value as 'SMS' | 'Email' | 'WhatsApp')} style={inputStyle}><option>SMS</option><option>Email</option><option>WhatsApp</option></select></div>
+                      <div><label style={labelStyle}>Propósito</label><select value={messagePurpose} onChange={event => setMessagePurpose(event.target.value as 'Seguimiento' | 'Recordatorio' | 'Plan' | 'General')} style={inputStyle}><option>Seguimiento</option><option>Recordatorio</option><option>Plan</option><option>General</option></select></div>
+                    </div>
+                    <label style={{ ...labelStyle, marginTop: 12 }}>Asunto opcional</label>
+                    <input value={messageSubject} onChange={event => setMessageSubject(event.target.value)} maxLength={500} placeholder="Ej. Seguimiento de tu plan" style={inputStyle} />
+                    <label style={{ ...labelStyle, marginTop: 12 }}>Mensaje</label>
+                    <textarea value={messageBody} onChange={event => setMessageBody(event.target.value)} placeholder="Escribe el borrador aquí…" rows={8} style={{ ...inputStyle, resize: 'vertical' }} />
+                    <div style={{ marginTop: 12, padding: 11, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>Sin envío: guardar sólo registra este texto dentro de Clinic Preview.</div>
+                    <button onClick={saveMessageDraft} disabled={messageSaving || !messageBody.trim()} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: messageSaving || !messageBody.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: messageSaving || !messageBody.trim() ? '#8E8881' : '#0A0A0A', cursor: messageSaving || !messageBody.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{messageSaving ? 'Guardando…' : 'Guardar borrador Preview'}</button>
+                    {messageStatus && <div style={{ marginTop: 12, color: messageStatus.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{messageStatus}</div>}
                   </div>
                 </div>
               ) : activeTab === 'Seguimiento' ? (

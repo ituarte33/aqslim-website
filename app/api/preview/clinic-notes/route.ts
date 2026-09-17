@@ -11,6 +11,16 @@ import {
   type ClinicFollowupPriority,
   type ClinicFollowupStatus,
 } from '@/lib/clinic-followup'
+import {
+  CLINIC_MESSAGE_CHANNELS,
+  CLINIC_MESSAGE_PURPOSES,
+  CLINIC_MESSAGE_STATUSES,
+  decodeClinicMessageDraft,
+  encodeClinicMessageDraft,
+  type ClinicMessageChannel,
+  type ClinicMessagePurpose,
+  type ClinicMessageStatus,
+} from '@/lib/clinic-message-draft'
 
 const TABLE_ID = 'tbljMLa7RCRzBYZBI'
 
@@ -85,16 +95,18 @@ export async function GET(request: NextRequest) {
     const notes = (data.records ?? []).map((record: any) => {
       const rawNote = record.fields?.[F.NOTE] ?? ''
       const followup = decodeClinicFollowup(rawNote)
+      const messageDraft = decodeClinicMessageDraft(rawNote)
       return {
         id: record.id,
         noteAt: record.fields?.[F.NOTE_AT] ?? null,
         authorEmail: record.fields?.[F.AUTHOR_EMAIL] ?? '',
         authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
         noteType: record.fields?.[F.NOTE_TYPE] ?? 'General',
-        note: followup?.action ?? rawNote,
+        note: followup?.action ?? messageDraft?.body ?? rawNote,
         followupRequired: record.fields?.[F.FOLLOWUP_REQUIRED] === true,
         followupDate: record.fields?.[F.FOLLOWUP_DATE] ?? null,
         followup,
+        messageDraft,
       }
     })
 
@@ -112,6 +124,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const patientId = safeText(body.patientId, 100)
     const isStructuredFollowup = body.kind === 'followup'
+    const isMessageDraft = body.kind === 'messageDraft'
     const action = safeText(body.action)
     const priority = CLINIC_FOLLOWUP_PRIORITIES.includes(body.priority as ClinicFollowupPriority)
       ? body.priority as ClinicFollowupPriority
@@ -119,16 +132,36 @@ export async function POST(request: NextRequest) {
     const status = CLINIC_FOLLOWUP_STATUSES.includes(body.status as ClinicFollowupStatus)
       ? body.status as ClinicFollowupStatus
       : 'Pendiente'
+    const messageBody = safeText(body.messageBody)
+    const messageChannel = CLINIC_MESSAGE_CHANNELS.includes(body.channel as ClinicMessageChannel)
+      ? body.channel as ClinicMessageChannel
+      : 'SMS'
+    const messagePurpose = CLINIC_MESSAGE_PURPOSES.includes(body.purpose as ClinicMessagePurpose)
+      ? body.purpose as ClinicMessagePurpose
+      : 'General'
+    const messageStatus = CLINIC_MESSAGE_STATUSES.includes(body.messageStatus as ClinicMessageStatus)
+      ? body.messageStatus as ClinicMessageStatus
+      : 'Borrador'
     const note = isStructuredFollowup
       ? encodeClinicFollowup({ action, priority, status })
-      : safeText(body.note)
+      : isMessageDraft
+        ? encodeClinicMessageDraft({
+          channel: messageChannel,
+          purpose: messagePurpose,
+          status: messageStatus,
+          subject: safeText(body.subject, 500),
+          body: messageBody,
+        })
+        : safeText(body.note)
     const noteType = isStructuredFollowup
       ? 'Seguimiento'
-      : ['Consulta', 'Entrevista', 'Seguimiento', 'General'].includes(body.noteType) ? body.noteType : 'General'
+      : isMessageDraft
+        ? 'General'
+        : ['Consulta', 'Entrevista', 'Seguimiento', 'General'].includes(body.noteType) ? body.noteType : 'General'
     const followupRequired = isStructuredFollowup ? clinicFollowupIsPending(status) : body.followupRequired === true
     const followupDate = followupRequired ? safeText(body.followupDate, 20) : ''
 
-    if (!patientId.startsWith('rec') || !note || (isStructuredFollowup && !action)) {
+    if (!patientId.startsWith('rec') || !note || (isStructuredFollowup && !action) || (isMessageDraft && !messageBody)) {
       return NextResponse.json({ ok: false, error: 'invalid_input' }, { status: 400 })
     }
 
@@ -188,6 +221,39 @@ export async function PATCH(request: NextRequest) {
     const current = await currentResponse.json()
     if (current.fields?.[F.PATIENT_ID] !== patientId) {
       return NextResponse.json({ ok: false, error: 'patient_mismatch' }, { status: 403 })
+    }
+
+    const existingMessageDraft = decodeClinicMessageDraft(current.fields?.[F.NOTE])
+    if (body.kind === 'messageDraft') {
+      if (!existingMessageDraft) return NextResponse.json({ ok: false, error: 'not_message_draft' }, { status: 400 })
+      const messageBody = safeText(body.messageBody) || existingMessageDraft.body
+      const channel = CLINIC_MESSAGE_CHANNELS.includes(body.channel as ClinicMessageChannel)
+        ? body.channel as ClinicMessageChannel
+        : existingMessageDraft.channel
+      const purpose = CLINIC_MESSAGE_PURPOSES.includes(body.purpose as ClinicMessagePurpose)
+        ? body.purpose as ClinicMessagePurpose
+        : existingMessageDraft.purpose
+      const status = CLINIC_MESSAGE_STATUSES.includes(body.messageStatus as ClinicMessageStatus)
+        ? body.messageStatus as ClinicMessageStatus
+        : existingMessageDraft.status
+      const subject = typeof body.subject === 'string' ? safeText(body.subject, 500) : existingMessageDraft.subject
+      const response = await fetch(baseUrl(), {
+        method: 'PATCH',
+        headers: headers(),
+        cache: 'no-store',
+        body: JSON.stringify({
+          records: [{
+            id: recordId,
+            fields: {
+              [F.NOTE]: encodeClinicMessageDraft({ channel, purpose, status, subject, body: messageBody }),
+              [F.FOLLOWUP_REQUIRED]: false,
+            },
+          }],
+          typecast: true,
+        }),
+      })
+      if (!response.ok) return NextResponse.json({ ok: false, error: 'update_failed' }, { status: 500 })
+      return NextResponse.json({ ok: true, updated: true })
     }
 
     const existing = decodeClinicFollowup(current.fields?.[F.NOTE])
