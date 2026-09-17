@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
+import { normalizeClinicWeightKg } from '@/lib/clinic-plan-format'
 
 type PlanData = {
   status?: string
@@ -57,6 +58,10 @@ function fieldLabel(text: string) {
 
 function numeric(value: number | null | undefined) {
   return value === null || value === undefined || Number.isNaN(value) ? '' : String(value)
+}
+
+function normalizePlan(plan: PlanData): PlanData {
+  return { ...plan, goalWeightKg: normalizeClinicWeightKg(plan.goalWeightKg) }
 }
 
 export function ClinicPlanCompatibility() {
@@ -141,7 +146,7 @@ export function ClinicPlanCompatibility() {
     const handlePrepare = (event: Event) => {
       const detail = (event as CustomEvent<PlanPrepareDetail>).detail
       if (!detail?.livePlan) return
-      setDraft(prev => ({
+      setDraft(prev => normalizePlan({
         ...emptyPlan,
         ...detail.livePlan,
         status: 'Draft',
@@ -171,7 +176,7 @@ export function ClinicPlanCompatibility() {
         if (!response.ok || !data.ok) throw new Error('load_failed')
         setPatientId(data.patient?.id ?? '')
         setLivePlan(data.livePlan ?? null)
-        setDraft(data.draft ? { ...emptyPlan, ...data.draft } : emptyPlan)
+        setDraft(data.draft ? normalizePlan({ ...emptyPlan, ...data.draft }) : emptyPlan)
       })
       .catch(() => { if (!cancelled) setMessage('No se pudo cargar el plan Preview de este paciente.') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -201,7 +206,7 @@ export function ClinicPlanCompatibility() {
       const verifyData = await verifyResponse.json()
       if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft) throw new Error('verify_failed')
 
-      setDraft({ ...emptyPlan, ...verifyData.draft })
+      setDraft(normalizePlan({ ...emptyPlan, ...verifyData.draft }))
       setLivePlan(verifyData.livePlan ?? livePlan)
       setMessage('✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
     } catch {
@@ -213,7 +218,7 @@ export function ClinicPlanCompatibility() {
 
   function copyLivePlan() {
     if (!livePlan) return
-    setDraft({ ...emptyPlan, ...livePlan, status: 'Draft', visitCadenceDays: draft.visitCadenceDays ?? 7 })
+    setDraft(normalizePlan({ ...emptyPlan, ...livePlan, status: 'Draft', visitCadenceDays: draft.visitCadenceDays ?? 7 }))
     setMessage('Plan actual copiado al borrador. Revisa y guarda antes de continuar.')
   }
 
@@ -236,7 +241,7 @@ export function ClinicPlanCompatibility() {
             <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Plan actual · sólo lectura</div>
             {!livePlan ? <div style={{ marginTop: 16, color: '#8E8881', lineHeight: 1.6 }}>No encontré un Plan AQSLIM actual vinculado a este paciente.</div> : <>
               <div style={{ marginTop: 16, display: 'grid', gap: 12, color: '#D9D5CF', fontSize: 13 }}>
-                <div><strong>Fase:</strong> {livePlan.phase || 'Sin fase'}{livePlan.phaseWeek ? ` · semana ${livePlan.phaseWeek}` : ''}</div>
+                <div><strong>Fase:</strong>{' '}{livePlan.phase || 'Sin fase'}{livePlan.phaseWeek ? ` · semana ${livePlan.phaseWeek}` : ''}</div>
                 <div><strong>Dieta/plan:</strong> {livePlan.dietName || '—'}</div>
                 <div><strong>Calorías:</strong> {livePlan.calorieTarget ?? '—'}</div>
                 <div><strong>Kenkho:</strong> {livePlan.kenkhoTier || 'Clinic'}</div>
