@@ -22,6 +22,11 @@ type ClinicNote = {
   note: string
   followupRequired: boolean
   followupDate: string | null
+  followup?: {
+    action: string
+    priority: 'Normal' | 'Alta' | 'Urgente'
+    status: 'Pendiente' | 'En progreso' | 'Completado'
+  } | null
 }
 
 type ClinicConsultation = {
@@ -77,6 +82,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [followupDate, setFollowupDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
+  const [followupAction, setFollowupAction] = useState('')
+  const [followupPriority, setFollowupPriority] = useState<'Normal' | 'Alta' | 'Urgente'>('Normal')
+  const [followupDueDate, setFollowupDueDate] = useState('')
+  const [followupSaving, setFollowupSaving] = useState(false)
+  const [followupUpdatingId, setFollowupUpdatingId] = useState('')
+  const [followupMessage, setFollowupMessage] = useState('')
 
   const [consultations, setConsultations] = useState<ClinicConsultation[]>([])
   const [consultationsLoading, setConsultationsLoading] = useState(false)
@@ -111,6 +122,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const selected = patients.find(patient => patient.id === selectedId) ?? null
   const latestNote = notes[0] ?? null
   const pendingFollowups = notes.filter(note => note.followupRequired)
+  const structuredFollowups = notes.filter(note => note.noteType === 'Seguimiento' && note.followup)
 
   async function loadNotes(patientId: string) {
     setNotesLoading(true)
@@ -119,9 +131,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       const response = await fetch(`/api/preview/clinic-notes?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('load_failed')
-      setNotes(Array.isArray(data.notes) ? data.notes : [])
+      const loadedNotes = Array.isArray(data.notes) ? data.notes as ClinicNote[] : []
+      setNotes(loadedNotes)
+      return loadedNotes
     } catch {
       setStatusMessage('No se pudieron cargar las notas Preview.')
+      return null
     } finally {
       setNotesLoading(false)
     }
@@ -173,6 +188,67 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       setStatusMessage('No se pudo guardar la nota. Intenta de nuevo.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function saveFollowup() {
+    if (!selected || !followupAction.trim()) return
+    setFollowupSaving(true)
+    setFollowupMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'followup',
+          patientId: selected.id,
+          action: followupAction,
+          priority: followupPriority,
+          status: 'Pendiente',
+          followupDate: followupDueDate,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error('save_failed')
+      setFollowupAction('')
+      setFollowupPriority('Normal')
+      setFollowupDueDate('')
+      const refreshed = await loadNotes(selected.id)
+      if (!refreshed?.some(note => note.followup?.action === followupAction.trim())) throw new Error('verify_failed')
+      setFollowupMessage('✓ Seguimiento guardado y verificado en Clinic Preview.')
+    } catch {
+      setFollowupMessage('No se pudo guardar el seguimiento. Intenta de nuevo.')
+    } finally {
+      setFollowupSaving(false)
+    }
+  }
+
+  async function updateFollowupStatus(note: ClinicNote, nextStatus: 'Pendiente' | 'En progreso' | 'Completado') {
+    if (!selected || !note.followup) return
+    setFollowupUpdatingId(note.id)
+    setFollowupMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-notes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: selected.id,
+          recordId: note.id,
+          action: note.followup.action,
+          priority: note.followup.priority,
+          status: nextStatus,
+          followupDate: note.followupDate,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error('update_failed')
+      const refreshed = await loadNotes(selected.id)
+      if (!refreshed?.some(item => item.id === note.id && item.followup?.status === nextStatus)) throw new Error('verify_failed')
+      setFollowupMessage('✓ Estado actualizado y verificado en Clinic Preview.')
+    } catch {
+      setFollowupMessage('No se pudo actualizar el seguimiento. Intenta de nuevo.')
+    } finally {
+      setFollowupUpdatingId('')
     }
   }
 
@@ -232,6 +308,10 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setActiveTab('Consultas')
     setStatusMessage('')
     setConsultationMessage('')
+    setFollowupMessage('')
+    setFollowupAction('')
+    setFollowupPriority('Normal')
+    setFollowupDueDate('')
   }
 
   function openNotes() { if (selected) setActiveTab('Notas') }
@@ -371,6 +451,42 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
                     <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta'}</button>
                     {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
+                  </div>
+                </div>
+              ) : activeTab === 'Seguimiento' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.75fr)', gap: 16, alignItems: 'start' }}>
+                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Seguimiento clínico</h3>
+                      <span style={{ color: '#6F6A64', fontSize: 12 }}>{structuredFollowups.length} registros</span>
+                    </div>
+                    <div style={{ color: '#8E8881', fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>Acciones internas del expediente. No envían mensajes ni modifican My AQSLIM.</div>
+                    <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+                      {notesLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : structuredFollowups.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay seguimientos estructurados para este paciente.</div> : structuredFollowups.map(note => {
+                        const item = note.followup!
+                        const priorityColor = item.priority === 'Urgente' ? '#E28E8E' : item.priority === 'Alta' ? '#E2C87A' : '#9A9590'
+                        return <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: item.status === 'Completado' ? 'rgba(106,160,116,.05)' : 'rgba(255,255,255,.02)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ color: priorityColor, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Prioridad {item.priority}</span>
+                            <select value={item.status} disabled={followupUpdatingId === note.id} onChange={event => void updateFollowupStatus(note, event.target.value as 'Pendiente' | 'En progreso' | 'Completado')} style={{ ...inputStyle, width: 160, padding: '8px 10px' }}><option>Pendiente</option><option>En progreso</option><option>Completado</option></select>
+                          </div>
+                          <div style={{ color: '#D9D5CF', lineHeight: 1.6, marginTop: 10, textDecoration: item.status === 'Completado' ? 'line-through' : 'none' }}>{item.action}</div>
+                          <div style={{ color: '#77716A', fontSize: 11, marginTop: 9 }}>{note.followupDate ? `Fecha objetivo: ${note.followupDate}` : 'Sin fecha objetivo'}{note.authorLabel ? ` · ${note.authorLabel}` : ''}</div>
+                        </div>
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
+                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Nueva próxima acción</div>
+                    <label style={{ ...labelStyle, marginTop: 14 }}>Acción pendiente</label>
+                    <textarea value={followupAction} onChange={event => setFollowupAction(event.target.value)} placeholder="Ej. Confirmar progreso, revisar tolerancia o preparar próxima consulta…" rows={5} style={{ ...inputStyle, resize: 'vertical' }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+                      <div><label style={labelStyle}>Prioridad</label><select value={followupPriority} onChange={event => setFollowupPriority(event.target.value as 'Normal' | 'Alta' | 'Urgente')} style={inputStyle}><option>Normal</option><option>Alta</option><option>Urgente</option></select></div>
+                      <div><label style={labelStyle}>Fecha objetivo</label><input type="date" value={followupDueDate} onChange={event => setFollowupDueDate(event.target.value)} style={inputStyle} /></div>
+                    </div>
+                    <button onClick={saveFollowup} disabled={followupSaving || !followupAction.trim()} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: followupSaving || !followupAction.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: followupSaving || !followupAction.trim() ? '#8E8881' : '#0A0A0A', cursor: followupSaving || !followupAction.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{followupSaving ? 'Guardando…' : 'Guardar seguimiento Preview'}</button>
+                    {followupMessage && <div style={{ marginTop: 12, color: followupMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{followupMessage}</div>}
                   </div>
                 </div>
               ) : (

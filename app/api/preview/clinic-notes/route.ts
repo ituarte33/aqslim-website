@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import {
+  CLINIC_FOLLOWUP_PRIORITIES,
+  CLINIC_FOLLOWUP_STATUSES,
+  clinicFollowupIsPending,
+  decodeClinicFollowup,
+  encodeClinicFollowup,
+  type ClinicFollowupPriority,
+  type ClinicFollowupStatus,
+} from '@/lib/clinic-followup'
 
 const TABLE_ID = 'tbljMLa7RCRzBYZBI'
 
@@ -73,16 +82,21 @@ export async function GET(request: NextRequest) {
     if (!response.ok) return NextResponse.json({ ok: false }, { status: 500 })
     const data = await response.json()
 
-    const notes = (data.records ?? []).map((record: any) => ({
-      id: record.id,
-      noteAt: record.fields?.[F.NOTE_AT] ?? null,
-      authorEmail: record.fields?.[F.AUTHOR_EMAIL] ?? '',
-      authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
-      noteType: record.fields?.[F.NOTE_TYPE] ?? 'General',
-      note: record.fields?.[F.NOTE] ?? '',
-      followupRequired: record.fields?.[F.FOLLOWUP_REQUIRED] === true,
-      followupDate: record.fields?.[F.FOLLOWUP_DATE] ?? null,
-    }))
+    const notes = (data.records ?? []).map((record: any) => {
+      const rawNote = record.fields?.[F.NOTE] ?? ''
+      const followup = decodeClinicFollowup(rawNote)
+      return {
+        id: record.id,
+        noteAt: record.fields?.[F.NOTE_AT] ?? null,
+        authorEmail: record.fields?.[F.AUTHOR_EMAIL] ?? '',
+        authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
+        noteType: record.fields?.[F.NOTE_TYPE] ?? 'General',
+        note: followup?.action ?? rawNote,
+        followupRequired: record.fields?.[F.FOLLOWUP_REQUIRED] === true,
+        followupDate: record.fields?.[F.FOLLOWUP_DATE] ?? null,
+        followup,
+      }
+    })
 
     return NextResponse.json({ ok: true, notes })
   } catch (error) {
@@ -97,12 +111,24 @@ export async function POST(request: NextRequest) {
     const actor = await requireFounder()
     const body = await request.json()
     const patientId = safeText(body.patientId, 100)
-    const note = safeText(body.note)
-    const noteType = ['Consulta', 'Entrevista', 'Seguimiento', 'General'].includes(body.noteType) ? body.noteType : 'General'
-    const followupRequired = body.followupRequired === true
+    const isStructuredFollowup = body.kind === 'followup'
+    const action = safeText(body.action)
+    const priority = CLINIC_FOLLOWUP_PRIORITIES.includes(body.priority as ClinicFollowupPriority)
+      ? body.priority as ClinicFollowupPriority
+      : 'Normal'
+    const status = CLINIC_FOLLOWUP_STATUSES.includes(body.status as ClinicFollowupStatus)
+      ? body.status as ClinicFollowupStatus
+      : 'Pendiente'
+    const note = isStructuredFollowup
+      ? encodeClinicFollowup({ action, priority, status })
+      : safeText(body.note)
+    const noteType = isStructuredFollowup
+      ? 'Seguimiento'
+      : ['Consulta', 'Entrevista', 'Seguimiento', 'General'].includes(body.noteType) ? body.noteType : 'General'
+    const followupRequired = isStructuredFollowup ? clinicFollowupIsPending(status) : body.followupRequired === true
     const followupDate = followupRequired ? safeText(body.followupDate, 20) : ''
 
-    if (!patientId.startsWith('rec') || !note) {
+    if (!patientId.startsWith('rec') || !note || (isStructuredFollowup && !action)) {
       return NextResponse.json({ ok: false, error: 'invalid_input' }, { status: 400 })
     }
 
@@ -137,6 +163,58 @@ export async function POST(request: NextRequest) {
     if (!response.ok) return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
 
     return NextResponse.json({ ok: true, saved: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'FORBIDDEN'
+    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    return NextResponse.json({ ok: false }, { status })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    await requireFounder()
+    const body = await request.json()
+    const patientId = safeText(body.patientId, 100)
+    const recordId = safeText(body.recordId, 100)
+    if (!patientId.startsWith('rec') || !recordId.startsWith('rec')) {
+      return NextResponse.json({ ok: false, error: 'invalid_input' }, { status: 400 })
+    }
+
+    const currentResponse = await fetch(`${baseUrl()}/${recordId}?returnFieldsByFieldId=true`, {
+      headers: headers(),
+      cache: 'no-store',
+    })
+    if (!currentResponse.ok) return NextResponse.json({ ok: false, error: 'followup_not_found' }, { status: 404 })
+    const current = await currentResponse.json()
+    if (current.fields?.[F.PATIENT_ID] !== patientId) {
+      return NextResponse.json({ ok: false, error: 'patient_mismatch' }, { status: 403 })
+    }
+
+    const existing = decodeClinicFollowup(current.fields?.[F.NOTE])
+    if (!existing) return NextResponse.json({ ok: false, error: 'not_structured_followup' }, { status: 400 })
+
+    const action = safeText(body.action) || existing.action
+    const priority = CLINIC_FOLLOWUP_PRIORITIES.includes(body.priority as ClinicFollowupPriority)
+      ? body.priority as ClinicFollowupPriority
+      : existing.priority
+    const status = CLINIC_FOLLOWUP_STATUSES.includes(body.status as ClinicFollowupStatus)
+      ? body.status as ClinicFollowupStatus
+      : existing.status
+    const followupDate = safeText(body.followupDate, 20)
+    const fields: Record<string, unknown> = {
+      [F.NOTE]: encodeClinicFollowup({ action, priority, status }),
+      [F.FOLLOWUP_REQUIRED]: clinicFollowupIsPending(status),
+    }
+    if (followupDate) fields[F.FOLLOWUP_DATE] = followupDate
+
+    const response = await fetch(baseUrl(), {
+      method: 'PATCH',
+      headers: headers(),
+      cache: 'no-store',
+      body: JSON.stringify({ records: [{ id: recordId, fields }], typecast: true }),
+    })
+    if (!response.ok) return NextResponse.json({ ok: false, error: 'update_failed' }, { status: 500 })
+    return NextResponse.json({ ok: true, updated: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
