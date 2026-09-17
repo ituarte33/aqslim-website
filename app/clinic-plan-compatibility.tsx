@@ -241,7 +241,7 @@ export function ClinicPlanCompatibility() {
             <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Plan actual · sólo lectura</div>
             {!livePlan ? <div style={{ marginTop: 16, color: '#8E8881', lineHeight: 1.6 }}>No encontré un Plan AQSLIM actual vinculado a este paciente.</div> : <>
               <div style={{ marginTop: 16, display: 'grid', gap: 12, color: '#D9D5CF', fontSize: 13 }}>
-                <div><strong>Fase:</strong>{' '}{livePlan.phase || 'Sin fase'}{livePlan.phaseWeek ? ` · semana ${livePlan.phaseWeek}` : ''}</div>
+                <div><strong>Fase:</strong>&nbsp;{livePlan.phase || 'Sin fase'}{livePlan.phaseWeek ? ` · semana ${livePlan.phaseWeek}` : ''}</div>
                 <div><strong>Dieta/plan:</strong> {livePlan.dietName || '—'}</div>
                 <div><strong>Calorías:</strong> {livePlan.calorieTarget ?? '—'}</div>
                 <div><strong>Kenkho:</strong> {livePlan.kenkhoTier || 'Clinic'}</div>
