@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { normalizeClinicWeightKg } from '@/lib/clinic-plan-format'
+import { compareClinicPlans, getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
 
 type PlanData = {
   status?: string
@@ -189,7 +190,11 @@ export function ClinicPlanCompatibility() {
     return `${tier}: la frecuencia automática del tier todavía no está fijada. Define los días manualmente por ahora.`
   }, [draft.kenkhoTier])
 
-  async function saveDraft() {
+  const readiness = useMemo(() => getClinicPlanReadiness(draft), [draft])
+  const comparison = useMemo(() => compareClinicPlans(livePlan, draft), [livePlan, draft])
+  const changedFields = comparison.filter(item => item.changed)
+
+  async function persistDraft(status: 'Draft' | 'Ready for Review') {
     if (!patientId || !identity) return
     setSaving(true)
     setMessage('')
@@ -197,23 +202,36 @@ export function ClinicPlanCompatibility() {
       const response = await fetch('/api/preview/clinic-plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patientId, ...draft }),
+        body: JSON.stringify({ patientId, ...draft, status }),
       })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('save_failed')
 
       const verifyResponse = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
       const verifyData = await verifyResponse.json()
-      if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft) throw new Error('verify_failed')
+      if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft || verifyData.draft.status !== status) throw new Error('verify_failed')
 
       setDraft(normalizePlan({ ...emptyPlan, ...verifyData.draft }))
       setLivePlan(verifyData.livePlan ?? livePlan)
-      setMessage('✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
+      setMessage(status === 'Ready for Review'
+        ? '✓ Plan marcado Listo para publicar y verificado en Clinic Preview. My AQSLIM todavía no fue modificado.'
+        : '✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
     } catch {
-      setMessage('No se pudo guardar y verificar el borrador. Intenta de nuevo.')
+      setMessage(status === 'Ready for Review'
+        ? 'El plan no pudo marcarse como listo. Revisa los requisitos pendientes.'
+        : 'No se pudo guardar y verificar el borrador. Intenta de nuevo.')
     } finally {
       setSaving(false)
     }
+  }
+
+  function saveDraft() {
+    void persistDraft('Draft')
+  }
+
+  function markReady() {
+    if (!readiness.ready) return
+    void persistDraft('Ready for Review')
   }
 
   function copyLivePlan() {
@@ -224,7 +242,7 @@ export function ClinicPlanCompatibility() {
 
   if (!active || !host || !identity) return null
 
-  const set = (key: keyof PlanData, value: any) => setDraft(prev => ({ ...prev, [key]: value }))
+  const set = (key: keyof PlanData, value: any) => setDraft(prev => ({ ...prev, [key]: value, status: 'Draft' }))
   const field = inputStyle()
 
   return createPortal(
@@ -254,7 +272,7 @@ export function ClinicPlanCompatibility() {
           <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: '#0E0E0E' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Borrador Clinic</div>
-              <select value={draft.status || 'Draft'} onChange={e => set('status', e.target.value)} style={{ ...field, width: 180 }}><option>Draft</option><option>Ready for Review</option></select>
+              <div style={{ padding: '8px 11px', borderRadius: 9, border: `1px solid ${draft.status === 'Ready for Review' ? 'rgba(106,160,116,.55)' : 'rgba(201,168,76,.30)'}`, background: draft.status === 'Ready for Review' ? 'rgba(106,160,116,.10)' : 'rgba(201,168,76,.06)', color: draft.status === 'Ready for Review' ? '#9ED4A8' : '#E2C87A', fontSize: 12 }}>{draft.status === 'Ready for Review' ? 'Listo para publicar' : 'Borrador'}</div>
             </div>
 
             <div style={{ marginTop: 14 }}>{fieldLabel('Nombre / etiqueta del plan')}<input value={draft.planLabel || ''} onChange={e => set('planLabel', e.target.value)} placeholder="Ej. FAST 36 + Plan Hipocalórico" style={field} /></div>
@@ -282,8 +300,30 @@ export function ClinicPlanCompatibility() {
               <div>{fieldLabel('Peso meta kg')}<input type="number" step="0.1" value={numeric(draft.goalWeightKg)} onChange={e => set('goalWeightKg', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
             </div>
 
-            <button onClick={saveDraft} disabled={saving || !patientId} style={{ width: '100%', marginTop: 18, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar borrador Preview'}</button>
+            <div style={{ marginTop: 18, border: '1px solid rgba(255,255,255,.08)', borderRadius: 11, padding: 14, background: 'rgba(255,255,255,.018)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><strong style={{ fontSize: 12, color: '#D9D5CF' }}>Validación previa</strong><span style={{ fontSize: 11, color: readiness.ready ? '#9ED4A8' : '#E2C87A' }}>{readiness.checks.filter(item => item.passed).length}/{readiness.checks.length}</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 12px', marginTop: 11 }}>
+                {readiness.checks.map(item => <div key={item.key} style={{ color: item.passed ? '#9ED4A8' : '#9A9590', fontSize: 11, lineHeight: 1.4 }}>{item.passed ? '✓' : '○'} {item.label}</div>)}
+              </div>
+            </div>
+
+            <button onClick={saveDraft} disabled={saving || !patientId} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar como borrador Preview'}</button>
+            <button onClick={markReady} disabled={saving || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
+            <button disabled style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.20)', background: 'rgba(226,142,142,.035)', color: '#9A7070', cursor: 'not-allowed', fontWeight: 600 }}>Publicar en My AQSLIM · bloqueado</button>
+            <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>La publicación real requiere una autorización posterior y no está implementada en esta etapa.</div>
             {message && <div style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
+          </div>
+
+          <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 20, background: 'rgba(255,255,255,.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div><div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Resumen de cambios</div><div style={{ color: '#8E8881', fontSize: 12, marginTop: 6 }}>{livePlan ? 'Plan actual de My AQSLIM comparado con el borrador Clinic.' : 'Este paciente no tiene un plan actual vinculado; el borrador sería un plan nuevo.'}</div></div>
+              <span style={{ color: '#E2C87A', fontSize: 12 }}>{changedFields.length} campos cambiarían</span>
+            </div>
+            {changedFields.length === 0 ? <div style={{ color: '#9ED4A8', fontSize: 12, marginTop: 16 }}>✓ El borrador coincide con el plan actual.</div> : <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+              {changedFields.map(item => <div key={String(item.key)} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 24px 1fr', gap: 10, alignItems: 'start', padding: '10px 12px', borderRadius: 9, background: 'rgba(201,168,76,.035)', fontSize: 12 }}>
+                <strong style={{ color: '#CDBE8B' }}>{item.label}</strong><span style={{ color: '#8E8881', whiteSpace: 'pre-wrap' }}>{item.current}</span><span style={{ color: '#C9A84C', textAlign: 'center' }}>→</span><span style={{ color: '#D9D5CF', whiteSpace: 'pre-wrap' }}>{item.draft}</span>
+              </div>)}
+            </div>}
           </div>
         </div>
       )}

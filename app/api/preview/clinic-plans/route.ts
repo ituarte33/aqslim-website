@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById, getClientes, getPlanById } from '@/lib/airtable'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
 
 const TABLE_ID = 'tblSaxNRZxJLpsnIm'
 
@@ -182,10 +183,32 @@ export async function POST(request: NextRequest) {
 
     const allowedPhases = ['Jing', 'Qi', 'Xue', 'Yang Sheng', 'Sin fase']
     const allowedTiers = ['Clinic', 'Start', 'Plus', 'Elite']
-    const allowedStatuses = ['Draft', 'Ready for Review', 'Published Preview']
+    const allowedStatuses = ['Draft', 'Ready for Review']
     const phase = allowedPhases.includes(String(body.phase)) ? String(body.phase) : 'Sin fase'
     const tier = allowedTiers.includes(String(body.kenkhoTier)) ? String(body.kenkhoTier) : 'Clinic'
     const status = allowedStatuses.includes(String(body.status)) ? String(body.status) : 'Draft'
+    const readiness = getClinicPlanReadiness({
+      planLabel: text(body.planLabel, 300),
+      treatmentStart: text(body.treatmentStart, 20),
+      phase,
+      phaseWeek: numberOrNull(body.phaseWeek),
+      phaseStart: text(body.phaseStart, 20),
+      calorieTarget: numberOrNull(body.calorieTarget),
+      dietName: text(body.dietName, 4000),
+      specialInstructions: text(body.specialInstructions, 8000),
+      kenkhoTier: tier,
+      visitCadenceDays: numberOrNull(body.visitCadenceDays),
+      startingWeightKg: numberOrNull(body.startingWeightKg),
+      currentWeightKg: numberOrNull(body.currentWeightKg),
+      goalWeightKg: numberOrNull(body.goalWeightKg),
+    })
+    if (status === 'Ready for Review' && !readiness.ready) {
+      return NextResponse.json({
+        ok: false,
+        error: 'plan_not_ready',
+        missing: readiness.checks.filter(check => !check.passed).map(check => check.key),
+      }, { status: 400 })
+    }
     const now = new Date().toISOString()
     const key = `${patient.id}:v1`
 
@@ -210,13 +233,13 @@ export async function POST(request: NextRequest) {
     ]
     for (const [field, value, max] of stringFields) {
       const clean = text(value, max)
-      if (clean) fields[field] = clean
+      fields[field] = clean
     }
 
     const dateFields: Array<[string, unknown]> = [[F.TREATMENT_START, body.treatmentStart], [F.PHASE_START, body.phaseStart]]
     for (const [field, value] of dateFields) {
       const clean = text(value, 20)
-      if (clean) fields[field] = clean
+      fields[field] = clean || null
     }
 
     const numberFields: Array<[string, unknown]> = [
@@ -229,7 +252,7 @@ export async function POST(request: NextRequest) {
     ]
     for (const [field, value] of numberFields) {
       const n = numberOrNull(value)
-      if (n !== null) fields[field] = n
+      fields[field] = n
     }
 
     const params = new URLSearchParams({
