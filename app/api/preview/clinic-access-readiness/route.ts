@@ -3,6 +3,7 @@ import { clerkClient } from '@clerk/nextjs/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
 import { getClinicAccessActivationReadiness } from '@/lib/clinic-access-activation-readiness'
+import { getClinicAccessAuthorizationGate } from '@/lib/clinic-access-authorization'
 import { getClinicAccessReconciliation } from '@/lib/clinic-access-reconciliation'
 import { getClinicAccessReadiness } from '@/lib/clinic-access-readiness'
 import { getClinicEntitlementDecision } from '@/lib/clinic-entitlement-decision'
@@ -107,8 +108,14 @@ export async function GET(request: NextRequest) {
       pilotRecognitionAuthorized,
       entitlementDecision,
     })
+    const authorization = getClinicAccessAuthorizationGate({
+      patientId,
+      patientEmail: email,
+      activation,
+      entitlementDecision,
+    })
 
-    return NextResponse.json({ ok: true, readiness: { ...readiness, reconciliation, entitlementDecision, activation } })
+    return NextResponse.json({ ok: true, readiness: { ...readiness, reconciliation, entitlementDecision, activation, authorization } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403

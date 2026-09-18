@@ -122,6 +122,18 @@ type ClinicAccessReadiness = {
       detail: string
     }>
   }
+  authorization: {
+    state: 'ready' | 'blocked' | 'no_action'
+    stateLabel: string
+    operationFingerprint: string | null
+    acknowledgements: Array<{
+      key: 'patient_identity' | 'preview_scope' | 'no_external_effects'
+      label: string
+    }>
+    executionEnabled: false
+    duplicateProtection: 'fingerprint_bound'
+    notice: string
+  }
 }
 
 const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
@@ -198,6 +210,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [accessInvitationBody, setAccessInvitationBody] = useState('')
   const [accessInvitationSaving, setAccessInvitationSaving] = useState(false)
   const [accessInvitationMessage, setAccessInvitationMessage] = useState('')
+  const [authorizationChecks, setAuthorizationChecks] = useState<Record<string, boolean>>({})
+  const [authorizedFingerprint, setAuthorizedFingerprint] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -316,6 +330,11 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       notesController.abort()
     }
   }, [selectedId])
+
+  useEffect(() => {
+    setAuthorizationChecks({})
+    setAuthorizedFingerprint(null)
+  }, [selectedId, accessReadiness?.authorization.operationFingerprint])
 
   useEffect(() => {
     if (!selectedId || nextAppointmentEdited) return
@@ -909,11 +928,32 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         </div>
                         <div style={{ marginTop: 10, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.activation.notice}</div>
                       </div>
+                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Gate de autorización · prueba de sesión</div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginTop: 9 }}>{accessReadiness.authorization.stateLabel}</div>
+                        {accessReadiness.authorization.state === 'ready' ? <>
+                          <div style={{ color: '#77716A', fontSize: 10, marginTop: 8 }}>Huella de operación: {accessReadiness.authorization.operationFingerprint}</div>
+                          <div style={{ display: 'grid', gap: 9, marginTop: 12 }}>
+                            {accessReadiness.authorization.acknowledgements.map(item => <label key={item.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10, border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, color: '#D9D5CF', fontSize: 11, lineHeight: 1.45, cursor: authorizedFingerprint ? 'default' : 'pointer' }}>
+                              <input type="checkbox" checked={authorizationChecks[item.key] === true} disabled={Boolean(authorizedFingerprint)} onChange={event => setAuthorizationChecks(current => ({ ...current, [item.key]: event.target.checked }))} />
+                              <span>{item.label}</span>
+                            </label>)}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setAuthorizedFingerprint(accessReadiness.authorization.operationFingerprint)}
+                            disabled={Boolean(authorizedFingerprint) || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true)}
+                            style={{ width: '100%', marginTop: 12, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.42)', background: authorizedFingerprint ? 'rgba(106,160,116,.09)' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#C9A84C' : 'rgba(201,168,76,.08)', color: authorizedFingerprint ? '#9ED4A8' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#0A0A0A' : '#77716A', cursor: authorizedFingerprint || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                          >{authorizedFingerprint ? '✓ Autorización de prueba validada en esta sesión' : 'Validar autorización de prueba'}</button>
+                        </> : null}
+                        <div style={{ marginTop: 10, color: accessReadiness.authorization.state === 'blocked' ? '#E0A0A0' : '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.authorization.notice}</div>
+                        {authorizedFingerprint ? <div style={{ marginTop: 8, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>✓ Huella verificada. La autorización no se guardó y la activación continúa bloqueada.</div> : null}
+                      </div>
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
                     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
                       <button onClick={prepareAccessInvitation} disabled={!accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Ejecutar activación · requiere autorización posterior</button>
+                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>{authorizedFingerprint ? 'Ejecutar activación · bloqueado hasta fase ejecutable' : 'Ejecutar activación · requiere autorización validada'}</button>
                     </div>
                     {accessInvitationDrafts.length > 0 && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(106,160,116,.24)', borderRadius: 9, background: 'rgba(106,160,116,.05)' }}>
                       <div style={{ color: '#9ED4A8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{accessInvitationDrafts.length} borrador{accessInvitationDrafts.length === 1 ? '' : 'es'} guardado{accessInvitationDrafts.length === 1 ? '' : 's'}</div>
