@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 export type PortalLanguage = 'es' | 'en'
 
 const STORAGE_KEY = 'myaq-language'
+const SHARED_LANGUAGE_STORAGE_KEY = 'aqslim-lang'
 const LANGUAGE_EVENT = 'aqslim-lang'
 
 export function isPortalLanguage(value: unknown): value is PortalLanguage {
@@ -50,11 +51,13 @@ export function usePortalLanguage(initialLanguage: PortalLanguage, scopeId?: str
 
   useEffect(() => {
     applyDocumentLanguage(language)
+    window.localStorage.setItem(SHARED_LANGUAGE_STORAGE_KEY, language)
   }, [language])
 
   const setLanguage = useCallback((nextLanguage: PortalLanguage) => {
     setLanguageState(nextLanguage)
     window.localStorage.setItem(storageKey, nextLanguage)
+    window.localStorage.setItem(SHARED_LANGUAGE_STORAGE_KEY, nextLanguage)
     applyDocumentLanguage(nextLanguage)
     window.dispatchEvent(new CustomEvent(LANGUAGE_EVENT, {
       detail: scopeId ? { language: nextLanguage, scopeId } : nextLanguage,

@@ -11,11 +11,17 @@ export function LanguageModal() {
   const [animateIn, setAnimateIn] = useState(false)
 
   useEffect(() => {
+    if (pathname.startsWith('/my-aqslim') || localStorage.getItem(LANG_KEY)) {
+      setAnimateIn(false)
+      setVisible(false)
+      return
+    }
+
     if (!localStorage.getItem(LANG_KEY)) {
       setVisible(true)
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimateIn(true)))
     }
-  }, [])
+  }, [pathname])
 
   function pick(lang: 'es' | 'en') {
     localStorage.setItem(LANG_KEY, lang)
