@@ -30,8 +30,8 @@ export function getClinicAccessReconciliation({
   if (accounts === null) {
     return {
       state: 'unavailable',
-      stateLabel: 'Reconciliación no disponible; no se realizaron cambios',
-      account: { state: 'unavailable', label: 'No verificable en este momento' },
+      stateLabel: 'Reconciliación no verificable; no se realizaron cambios',
+      account: { state: 'unavailable', label: 'No verificable sin email válido o lectura disponible' },
       binding: { state: 'unavailable', label: 'No verificable en este momento' },
       pilot: { state: 'unavailable', label: 'No verificable en este momento' },
     }

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
                 }
               })
           })
-        : Promise.resolve([]),
+        : Promise.resolve(null),
     ])
     const source = sourceResult.status === 'fulfilled' ? sourceResult.value : null
     const readiness = getClinicAccessReadiness({
