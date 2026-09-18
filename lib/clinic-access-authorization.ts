@@ -29,7 +29,7 @@ export function getClinicAccessAuthorizationGate({
   entitlementDecision: ClinicEntitlementDecision
 }): ClinicAccessAuthorizationGate {
   const email = patientEmail.trim().toLowerCase()
-  const recommendationIsExact = entitlementDecision.state === 'recommended'
+  const recommendationIsExact = (entitlementDecision.state === 'recommended' || entitlementDecision.state === 'migration_recommended')
     && entitlementDecision.tier === 'internal_pilot'
     && entitlementDecision.status === 'active'
     && entitlementDecision.source === 'internal_pilot'
@@ -37,10 +37,11 @@ export function getClinicAccessAuthorizationGate({
     && entitlementDecision.billing === 'none'
     && entitlementDecision.lifecycle === 'pilot_only'
 
+  const isMigration = entitlementDecision.state === 'migration_recommended'
   const acknowledgements: ClinicAccessAuthorizationAcknowledgement[] = [
     { key: 'patient_identity', label: `Confirmo el expediente y el email ${email || 'no verificable'}.` },
-    { key: 'preview_scope', label: 'Confirmo internal_pilot activo exclusivamente en Preview.' },
-    { key: 'no_external_effects', label: 'Confirmo que esta prueba no debe crear acceso, enviar invitaciones ni generar cobros.' },
+    { key: 'preview_scope', label: isMigration ? 'Confirmo migrar el canary P5 a internal_pilot activo exclusivamente en Preview.' : 'Confirmo internal_pilot activo exclusivamente en Preview.' },
+    { key: 'no_external_effects', label: isMigration ? 'Confirmo conservar la evidencia histórica P5 y no generar cobros, invitaciones ni efectos en Producción.' : 'Confirmo que esta prueba no debe crear acceso, enviar invitaciones ni generar cobros.' },
   ]
 
   if (activation.state === 'no_action') {
@@ -68,7 +69,20 @@ export function getClinicAccessAuthorizationGate({
   }
 
   const operationFingerprint = createHash('sha256')
-    .update([patientId, email, 'internal_pilot', 'active', 'internal_pilot', 'preview_only'].join('|'))
+    .update([
+      patientId,
+      email,
+      isMigration ? 'migrate_p5_canary' : 'activate_internal_pilot',
+      entitlementDecision.migrationFrom?.tier ?? 'none',
+      entitlementDecision.migrationFrom?.status ?? 'none',
+      entitlementDecision.migrationFrom?.source ?? 'none',
+      entitlementDecision.migrationFrom?.trialStarts ?? 'none',
+      entitlementDecision.migrationFrom?.trialEnds ?? 'none',
+      'internal_pilot',
+      'active',
+      'internal_pilot',
+      'preview_only',
+    ].join('|'))
     .digest('hex')
     .slice(0, 16)
 

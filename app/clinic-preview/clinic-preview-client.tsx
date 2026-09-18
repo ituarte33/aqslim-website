@@ -77,6 +77,10 @@ type ClinicAccessReadiness = {
     binding: 'pending' | 'linked' | 'none'
     tier: string | null
     status: string | null
+    source?: string | null
+    trialStarts?: string | null
+    trialEnds?: string | null
+    reason?: string | null
   }
   reconciliation: {
     state: 'consistent' | 'review_needed' | 'no_account' | 'unavailable'
@@ -95,7 +99,7 @@ type ClinicAccessReadiness = {
     }
   }
   entitlementDecision: {
-    state: 'recommended' | 'existing' | 'blocked'
+    state: 'recommended' | 'migration_recommended' | 'existing' | 'blocked'
     stateLabel: string
     tier: string | null
     status: string | null
@@ -103,6 +107,14 @@ type ClinicAccessReadiness = {
     scope: 'preview_only' | null
     billing: 'none' | null
     lifecycle: 'pilot_only' | null
+    migrationFrom: {
+      tier: string
+      status: string
+      source: string
+      trialStarts: string | null
+      trialEnds: string | null
+      reason: string
+    } | null
     reason: string
     notice: string
   }
@@ -943,12 +955,17 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         {accessReadiness.entitlementDecision.state !== 'blocked' ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8, marginTop: 12, color: '#9A9590', fontSize: 11 }}>
                           <div>Tier: <span style={{ color: '#E2C87A' }}>{accessReadiness.entitlementDecision.tier || 'No definido'}</span></div>
                           <div>Estado: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlementDecision.status || 'No definido'}</span></div>
-                          {accessReadiness.entitlementDecision.state === 'recommended' ? <>
+                          {accessReadiness.entitlementDecision.state === 'recommended' || accessReadiness.entitlementDecision.state === 'migration_recommended' ? <>
                             <div>Fuente: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlementDecision.source}</span></div>
                             <div>Alcance: <span style={{ color: '#D9D5CF' }}>Sólo Preview</span></div>
                             <div>Cobro: <span style={{ color: '#D9D5CF' }}>Ninguno</span></div>
                             <div>Lifecycle: <span style={{ color: '#D9D5CF' }}>Piloto únicamente</span></div>
                           </> : null}
+                        </div> : null}
+                        {accessReadiness.entitlementDecision.state === 'migration_recommended' && accessReadiness.entitlementDecision.migrationFrom ? <div style={{ marginTop: 10, display: 'grid', gap: 7, padding: 11, border: '1px solid rgba(201,168,76,.22)', borderRadius: 8, background: 'rgba(201,168,76,.04)', color: '#9A9590', fontSize: 11 }}>
+                          <div><span style={{ color: '#D9D5CF' }}>Antes:</span> {accessReadiness.entitlementDecision.migrationFrom.tier} / {accessReadiness.entitlementDecision.migrationFrom.status} / {accessReadiness.entitlementDecision.migrationFrom.source}</div>
+                          <div><span style={{ color: '#D9D5CF' }}>Después:</span> internal_pilot / active / internal_pilot</div>
+                          <div><span style={{ color: '#D9D5CF' }}>Evidencia:</span> origen P5, razón y fechas originales preservadas en auditoría.</div>
                         </div> : null}
                         <div style={{ marginTop: 10, padding: 11, border: `1px solid ${accessReadiness.entitlementDecision.state === 'blocked' ? 'rgba(226,142,142,.22)' : 'rgba(201,168,76,.20)'}`, borderRadius: 8, color: accessReadiness.entitlementDecision.state === 'blocked' ? '#E0A0A0' : '#E2C87A', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.reason}</div>
                         <div style={{ marginTop: 8, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.notice}</div>

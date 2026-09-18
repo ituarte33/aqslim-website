@@ -92,7 +92,14 @@ export function getClinicAccessActivationReadiness({
           detail: 'Bloqueado hasta comprobar la cuenta y una autorización piloto aplicable a este expediente.',
         }
 
-  const entitlementStep: ClinicAccessActivationStep = entitlementDecision.state === 'existing'
+  const entitlementStep: ClinicAccessActivationStep = entitlementDecision.state === 'migration_recommended'
+    ? {
+        key: 'preview_entitlement',
+        label: 'Migrar canary P5 conservando auditoría',
+        state: 'proposed',
+        detail: 'Propuesto: reemplazar el estado operativo clinic_ai/trial por internal_pilot/active, preservando en la razón de auditoría el origen P5 y sus fechas originales.',
+      }
+    : entitlementDecision.state === 'existing'
     ? {
         key: 'preview_entitlement',
         label: 'Determinar entitlement Preview',

@@ -89,6 +89,32 @@ test('reports no action when binding, pilot, and entitlement already exist', () 
   assert.ok(result.steps.every(step => step.state === 'complete'))
 })
 
+test('proposes an audit-preserving migration for the exact Founder P5 canary', () => {
+  const result = buildScenario({
+    accounts: [{
+      boundPatientId: patientId,
+      hasPilotAccess: true,
+      isCurrentSession: true,
+      hasExplicitPilotMetadata: true,
+      legacyPilotPolicyApplies: false,
+    }],
+    entitlement: {
+      present: true,
+      binding: 'linked',
+      tier: 'clinic_ai',
+      status: 'trial',
+      source: 'clinic_ai_trial',
+      trialStarts: '2026-09-11T00:00:00.000Z',
+      trialEnds: '2026-10-11T00:00:00.000Z',
+      reason: 'P5_FOUNDER_REAL_USER_CANARY; synthetic lifecycle anchor only',
+    },
+  })
+
+  assert.equal(result.state, 'ready_for_authorization')
+  assert.equal(result.steps.find(step => step.key === 'preview_entitlement')?.state, 'proposed')
+  assert.match(result.steps.find(step => step.key === 'preview_entitlement')?.detail ?? '', /preservando/)
+})
+
 test('does not propose pilot recognition for an unapproved selected account', () => {
   const result = buildScenario({
     accounts: [{

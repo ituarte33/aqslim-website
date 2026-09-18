@@ -12,6 +12,7 @@ const recommended = {
   scope: 'preview_only' as const,
   billing: 'none' as const,
   lifecycle: 'pilot_only' as const,
+  migrationFrom: null,
   reason: 'authorized',
   notice: 'read-only',
 }
@@ -52,12 +53,36 @@ test('fails closed for a blocked activation or a non-exact entitlement', () => {
   assert.equal(wrongTier.operationFingerprint, null)
 })
 
+test('creates a distinct stable fingerprint for an exact P5 canary migration', () => {
+  const migration = {
+    ...recommended,
+    state: 'migration_recommended' as const,
+    migrationFrom: {
+      tier: 'clinic_ai',
+      status: 'trial',
+      source: 'clinic_ai_trial',
+      trialStarts: '2026-09-11T00:00:00.000Z',
+      trialEnds: '2026-10-11T00:00:00.000Z',
+      reason: 'P5_FOUNDER_REAL_USER_CANARY',
+    },
+  }
+  const first = getClinicAccessAuthorizationGate({ patientId: 'recABCDEFGHIJKLMN', patientEmail: 'rom@ituarteconsulting.com', activation: ready, entitlementDecision: migration })
+  const second = getClinicAccessAuthorizationGate({ patientId: 'recABCDEFGHIJKLMN', patientEmail: 'rom@ituarteconsulting.com', activation: ready, entitlementDecision: migration })
+
+  assert.equal(first.state, 'ready')
+  assert.equal(first.operationFingerprint, second.operationFingerprint)
+  assert.notEqual(first.operationFingerprint, getClinicAccessAuthorizationGate({ patientId: 'recABCDEFGHIJKLMN', patientEmail: 'rom@ituarteconsulting.com', activation: ready, entitlementDecision: recommended }).operationFingerprint)
+  assert.match(first.acknowledgements[2].label, /evidencia histórica P5/)
+})
+
 test('readiness remains read-only and the client keeps execution disabled', async () => {
   const route = await readFile(new URL('../app/api/preview/clinic-access-readiness/route.ts', import.meta.url), 'utf8')
+  const activationRoute = await readFile(new URL('../app/api/preview/clinic-access-activation/route.ts', import.meta.url), 'utf8')
   const client = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
 
   assert.doesNotMatch(route, /export async function (POST|PUT|PATCH|DELETE)/)
   assert.doesNotMatch(route, /createPreviewEntitlement|updatePreviewEntitlement|users\.updateUser/)
   assert.match(client, /Ejecutar activación · preparado, aún deshabilitado/)
   assert.match(client, /mode: 'validate'/)
+  assert.match(activationRoute, /migration_execution_not_enabled/)
 })

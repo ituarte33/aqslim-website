@@ -3,6 +3,10 @@ export type ClinicAccessEntitlement = {
   binding: 'pending' | 'linked' | 'none'
   tier: string | null
   status: string | null
+  source?: string | null
+  trialStarts?: string | null
+  trialEnds?: string | null
+  reason?: string | null
 }
 
 export type ClinicAccessCheck = {
@@ -48,6 +52,10 @@ export function getClinicAccessReadiness({
     binding: 'none',
     tier: null,
     status: null,
+    source: null,
+    trialStarts: null,
+    trialEnds: null,
+    reason: null,
   }
   const checks: ClinicAccessCheck[] = [
     { key: 'patient_record', label: 'Expediente estable identificado', passed: validPatientRecordId(patientId), required: true },

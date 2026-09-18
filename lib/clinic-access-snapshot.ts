@@ -83,6 +83,10 @@ export async function resolveClinicAccessSnapshot({
       binding: source.storedSubjectId === pendingSubject ? 'pending' : 'linked',
       tier: source.record.tier,
       status: source.record.status,
+      source: source.record.source,
+      trialStarts: source.record.trialStarts,
+      trialEnds: source.record.trialEnds,
+      reason: source.record.entitlementReason,
     } : null,
   })
   const reconciliation = getClinicAccessReconciliation({

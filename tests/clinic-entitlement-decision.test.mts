@@ -60,6 +60,45 @@ test('preserves an existing Preview entitlement instead of recommending a replac
   assert.equal(result.lifecycle, null)
 })
 
+test('recommends a controlled migration only for the exact linked Founder P5 canary', () => {
+  const result = scenario({
+    accounts: [{ boundPatientId: patientId, hasPilotAccess: true, isCurrentSession: true, hasExplicitPilotMetadata: true, legacyPilotPolicyApplies: false }],
+    entitlement: {
+      present: true,
+      binding: 'linked',
+      tier: 'clinic_ai',
+      status: 'trial',
+      source: 'clinic_ai_trial',
+      trialStarts: '2026-09-11T00:00:00.000Z',
+      trialEnds: '2026-10-11T00:00:00.000Z',
+      reason: 'P5_FOUNDER_REAL_USER_CANARY; synthetic lifecycle anchor only',
+    },
+  })
+
+  assert.equal(result.state, 'migration_recommended')
+  assert.equal(result.tier, 'internal_pilot')
+  assert.equal(result.status, 'active')
+  assert.equal(result.migrationFrom?.tier, 'clinic_ai')
+  assert.equal(result.migrationFrom?.trialEnds, '2026-10-11T00:00:00.000Z')
+  assert.match(result.notice, /no fueron modificados/)
+})
+
+test('does not migrate a generic clinic_ai trial without the exact P5 audit marker', () => {
+  const result = scenario({
+    accounts: [{ boundPatientId: patientId, hasPilotAccess: true, isCurrentSession: true, hasExplicitPilotMetadata: true, legacyPilotPolicyApplies: false }],
+    entitlement: {
+      present: true,
+      binding: 'linked',
+      tier: 'clinic_ai',
+      status: 'trial',
+      source: 'clinic_ai_trial',
+      reason: 'ordinary clinic trial',
+    },
+  })
+
+  assert.equal(result.state, 'existing')
+})
+
 test('the Clinic readiness route has no entitlement, Clerk, or account mutation wiring', async () => {
   const source = await readFile(new URL('../app/api/preview/clinic-access-readiness/route.ts', import.meta.url), 'utf8')
 

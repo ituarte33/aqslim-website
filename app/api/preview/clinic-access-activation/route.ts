@@ -58,6 +58,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    if (snapshot.readiness.entitlementDecision.state === 'migration_recommended') {
+      return NextResponse.json({ ok: false, error: 'migration_execution_not_enabled' }, { status: 409 })
+    }
+
     if (!executionEnabled) {
       return NextResponse.json({ ok: false, error: 'execution_disabled' }, { status: 409 })
     }
