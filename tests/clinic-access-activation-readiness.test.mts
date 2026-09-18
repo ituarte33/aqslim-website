@@ -4,6 +4,7 @@ import test from 'node:test'
 import { getClinicAccessActivationReadiness } from '../lib/clinic-access-activation-readiness.ts'
 import { getClinicAccessReadiness } from '../lib/clinic-access-readiness.ts'
 import { getClinicAccessReconciliation } from '../lib/clinic-access-reconciliation.ts'
+import { getClinicEntitlementDecision } from '../lib/clinic-entitlement-decision.ts'
 
 const patientId = 'recABCDEFGHIJKLMN'
 
@@ -24,10 +25,11 @@ function buildScenario({
     entitlement,
   })
   const reconciliation = getClinicAccessReconciliation({ patientId, accounts })
-  return getClinicAccessActivationReadiness({ readiness, reconciliation, pilotRecognitionAuthorized })
+  const entitlementDecision = getClinicEntitlementDecision({ readiness, reconciliation, pilotRecognitionAuthorized })
+  return getClinicAccessActivationReadiness({ readiness, reconciliation, pilotRecognitionAuthorized, entitlementDecision })
 }
 
-test('proposes binding and pilot recognition but requires an entitlement decision', () => {
+test('proposes binding, pilot recognition, and the approved Preview entitlement', () => {
   const result = buildScenario({
     accounts: [{
       boundPatientId: null,
@@ -41,7 +43,7 @@ test('proposes binding and pilot recognition but requires an entitlement decisio
   assert.equal(result.state, 'ready_for_authorization')
   assert.equal(result.steps.find(step => step.key === 'patient_binding')?.state, 'proposed')
   assert.equal(result.steps.find(step => step.key === 'pilot_recognition')?.state, 'proposed')
-  assert.equal(result.steps.find(step => step.key === 'preview_entitlement')?.state, 'decision_required')
+  assert.equal(result.steps.find(step => step.key === 'preview_entitlement')?.state, 'proposed')
   assert.match(result.notice, /ninguna acción fue ejecutada/)
 })
 

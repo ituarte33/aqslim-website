@@ -94,6 +94,18 @@ type ClinicAccessReadiness = {
       }>
     }
   }
+  entitlementDecision: {
+    state: 'recommended' | 'existing' | 'blocked'
+    stateLabel: string
+    tier: string | null
+    status: string | null
+    source: string | null
+    scope: 'preview_only' | null
+    billing: 'none' | null
+    lifecycle: 'pilot_only' | null
+    reason: string
+    notice: string
+  }
   activation: {
     state: 'ready_for_authorization' | 'blocked' | 'no_action'
     stateLabel: string
@@ -106,7 +118,7 @@ type ClinicAccessReadiness = {
     steps: Array<{
       key: 'patient_binding' | 'pilot_recognition' | 'preview_entitlement'
       label: string
-      state: 'proposed' | 'complete' | 'decision_required' | 'blocked'
+      state: 'proposed' | 'complete' | 'blocked'
       detail: string
     }>
   }
@@ -864,12 +876,28 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         <div style={{ marginTop: 10, padding: 11, border: '1px solid rgba(201,168,76,.20)', borderRadius: 8, color: '#E2C87A', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.reconciliation.provenance.conclusion}</div>
                       </div>
                       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Decisión de entitlement · sólo lectura</div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginTop: 9 }}>{accessReadiness.entitlementDecision.stateLabel}</div>
+                        {accessReadiness.entitlementDecision.state !== 'blocked' ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8, marginTop: 12, color: '#9A9590', fontSize: 11 }}>
+                          <div>Tier: <span style={{ color: '#E2C87A' }}>{accessReadiness.entitlementDecision.tier || 'No definido'}</span></div>
+                          <div>Estado: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlementDecision.status || 'No definido'}</span></div>
+                          {accessReadiness.entitlementDecision.state === 'recommended' ? <>
+                            <div>Fuente: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlementDecision.source}</span></div>
+                            <div>Alcance: <span style={{ color: '#D9D5CF' }}>Sólo Preview</span></div>
+                            <div>Cobro: <span style={{ color: '#D9D5CF' }}>Ninguno</span></div>
+                            <div>Lifecycle: <span style={{ color: '#D9D5CF' }}>Piloto únicamente</span></div>
+                          </> : null}
+                        </div> : null}
+                        <div style={{ marginTop: 10, padding: 11, border: `1px solid ${accessReadiness.entitlementDecision.state === 'blocked' ? 'rgba(226,142,142,.22)' : 'rgba(201,168,76,.20)'}`, borderRadius: 8, color: accessReadiness.entitlementDecision.state === 'blocked' ? '#E0A0A0' : '#E2C87A', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.reason}</div>
+                        <div style={{ marginTop: 8, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.notice}</div>
+                      </div>
+                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
                         <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Propuesta de activación · no ejecutable</div>
                         <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginTop: 9 }}>{accessReadiness.activation.stateLabel}</div>
                         <div style={{ display: 'grid', gap: 9, marginTop: 12 }}>
                           {accessReadiness.activation.steps.map(step => {
-                            const stateLabel = step.state === 'complete' ? '✓ Completo' : step.state === 'proposed' ? 'Propuesto' : step.state === 'decision_required' ? 'Decisión requerida' : 'Bloqueado'
-                            const stateColor = step.state === 'complete' ? '#9ED4A8' : step.state === 'proposed' || step.state === 'decision_required' ? '#E2C87A' : '#E0A0A0'
+                            const stateLabel = step.state === 'complete' ? '✓ Completo' : step.state === 'proposed' ? 'Propuesto' : 'Bloqueado'
+                            const stateColor = step.state === 'complete' ? '#9ED4A8' : step.state === 'proposed' ? '#E2C87A' : '#E0A0A0'
                             return <div key={step.key} style={{ padding: 10, border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, background: 'rgba(255,255,255,.015)' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#D9D5CF', fontSize: 11 }}>
                                 <span>{step.label}</span>

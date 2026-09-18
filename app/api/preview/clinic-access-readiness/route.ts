@@ -5,6 +5,7 @@ import { getClienteById } from '@/lib/airtable'
 import { getClinicAccessActivationReadiness } from '@/lib/clinic-access-activation-readiness'
 import { getClinicAccessReconciliation } from '@/lib/clinic-access-reconciliation'
 import { getClinicAccessReadiness } from '@/lib/clinic-access-readiness'
+import { getClinicEntitlementDecision } from '@/lib/clinic-entitlement-decision'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { isSyntheticPreviewEnvironment } from '@/lib/nutrition/synthetic-preview-policy'
 import { pendingPatientSubjectId } from '@/lib/p4-provisioning-policy'
@@ -93,14 +94,21 @@ export async function GET(request: NextRequest) {
       patientId,
       accounts: accountResult.status === 'fulfilled' ? accountResult.value : null,
     })
+    const pilotRecognitionAuthorized = email === actor.email.trim().toLowerCase()
+      && reconciliation.provenance.checks.some(check => check.key === 'session_identity' && check.state === 'confirmed')
+    const entitlementDecision = getClinicEntitlementDecision({
+      readiness,
+      reconciliation,
+      pilotRecognitionAuthorized,
+    })
     const activation = getClinicAccessActivationReadiness({
       readiness,
       reconciliation,
-      pilotRecognitionAuthorized: email === actor.email.trim().toLowerCase()
-        && reconciliation.provenance.checks.some(check => check.key === 'session_identity' && check.state === 'confirmed'),
+      pilotRecognitionAuthorized,
+      entitlementDecision,
     })
 
-    return NextResponse.json({ ok: true, readiness: { ...readiness, reconciliation, activation } })
+    return NextResponse.json({ ok: true, readiness: { ...readiness, reconciliation, entitlementDecision, activation } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403

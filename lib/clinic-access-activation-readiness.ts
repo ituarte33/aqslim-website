@@ -1,10 +1,11 @@
 import type { ClinicAccessReadiness } from './clinic-access-readiness'
 import type { ClinicAccessReconciliation } from './clinic-access-reconciliation'
+import type { ClinicEntitlementDecision } from './clinic-entitlement-decision'
 
 export type ClinicAccessActivationStep = {
   key: 'patient_binding' | 'pilot_recognition' | 'preview_entitlement'
   label: string
-  state: 'proposed' | 'complete' | 'decision_required' | 'blocked'
+  state: 'proposed' | 'complete' | 'blocked'
   detail: string
 }
 
@@ -26,10 +27,12 @@ export function getClinicAccessActivationReadiness({
   readiness,
   reconciliation,
   pilotRecognitionAuthorized,
+  entitlementDecision,
 }: {
   readiness: ClinicAccessReadiness
   reconciliation: ClinicAccessReconciliation
   pilotRecognitionAuthorized: boolean
+  entitlementDecision: ClinicEntitlementDecision
 }): ClinicAccessActivationReadiness {
   const patientRecordReady = readiness.checks.find(check => check.key === 'patient_record')?.passed === true
   const emailReady = readiness.checks.find(check => check.key === 'email')?.passed === true
@@ -89,14 +92,14 @@ export function getClinicAccessActivationReadiness({
           detail: 'Bloqueado hasta comprobar la cuenta y una autorización piloto aplicable a este expediente.',
         }
 
-  const entitlementStep: ClinicAccessActivationStep = readiness.entitlement.present
+  const entitlementStep: ClinicAccessActivationStep = entitlementDecision.state === 'existing'
     ? {
         key: 'preview_entitlement',
         label: 'Determinar entitlement Preview',
         state: 'complete',
         detail: 'Ya existe un registro Preview; esta propuesta conserva su tier y estado sin cambios.',
       }
-    : blocked
+    : blocked || entitlementDecision.state === 'blocked'
       ? {
           key: 'preview_entitlement',
           label: 'Determinar entitlement Preview',
@@ -106,8 +109,8 @@ export function getClinicAccessActivationReadiness({
       : {
           key: 'preview_entitlement',
           label: 'Determinar entitlement Preview',
-          state: 'decision_required',
-          detail: 'Requiere una decisión clínica y técnica posterior; no se asigna tier automáticamente.',
+          state: 'proposed',
+          detail: 'Propuesto: internal_pilot activo, fuente internal_pilot y alcance exclusivo de Preview; todavía no fue creado.',
         }
 
   const steps = [bindingStep, pilotStep, entitlementStep]
