@@ -16,6 +16,7 @@ export type ClinicEntitlementDecision = {
     source: string
     trialStarts: string | null
     trialEnds: string | null
+    lastAccessChange: string
     reason: string
   } | null
   reason: string
@@ -59,6 +60,7 @@ export function getClinicEntitlementDecision({
         source: existing.source as string,
         trialStarts: existing.trialStarts ?? null,
         trialEnds: existing.trialEnds ?? null,
+        lastAccessChange: existing.lastAccessChange as string,
         reason: existing.reason as string,
       },
       reason: 'El registro actual es el canary sintético P5 del Founder, no un entitlement comercial ni una visita clínica. Se propone migrarlo a internal_pilot activo conservando su evidencia histórica en la auditoría.',

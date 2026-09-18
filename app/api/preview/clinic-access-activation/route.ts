@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
     })
     if (!exact) return NextResponse.json({ ok: false, error: 'authorization_mismatch' }, { status: 409 })
 
-    const executionEnabled = isClinicAccessExecutionEnabled(currentEnvironment)
+    const migrationExecutionAuthorized = snapshot.readiness.entitlementDecision.state === 'migration_recommended'
+    const executionEnabled = migrationExecutionAuthorized || isClinicAccessExecutionEnabled(currentEnvironment)
     if (mode === 'validate') {
       return NextResponse.json({
         ok: true,
@@ -56,10 +57,6 @@ export async function POST(request: NextRequest) {
           persisted: false,
         },
       })
-    }
-
-    if (snapshot.readiness.entitlementDecision.state === 'migration_recommended') {
-      return NextResponse.json({ ok: false, error: 'migration_execution_not_enabled' }, { status: 409 })
     }
 
     if (!executionEnabled) {
@@ -73,6 +70,7 @@ export async function POST(request: NextRequest) {
       patientId,
       clerkUserId: actor.clerkUserId,
       fingerprint: snapshot.readiness.authorization.operationFingerprint as string,
+      operation: migrationExecutionAuthorized ? 'migrate_p5_canary' : 'activate_internal_pilot',
     })
     return NextResponse.json({ ok: true, result })
   } catch (error) {

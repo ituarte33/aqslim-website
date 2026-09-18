@@ -87,6 +87,7 @@ export async function resolveClinicAccessSnapshot({
       trialStarts: source.record.trialStarts,
       trialEnds: source.record.trialEnds,
       reason: source.record.entitlementReason,
+      lastAccessChange: source.record.lastAccessChange,
     } : null,
   })
   const reconciliation = getClinicAccessReconciliation({

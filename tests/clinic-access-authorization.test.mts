@@ -63,6 +63,7 @@ test('creates a distinct stable fingerprint for an exact P5 canary migration', (
       source: 'clinic_ai_trial',
       trialStarts: '2026-09-11T00:00:00.000Z',
       trialEnds: '2026-10-11T00:00:00.000Z',
+      lastAccessChange: '2026-09-11T00:00:00.000Z',
       reason: 'P5_FOUNDER_REAL_USER_CANARY',
     },
   }
@@ -75,14 +76,17 @@ test('creates a distinct stable fingerprint for an exact P5 canary migration', (
   assert.match(first.acknowledgements[2].label, /evidencia histórica P5/)
 })
 
-test('readiness remains read-only and the client keeps execution disabled', async () => {
+test('readiness remains read-only while execution requires a separate confirmed request', async () => {
   const route = await readFile(new URL('../app/api/preview/clinic-access-readiness/route.ts', import.meta.url), 'utf8')
   const activationRoute = await readFile(new URL('../app/api/preview/clinic-access-activation/route.ts', import.meta.url), 'utf8')
   const client = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
 
   assert.doesNotMatch(route, /export async function (POST|PUT|PATCH|DELETE)/)
   assert.doesNotMatch(route, /createPreviewEntitlement|updatePreviewEntitlement|users\.updateUser/)
-  assert.match(client, /Ejecutar activación · preparado, aún deshabilitado/)
+  assert.match(client, /Ejecutar migración y activación autorizadas/)
   assert.match(client, /mode: 'validate'/)
-  assert.match(activationRoute, /migration_execution_not_enabled/)
+  assert.match(client, /mode: 'execute'/)
+  assert.match(client, /executionConfirmation: 'ACTIVATE_ROM_PREVIEW'/)
+  assert.match(activationRoute, /migrationExecutionAuthorized/)
+  assert.doesNotMatch(activationRoute, /migration_execution_not_enabled/)
 })

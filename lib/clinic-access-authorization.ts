@@ -78,6 +78,8 @@ export function getClinicAccessAuthorizationGate({
       entitlementDecision.migrationFrom?.source ?? 'none',
       entitlementDecision.migrationFrom?.trialStarts ?? 'none',
       entitlementDecision.migrationFrom?.trialEnds ?? 'none',
+      entitlementDecision.migrationFrom?.lastAccessChange ?? 'none',
+      entitlementDecision.migrationFrom?.reason ?? 'none',
       'internal_pilot',
       'active',
       'internal_pilot',

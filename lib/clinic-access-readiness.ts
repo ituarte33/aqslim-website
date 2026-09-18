@@ -7,6 +7,7 @@ export type ClinicAccessEntitlement = {
   trialStarts?: string | null
   trialEnds?: string | null
   reason?: string | null
+  lastAccessChange?: string | null
 }
 
 export type ClinicAccessCheck = {
@@ -56,6 +57,7 @@ export function getClinicAccessReadiness({
     trialStarts: null,
     trialEnds: null,
     reason: null,
+    lastAccessChange: null,
   }
   const checks: ClinicAccessCheck[] = [
     { key: 'patient_record', label: 'Expediente estable identificado', passed: validPatientRecordId(patientId), required: true },

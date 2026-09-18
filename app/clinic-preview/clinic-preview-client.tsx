@@ -113,6 +113,7 @@ type ClinicAccessReadiness = {
       source: string
       trialStarts: string | null
       trialEnds: string | null
+      lastAccessChange: string
       reason: string
     } | null
     reason: string
@@ -226,6 +227,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [authorizedFingerprint, setAuthorizedFingerprint] = useState<string | null>(null)
   const [authorizationValidating, setAuthorizationValidating] = useState(false)
   const [authorizationMessage, setAuthorizationMessage] = useState('')
+  const [authorizationExecutionEnabled, setAuthorizationExecutionEnabled] = useState(false)
+  const [activationExecuting, setActivationExecuting] = useState(false)
+  const [activationComplete, setActivationComplete] = useState(false)
   const authorizationRequestId = useRef(0)
 
   const filtered = useMemo(() => {
@@ -352,6 +356,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setAuthorizedFingerprint(null)
     setAuthorizationValidating(false)
     setAuthorizationMessage('')
+    setAuthorizationExecutionEnabled(false)
+    setActivationExecuting(false)
+    setActivationComplete(false)
   }, [selectedId, accessReadiness?.authorization.operationFingerprint])
 
   async function validateAccessAuthorization() {
@@ -379,8 +386,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       if (!response.ok || !data.ok || data.validation?.state !== 'validated') throw new Error('validation_failed')
       if (data.validation.operationFingerprint !== accessReadiness.authorization.operationFingerprint) throw new Error('fingerprint_mismatch')
       setAuthorizedFingerprint(data.validation.operationFingerprint)
+      setAuthorizationExecutionEnabled(data.validation.executionEnabled === true)
       setAuthorizationMessage(data.validation.executionEnabled
-        ? '✓ Autorización verificada por el servidor; el ejecutor está disponible para una prueba controlada posterior.'
+        ? '✓ Autorización verificada por el servidor; la operación aprobada está lista para ejecución controlada.'
         : '✓ Autorización verificada por el servidor. No se guardó y el ejecutor continúa deshabilitado.')
     } catch {
       if (requestId !== authorizationRequestId.current) return
@@ -388,6 +396,41 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       setAuthorizationMessage('No se pudo validar la autorización en el servidor. Revisa el expediente y vuelve a intentarlo.')
     } finally {
       if (requestId === authorizationRequestId.current) setAuthorizationValidating(false)
+    }
+  }
+
+  async function executeAccessActivation() {
+    if (!selected || !accessReadiness || !authorizedFingerprint || !authorizationExecutionEnabled || activationComplete) return
+    const acknowledgements = accessReadiness.authorization.acknowledgements
+      .filter(item => authorizationChecks[item.key] === true)
+      .map(item => item.key)
+    setActivationExecuting(true)
+    setAuthorizationMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-access-activation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'execute',
+          patientId: selected.id,
+          operationFingerprint: authorizedFingerprint,
+          acknowledgements,
+          executionConfirmation: 'ACTIVATE_ROM_PREVIEW',
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok || data.result?.entitlementVerified !== true || data.result?.accountVerified !== true) {
+        throw new Error('execution_failed')
+      }
+      setActivationComplete(true)
+      setAuthorizationExecutionEnabled(false)
+      setAuthorizationMessage(data.result.state === 'migrated'
+        ? '✓ Migración P5 completada y verificada. Auditoría histórica preservada; acceso internal_pilot activo sólo en Preview.'
+        : '✓ Activación Preview completada y verificada por el servidor.')
+    } catch {
+      setAuthorizationMessage('No se completó la activación. El servidor la bloqueó o requiere revisión; no vuelvas a intentarlo hasta verificar el estado.')
+    } finally {
+      setActivationExecuting(false)
     }
   }
 
@@ -971,7 +1014,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         <div style={{ marginTop: 8, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.notice}</div>
                       </div>
                       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Propuesta de activación · no ejecutable</div>
+                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Activación Preview · controlada</div>
                         <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginTop: 9 }}>{accessReadiness.activation.stateLabel}</div>
                         <div style={{ display: 'grid', gap: 9, marginTop: 12 }}>
                           {accessReadiness.activation.steps.map(step => {
@@ -1010,10 +1053,15 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         {authorizationMessage ? <div style={{ marginTop: 8, color: authorizationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 11, lineHeight: 1.5 }}>{authorizationMessage}</div> : null}
                       </div>
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
-                    <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
+                    <div style={{ marginTop: 18, padding: 12, border: `1px solid ${activationComplete ? 'rgba(106,160,116,.24)' : 'rgba(226,142,142,.22)'}`, borderRadius: 9, color: activationComplete ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>{activationComplete ? 'La migración autorizada fue verificada en Airtable y Clerk. No creó cobros, invitaciones ni efectos en Producción.' : 'Ningún cambio se ejecuta sin validación y confirmación explícitas. Esta operación no crea cobros, invitaciones ni efectos en Producción.'}</div>
                     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
                       <button onClick={prepareAccessInvitation} disabled={!accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>{authorizedFingerprint ? 'Ejecutar activación · preparado, aún deshabilitado' : 'Ejecutar activación · requiere autorización validada'}</button>
+                      <button
+                        type="button"
+                        onClick={() => void executeAccessActivation()}
+                        disabled={!authorizedFingerprint || !authorizationExecutionEnabled || activationExecuting || activationComplete}
+                        style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${authorizationExecutionEnabled && !activationComplete ? 'rgba(201,168,76,.45)' : 'rgba(255,255,255,.08)'}`, background: authorizationExecutionEnabled && !activationComplete ? '#C9A84C' : 'rgba(255,255,255,.025)', color: authorizationExecutionEnabled && !activationComplete ? '#0A0A0A' : activationComplete ? '#9ED4A8' : '#77716A', textAlign: 'left', cursor: authorizationExecutionEnabled && !activationExecuting && !activationComplete ? 'pointer' : 'not-allowed', fontWeight: 600 }}
+                      >{activationExecuting ? 'Ejecutando y verificando…' : activationComplete ? '✓ Migración y activación verificadas' : authorizationExecutionEnabled ? 'Ejecutar migración y activación autorizadas' : authorizedFingerprint ? 'Ejecutar activación · servidor no habilitado' : 'Ejecutar activación · requiere autorización validada'}</button>
                     </div>
                     {accessInvitationDrafts.length > 0 && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(106,160,116,.24)', borderRadius: 9, background: 'rgba(106,160,116,.05)' }}>
                       <div style={{ color: '#9ED4A8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{accessInvitationDrafts.length} borrador{accessInvitationDrafts.length === 1 ? '' : 'es'} guardado{accessInvitationDrafts.length === 1 ? '' : 's'}</div>

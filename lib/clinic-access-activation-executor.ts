@@ -8,12 +8,20 @@ import {
   type CanonicalEntitlementRecord,
 } from './entitlement-record'
 import {
+  P5_FOUNDER_ENTITLEMENT_RECORD_ID,
+  P5_FOUNDER_PATIENT_RECORD_ID,
+  isExactP5FounderCanary,
+  p5MigrationAuditReason,
+} from './clinic-p5-migration'
+import {
   PREVIEW_ENTITLEMENTS_TABLE,
   PREVIEW_ENTITLEMENT_FIELDS,
   getPreviewEntitlementSourceRecordByPatientRecordId,
 } from './preview-entitlement-store'
 
 const ACTIVATION_REASON = 'MYAQ_CLINIC_001_FOUNDER_PREVIEW_ACTIVATION'
+
+export type ClinicAccessExecutionOperation = 'activate_internal_pilot' | 'migrate_p5_canary'
 
 function headers(): HeadersInit {
   const pat = process.env.AIRTABLE_PAT
@@ -84,6 +92,49 @@ async function upsertEntitlement({
   return recordId
 }
 
+async function migrateP5Entitlement({
+  recordId,
+  before,
+  fingerprint,
+  now,
+}: {
+  recordId: string
+  before: CanonicalEntitlementRecord
+  fingerprint: string
+  now: Date
+}): Promise<string> {
+  const response = await fetch(airtableUrl(), {
+    method: 'PATCH',
+    headers: headers(),
+    cache: 'no-store',
+    body: JSON.stringify({
+      records: [{
+        id: recordId,
+        fields: {
+          [PREVIEW_ENTITLEMENT_FIELDS.TIER]: 'internal_pilot',
+          [PREVIEW_ENTITLEMENT_FIELDS.STATUS]: 'active',
+          [PREVIEW_ENTITLEMENT_FIELDS.SOURCE]: 'internal_pilot',
+          [PREVIEW_ENTITLEMENT_FIELDS.TRIAL_STARTS]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.TRIAL_ENDS]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.PAID_THROUGH]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.ACCESS_EXPIRES]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.SQUARE_SUBSCRIPTION_ID]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.REASON]: p5MigrationAuditReason(before, fingerprint),
+          [PREVIEW_ENTITLEMENT_FIELDS.LAST_ACCESS_CHANGE]: now.toISOString(),
+          [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE_REASON]: null,
+          [PREVIEW_ENTITLEMENT_FIELDS.RECORD_VERSION]: ENTITLEMENT_RECORD_VERSION,
+          [PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY]: true,
+        },
+      }],
+    }),
+  })
+  if (!response.ok) throw new Error('ENTITLEMENT_MIGRATION_FAILED')
+  const payload = await response.json() as { records?: Array<{ id?: string }> }
+  if (payload.records?.[0]?.id !== recordId) throw new Error('ENTITLEMENT_WRITE_UNVERIFIED')
+  return recordId
+}
+
 function activatedPrivateMetadata(current: Record<string, unknown>, patientId: string) {
   return {
     ...withAqslimPatientBinding(current, patientId),
@@ -103,36 +154,74 @@ export async function executeClinicAccessActivation({
   patientId,
   clerkUserId,
   fingerprint,
+  operation,
   now = new Date(),
 }: {
   patientId: string
   clerkUserId: string
   fingerprint: string
+  operation: ClinicAccessExecutionOperation
   now?: Date
 }) {
   const before = await getPreviewEntitlementSourceRecordByPatientRecordId({
     patientRecordId: patientId,
     canonicalSubjectId: clerkUserId,
   })
-  if (before && (!isExactEntitlement(before.record, clerkUserId) || before.storedSubjectId !== clerkUserId)) {
+  const migrating = operation === 'migrate_p5_canary'
+  if (migrating) {
+    if (patientId !== P5_FOUNDER_PATIENT_RECORD_ID
+      || !before
+      || before.airtableRecordId !== P5_FOUNDER_ENTITLEMENT_RECORD_ID
+      || before.storedSubjectId !== clerkUserId
+      || !isExactP5FounderCanary(before.record, clerkUserId)) {
+      throw new Error('P5_MIGRATION_CONFLICT')
+    }
+  } else if (before && (!isExactEntitlement(before.record, clerkUserId) || before.storedSubjectId !== clerkUserId)) {
     throw new Error('ENTITLEMENT_CONFLICT')
   }
 
-  const entitlementRecordId = before?.airtableRecordId ?? await upsertEntitlement({
-    patientId,
-    clerkUserId,
-    fingerprint,
-    now,
-  })
-
   const clerk = await clerkClient()
   const user = await clerk.users.getUser(clerkUserId)
+  const originalPrivateMetadata = user.privateMetadata
   const alreadyBound = user.privateMetadata?.aqslimPatientId === patientId
   const alreadyPilot = pilotAccessFromMetadata(user.privateMetadata) !== null
+  const metadataChanged = !alreadyBound || !alreadyPilot
   if (!alreadyBound || !alreadyPilot) {
     await clerk.users.updateUserMetadata(clerkUserId, {
       privateMetadata: activatedPrivateMetadata(user.privateMetadata, patientId),
     })
+  }
+
+  let entitlementRecordId: string
+  try {
+    entitlementRecordId = migrating
+      ? await migrateP5Entitlement({
+          recordId: before!.airtableRecordId,
+          before: before!.record,
+          fingerprint,
+          now,
+        })
+      : before?.airtableRecordId ?? await upsertEntitlement({
+          patientId,
+          clerkUserId,
+          fingerprint,
+          now,
+        })
+  } catch (error) {
+    if (metadataChanged) {
+      try {
+        await clerk.users.updateUserMetadata(clerkUserId, {
+          privateMetadata: {
+            ...activatedPrivateMetadata(originalPrivateMetadata, patientId),
+            aqslimPatientId: originalPrivateMetadata?.aqslimPatientId ?? null,
+            pilot: originalPrivateMetadata?.pilot ?? null,
+          },
+        })
+      } catch {
+        throw new Error('PARTIAL_EXECUTION_REQUIRES_REVIEW')
+      }
+    }
+    throw error
   }
 
   const [verifiedEntitlement, verifiedUser] = await Promise.all([
@@ -153,7 +242,12 @@ export async function executeClinicAccessActivation({
   if (!entitlementVerified || !accountVerified) throw new Error('POST_WRITE_VERIFICATION_FAILED')
 
   return {
-    state: before && alreadyBound && alreadyPilot ? 'already_active' as const : 'activated' as const,
+    state: migrating
+      ? 'migrated' as const
+      : before && alreadyBound && alreadyPilot
+        ? 'already_active' as const
+        : 'activated' as const,
+    operation,
     fingerprint,
     entitlementRecordId,
     entitlementVerified,

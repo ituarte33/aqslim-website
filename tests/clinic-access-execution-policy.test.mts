@@ -35,7 +35,7 @@ test('server acknowledgement validation is exact', () => {
   assert.equal(hasExactClinicAccessAcknowledgements(['patient_identity', 'patient_identity', 'no_external_effects']), false)
 })
 
-test('real execution requires a separate exact confirmation that the UI does not send', () => {
+test('real execution requires a separate exact confirmation', () => {
   assert.equal(hasExplicitClinicAccessExecutionConfirmation(CLINIC_ACCESS_EXECUTION_CONFIRMATION), true)
   assert.equal(hasExplicitClinicAccessExecutionConfirmation('activate'), false)
   assert.equal(hasExplicitClinicAccessExecutionConfirmation(undefined), false)
