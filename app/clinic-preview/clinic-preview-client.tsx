@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { resolveClinicCadence, suggestClinicAppointment } from '@/lib/clinic-scheduling'
 
 type Patient = {
   id: string
@@ -124,6 +125,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [paymentMethod, setPaymentMethod] = useState('Sin especificar')
   const [consultationSaving, setConsultationSaving] = useState(false)
   const [consultationMessage, setConsultationMessage] = useState('')
+  const [visitCadenceDays, setVisitCadenceDays] = useState<number | null>(null)
+  const [nextAppointmentEdited, setNextAppointmentEdited] = useState(false)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -138,6 +141,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const pendingFollowups = notes.filter(note => note.followupRequired)
   const structuredFollowups = notes.filter(note => note.noteType === 'Seguimiento' && note.followup)
   const messageDrafts = notes.filter(note => note.messageDraft)
+  const cadence = useMemo(() => resolveClinicCadence(visitCadenceDays), [visitCadenceDays])
+  const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
+  const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
 
   async function loadNotes(patientId: string) {
     setNotesLoading(true)
@@ -172,15 +178,37 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     }
   }
 
+  async function getSchedulingCadence(patientId: string) {
+    try {
+      const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error('load_failed')
+      return data.draft?.visitCadenceDays ?? null
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
+    let cancelled = false
     if (selectedId) {
       void loadNotes(selectedId)
       void loadConsultations(selectedId)
+      void getSchedulingCadence(selectedId).then(days => {
+        if (!cancelled) setVisitCadenceDays(days)
+      })
     } else {
       setNotes([])
       setConsultations([])
+      setVisitCadenceDays(null)
     }
+    return () => { cancelled = true }
   }, [selectedId])
+
+  useEffect(() => {
+    if (!selectedId || nextAppointmentEdited) return
+    setNextAppointment(suggestClinicAppointment(consultationDate, cadence.days))
+  }, [selectedId, consultationDate, cadence.days, nextAppointmentEdited])
 
   async function saveNote() {
     if (!selected || !noteText.trim()) return
@@ -373,6 +401,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       setPhaseWeek('')
       setRecommendations('')
       setNextAppointment('')
+      setNextAppointmentEdited(false)
       setConsultationMessage('✓ Consulta guardada en AQSLIM Clinic Preview.')
       await loadConsultations(selected.id)
     } catch {
@@ -394,6 +423,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setMessageStatus('')
     setMessageSubject('')
     setMessageBody('')
+    setNextAppointment('')
+    setNextAppointmentEdited(false)
+    setVisitCadenceDays(null)
   }
 
   function openNotes() { if (selected) setActiveTab('Notas') }
@@ -485,6 +517,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span></div>
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+                      {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Próxima consulta preliminar</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
                       {consultationsLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : consultations.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay consultas registradas en Clinic Preview.</div> : consultations.map(item => <div key={item.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><strong style={{ color: '#C9A84C', fontSize: 12 }}>{item.consultationType}</strong><span style={{ color: '#6F6A64', fontSize: 11 }}>{item.consultationDate || (item.consultationAt ? new Date(item.consultationAt).toLocaleDateString('es-US') : '')}</span></div>
                         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', color: '#D9D5CF', fontSize: 12, marginTop: 10 }}>
@@ -492,6 +525,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         </div>
                         {item.phase && <div style={{ marginTop: 8, color: '#8E8881', fontSize: 11 }}>Fase: {item.phase}{item.phaseWeek !== null ? ` · semana ${item.phaseWeek}` : ''}</div>}
                         {item.recommendations && <div style={{ marginTop: 8, color: '#B8B3AD', fontSize: 12, lineHeight: 1.5 }}>{item.recommendations}</div>}
+                        {item.nextAppointment && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 11 }}>Próxima consulta preliminar: {new Date(item.nextAppointment).toLocaleString('es-US')}</div>}
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8, color: '#6F6A64', fontSize: 11 }}>
                           {item.amountCollected !== null && <span>Cobrado: ${Number(item.amountCollected).toFixed(2)}</span>}{item.paymentMethod && <span>{item.paymentMethod}</span>}{item.authorLabel && <span>{item.authorLabel}</span>}
                         </div>
@@ -522,8 +556,14 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     <textarea value={recommendations} onChange={e => setRecommendations(e.target.value)} placeholder="Instrucciones, observaciones o recomendaciones para esta consulta…" rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
 
                     <div style={sectionTitle}>Próxima cita</div>
-                    <input type="datetime-local" value={nextAppointment} onChange={e => setNextAppointment(e.target.value)} style={inputStyle} />
-                    <a href={SQUARE_BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#C9A84C', textDecoration: 'none', border: '1px solid rgba(201,168,76,.35)', borderRadius: 8, padding: '9px 12px', fontSize: 12 }}>+ Agendar en Square ↗</a>
+                    <input type="datetime-local" value={nextAppointment} onChange={e => { setNextAppointment(e.target.value); setNextAppointmentEdited(true) }} style={inputStyle} />
+                    <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(201,168,76,.20)', borderRadius: 9, background: 'rgba(201,168,76,.04)' }}>
+                      <div style={{ color: '#9A9590', fontSize: 11 }}>Sugerencia activa · {cadence.label}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>{cadenceOptions.map(days => <button key={days} type="button" onClick={() => { setNextAppointment(suggestClinicAppointment(consultationDate, days)); setNextAppointmentEdited(true) }} style={{ padding: '8px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.35)', background: days === cadence.days ? 'rgba(201,168,76,.15)' : 'rgba(201,168,76,.08)', color: '#E2C87A', cursor: 'pointer', fontSize: 11 }}>+ {days} días{days === cadence.days ? cadence.source === 'plan' ? ' · plan' : ' · estándar' : ''}</button>)}</div>
+                      <div style={{ color: '#6F6A64', fontSize: 10, lineHeight: 1.5, marginTop: 8 }}>Puedes cambiar la fecha manualmente antes de guardar la consulta.</div>
+                    </div>
+                    <a href={SQUARE_BOOKING_URL} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#C9A84C', textDecoration: 'none', border: '1px solid rgba(201,168,76,.35)', borderRadius: 8, padding: '9px 12px', fontSize: 12 }}>Abrir Square para agendar ↗</a>
+                    <div style={{ marginTop: 7, color: '#E0A0A0', fontSize: 10, lineHeight: 1.5 }}>Abrir Square no crea ni confirma una cita desde Clinic Preview.</div>
 
                     <div style={sectionTitle}>Pago</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><div><label style={labelStyle}>Cargo ($)</label><input inputMode="decimal" value={consultationFee} onChange={e => setConsultationFee(e.target.value)} style={inputStyle} /></div><div><label style={labelStyle}>Monto cobrado ($)</label><input inputMode="decimal" value={amountCollected} onChange={e => setAmountCollected(e.target.value)} style={inputStyle} /></div></div>
