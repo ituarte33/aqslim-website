@@ -106,7 +106,9 @@ test('explains Clinic Founder-only access without claiming inherited pilot acces
 
 test('the reconciliation route reads Clerk without provisioning or mutation calls', async () => {
   const source = await readFile(new URL('../app/api/preview/clinic-access-readiness/route.ts', import.meta.url), 'utf8')
+  const snapshot = await readFile(new URL('../lib/clinic-access-snapshot.ts', import.meta.url), 'utf8')
 
-  assert.match(source, /users\.getUserList/)
-  assert.doesNotMatch(source, /users\.updateUser|createUser|claimPendingPreviewEntitlementSubject/)
+  assert.match(source, /resolveClinicAccessSnapshot/)
+  assert.match(snapshot, /users\.getUserList/)
+  assert.doesNotMatch(snapshot, /users\.updateUser|createUser|claimPendingPreviewEntitlementSubject/)
 })

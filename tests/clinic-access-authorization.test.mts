@@ -52,11 +52,12 @@ test('fails closed for a blocked activation or a non-exact entitlement', () => {
   assert.equal(wrongTier.operationFingerprint, null)
 })
 
-test('authorization remains read-only and exposes no execution route', async () => {
+test('readiness remains read-only and the client keeps execution disabled', async () => {
   const route = await readFile(new URL('../app/api/preview/clinic-access-readiness/route.ts', import.meta.url), 'utf8')
   const client = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
 
   assert.doesNotMatch(route, /export async function (POST|PUT|PATCH|DELETE)/)
   assert.doesNotMatch(route, /createPreviewEntitlement|updatePreviewEntitlement|users\.updateUser/)
-  assert.match(client, /Ejecutar activación · bloqueado hasta fase ejecutable/)
+  assert.match(client, /Ejecutar activación · preparado, aún deshabilitado/)
+  assert.match(client, /mode: 'validate'/)
 })

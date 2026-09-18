@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 
@@ -130,7 +130,7 @@ type ClinicAccessReadiness = {
       key: 'patient_identity' | 'preview_scope' | 'no_external_effects'
       label: string
     }>
-    executionEnabled: false
+    executionEnabled: boolean
     duplicateProtection: 'fingerprint_bound'
     notice: string
   }
@@ -212,6 +212,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [accessInvitationMessage, setAccessInvitationMessage] = useState('')
   const [authorizationChecks, setAuthorizationChecks] = useState<Record<string, boolean>>({})
   const [authorizedFingerprint, setAuthorizedFingerprint] = useState<string | null>(null)
+  const [authorizationValidating, setAuthorizationValidating] = useState(false)
+  const [authorizationMessage, setAuthorizationMessage] = useState('')
+  const authorizationRequestId = useRef(0)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -332,9 +335,49 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   }, [selectedId])
 
   useEffect(() => {
+    authorizationRequestId.current += 1
     setAuthorizationChecks({})
     setAuthorizedFingerprint(null)
+    setAuthorizationValidating(false)
+    setAuthorizationMessage('')
   }, [selectedId, accessReadiness?.authorization.operationFingerprint])
+
+  async function validateAccessAuthorization() {
+    if (!selected || !accessReadiness || accessReadiness.authorization.state !== 'ready') return
+    const requestId = authorizationRequestId.current + 1
+    authorizationRequestId.current = requestId
+    const acknowledgements = accessReadiness.authorization.acknowledgements
+      .filter(item => authorizationChecks[item.key] === true)
+      .map(item => item.key)
+    setAuthorizationValidating(true)
+    setAuthorizationMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-access-activation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'validate',
+          patientId: selected.id,
+          operationFingerprint: accessReadiness.authorization.operationFingerprint,
+          acknowledgements,
+        }),
+      })
+      const data = await response.json()
+      if (requestId !== authorizationRequestId.current) return
+      if (!response.ok || !data.ok || data.validation?.state !== 'validated') throw new Error('validation_failed')
+      if (data.validation.operationFingerprint !== accessReadiness.authorization.operationFingerprint) throw new Error('fingerprint_mismatch')
+      setAuthorizedFingerprint(data.validation.operationFingerprint)
+      setAuthorizationMessage(data.validation.executionEnabled
+        ? '✓ Autorización verificada por el servidor; el ejecutor está disponible para una prueba controlada posterior.'
+        : '✓ Autorización verificada por el servidor. No se guardó y el ejecutor continúa deshabilitado.')
+    } catch {
+      if (requestId !== authorizationRequestId.current) return
+      setAuthorizedFingerprint(null)
+      setAuthorizationMessage('No se pudo validar la autorización en el servidor. Revisa el expediente y vuelve a intentarlo.')
+    } finally {
+      if (requestId === authorizationRequestId.current) setAuthorizationValidating(false)
+    }
+  }
 
   useEffect(() => {
     if (!selectedId || nextAppointmentEdited) return
@@ -941,19 +984,19 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                           </div>
                           <button
                             type="button"
-                            onClick={() => setAuthorizedFingerprint(accessReadiness.authorization.operationFingerprint)}
-                            disabled={Boolean(authorizedFingerprint) || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true)}
-                            style={{ width: '100%', marginTop: 12, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.42)', background: authorizedFingerprint ? 'rgba(106,160,116,.09)' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#C9A84C' : 'rgba(201,168,76,.08)', color: authorizedFingerprint ? '#9ED4A8' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#0A0A0A' : '#77716A', cursor: authorizedFingerprint || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
-                          >{authorizedFingerprint ? '✓ Autorización de prueba validada en esta sesión' : 'Validar autorización de prueba'}</button>
+                            onClick={() => void validateAccessAuthorization()}
+                            disabled={authorizationValidating || Boolean(authorizedFingerprint) || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true)}
+                            style={{ width: '100%', marginTop: 12, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.42)', background: authorizedFingerprint ? 'rgba(106,160,116,.09)' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#C9A84C' : 'rgba(201,168,76,.08)', color: authorizedFingerprint ? '#9ED4A8' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#0A0A0A' : '#77716A', cursor: authorizationValidating || authorizedFingerprint || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                          >{authorizationValidating ? 'Validando en servidor…' : authorizedFingerprint ? '✓ Autorización validada por el servidor' : 'Validar autorización de prueba'}</button>
                         </> : null}
                         <div style={{ marginTop: 10, color: accessReadiness.authorization.state === 'blocked' ? '#E0A0A0' : '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.authorization.notice}</div>
-                        {authorizedFingerprint ? <div style={{ marginTop: 8, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>✓ Huella verificada. La autorización no se guardó y la activación continúa bloqueada.</div> : null}
+                        {authorizationMessage ? <div style={{ marginTop: 8, color: authorizationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 11, lineHeight: 1.5 }}>{authorizationMessage}</div> : null}
                       </div>
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
                     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
                       <button onClick={prepareAccessInvitation} disabled={!accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>{authorizedFingerprint ? 'Ejecutar activación · bloqueado hasta fase ejecutable' : 'Ejecutar activación · requiere autorización validada'}</button>
+                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>{authorizedFingerprint ? 'Ejecutar activación · preparado, aún deshabilitado' : 'Ejecutar activación · requiere autorización validada'}</button>
                     </div>
                     {accessInvitationDrafts.length > 0 && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(106,160,116,.24)', borderRadius: 9, background: 'rgba(106,160,116,.05)' }}>
                       <div style={{ color: '#9ED4A8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{accessInvitationDrafts.length} borrador{accessInvitationDrafts.length === 1 ? '' : 'es'} guardado{accessInvitationDrafts.length === 1 ? '' : 's'}</div>

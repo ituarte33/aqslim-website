@@ -4,6 +4,7 @@ import {
   isEntitlementEnforcementPreviewBranch,
   SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID,
 } from './nutrition/synthetic-preview-policy'
+import { CLINIC_PREVIEW_BRANCH } from './clinic-preview-policy'
 import {
   createCanonicalEntitlementRecord,
   ENTITLEMENT_RECORD_VERSION,
@@ -79,7 +80,8 @@ type AirtableEntitlementRecord = {
 
 function isPreviewStoreEnabled(): boolean {
   return process.env.VERCEL_ENV === 'preview'
-    && isEntitlementEnforcementPreviewBranch(process.env.VERCEL_GIT_COMMIT_REF)
+    && (isEntitlementEnforcementPreviewBranch(process.env.VERCEL_GIT_COMMIT_REF)
+      || process.env.VERCEL_GIT_COMMIT_REF === CLINIC_PREVIEW_BRANCH)
     && process.env.AIRTABLE_BASE_ID === SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID
     && Boolean(process.env.AIRTABLE_PAT)
 }
