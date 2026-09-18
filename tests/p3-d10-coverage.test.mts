@@ -43,9 +43,14 @@ test('scanner exposes Clinic AI and the two-correction experience', async () => 
   assert.match(source, /2 corrections available/)
 })
 
-test('D10 audit storage is isolated to the exact P3 Preview branch', async () => {
+test('D10 audit storage includes the dedicated Client App Preview without enabling entitlement enforcement', async () => {
   const source = await readFile(new URL('../lib/preview-reanalysis-store.ts', import.meta.url), 'utf8')
+  const policy = await readFile(new URL('../lib/nutrition/synthetic-preview-policy.ts', import.meta.url), 'utf8')
   assert.match(source, /VERCEL_ENV === 'preview'/)
-  assert.match(source, /VERCEL_GIT_COMMIT_REF === ENTITLEMENT_P3_PREVIEW_BRANCH/)
+  assert.match(source, /isReanalysisAuditPreviewBranch\(process\.env\.VERCEL_GIT_COMMIT_REF\)/)
   assert.match(source, /PREVIEW_REANALYSIS_TABLE/)
+  assert.match(policy, /MYAQ_CLIENT_PREVIEW_BRANCH = 'myaq-client-001-preview'/)
+  assert.match(policy, /REANALYSIS_AUDIT_PREVIEW_BRANCHES[\s\S]*?MYAQ_CLIENT_PREVIEW_BRANCH/)
+  const enforcementSet = policy.match(/const ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES = new Set\(\[[\s\S]*?\]\)/)?.[0] ?? ''
+  assert.doesNotMatch(enforcementSet, /MYAQ_CLIENT_PREVIEW_BRANCH/)
 })

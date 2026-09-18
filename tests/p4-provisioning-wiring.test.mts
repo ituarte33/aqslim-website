@@ -36,9 +36,10 @@ test('P4 entitlement context falls back by stable patient record and rejects a d
   assert.match(context, /claimPendingPreviewEntitlementSubject/)
 })
 
-test('patient identity may fall back to a unique Airtable email match but admin identity may not', async () => {
+test('patient identity may fall back to a unique Airtable email match with an isolated Founder canary exception', async () => {
   const auth = await source('lib/auth.ts')
-  assert.match(auth, /if \(role === 'patient' && !boundPatientId\)/)
+  assert.match(auth, /if \(\(role === 'patient' \|\| founderCanaryIdentity\) && !boundPatientId\)/)
+  assert.match(auth, /isP5FounderCanaryIdentity\(\{/)
   assert.match(auth, /const matches = await getClientesByEmail\(email\)/)
   assert.match(auth, /resolveAuthenticatedPatientScope/)
   assert.match(auth, /catch \{\s*boundPatientId = null/s)

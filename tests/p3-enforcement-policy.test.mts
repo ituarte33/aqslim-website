@@ -35,9 +35,14 @@ test('P3 enforcement cannot activate in Production, main, another Preview branch
 })
 
 test('AQ Buddy only denies on an explicitly enforced P3 gate result', async () => {
-  const authSource = await readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8')
-  assert.match(authSource, /runP3PreviewEntitlementGate\(/)
-  assert.match(authSource, /if \(p3Gate\.enforced && p3Gate\.decision !== 'allow'\)/)
+  const [authSource, accessSource] = await Promise.all([
+    readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../lib/ai-entitlement-access.ts', import.meta.url), 'utf8'),
+  ])
+  assert.match(authSource, /evaluateAiEntitlementAccess\(/)
+  assert.match(accessSource, /runP3PreviewEntitlementGate\(/)
+  assert.match(accessSource, /allowed: p3Gate\.enforced[\s\S]*?p3Gate\.decision === 'allow'[\s\S]*?: currentAccessAllowed/)
+  assert.match(authSource, /if \(!access\.allowed\)/)
   assert.match(authSource, /throw new AuthorizationError\('FORBIDDEN'\)/)
 })
 

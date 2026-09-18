@@ -3,13 +3,17 @@ import { Webhook } from 'svix'
 import { Resend } from 'resend'
 import { getClienteByEmail, updateCliente, CLIENTES_FIELDS } from '@/lib/airtable'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function POST(request: NextRequest) {
+  const webhookSecret = process.env.RESEND_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    console.error('[booking-webhook] missing_webhook_secret')
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+  }
+
   const payload = await request.text()
 
   // Verify Resend webhook signature via Svix
-  const wh = new Webhook(process.env.RESEND_WEBHOOK_SECRET!)
+  const wh = new Webhook(webhookSecret)
   let event: { type: string; data: { email_id: string; from: string; subject: string } }
   try {
     event = wh.verify(payload, {
@@ -37,6 +41,13 @@ export async function POST(request: NextRequest) {
   if (!isBooking && !isCancellation) return NextResponse.json({ ok: true })
 
   // Fetch the full email body
+  const resendApiKey = process.env.RESEND_API_KEY
+  if (!resendApiKey) {
+    console.error('[booking-webhook] missing_resend_api_key')
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+  }
+
+  const resend = new Resend(resendApiKey)
   const { data: email, error } = await resend.emails.receiving.get(email_id)
   if (error || !email?.text) {
     console.error('[booking-webhook] email_body_fetch_failed', {

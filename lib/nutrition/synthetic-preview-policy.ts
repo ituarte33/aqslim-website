@@ -6,6 +6,7 @@ export const ENTITLEMENT_P3_PREVIEW_BRANCH = 'myaq-ent-p3-preview-enforcement-ca
 export const ENTITLEMENT_P4_PREVIEW_BRANCH = 'myaq-ent-p4-preview-provisioning'
 export const ENTITLEMENT_P5_PREVIEW_BRANCH = 'myaq-ent-p5-founder-real-user-preview-canary'
 export const ENTITLEMENT_P5_1_PREVIEW_BRANCH = 'myaq-ent-p5-1-extended-ai-live-canary'
+export const MYAQ_CLIENT_PREVIEW_BRANCH = 'myaq-client-001-preview'
 export const SYNTHETIC_PREVIEW_CLIENT_ID = 'SYN-CLIENT-001'
 export const SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID = 'appuUHRs26ATXnZjf'
 
@@ -18,6 +19,7 @@ const ALLOWED_PREVIEW_BRANCHES = new Set([
   ENTITLEMENT_P4_PREVIEW_BRANCH,
   ENTITLEMENT_P5_PREVIEW_BRANCH,
   ENTITLEMENT_P5_1_PREVIEW_BRANCH,
+  MYAQ_CLIENT_PREVIEW_BRANCH,
 ])
 
 const ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES = new Set([
@@ -25,6 +27,11 @@ const ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES = new Set([
   ENTITLEMENT_P4_PREVIEW_BRANCH,
   ENTITLEMENT_P5_PREVIEW_BRANCH,
   ENTITLEMENT_P5_1_PREVIEW_BRANCH,
+])
+
+const REANALYSIS_AUDIT_PREVIEW_BRANCHES = new Set([
+  ...ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES,
+  MYAQ_CLIENT_PREVIEW_BRANCH,
 ])
 
 export function isSyntheticPreviewEnvironment(environment: {
@@ -38,6 +45,10 @@ export function isSyntheticPreviewEnvironment(environment: {
 
 export function isEntitlementEnforcementPreviewBranch(branch?: string): boolean {
   return Boolean(branch) && ENTITLEMENT_ENFORCEMENT_PREVIEW_BRANCHES.has(branch as string)
+}
+
+export function isReanalysisAuditPreviewBranch(branch?: string): boolean {
+  return Boolean(branch) && REANALYSIS_AUDIT_PREVIEW_BRANCHES.has(branch as string)
 }
 
 export function hasSyntheticPreviewStorageConfiguration(environment: {

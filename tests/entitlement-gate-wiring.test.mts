@@ -12,13 +12,14 @@ test('central entitlement gate remains explicitly shadow-only', async () => {
   assert.doesNotMatch(source, /enforced: true/)
 })
 
-test('AQ Buddy capability path goes through the centralized shadow gate', async () => {
-  const source = await readFile(
-    new URL('../lib/auth.ts', import.meta.url),
-    'utf8',
-  )
-  const capabilityBlock = source.slice(source.indexOf('export async function requireCapability'))
-  assert.match(capabilityBlock, /runEntitlementGateShadow\(/)
+test('AQ Buddy capability path goes through the centralized AI entitlement boundary', async () => {
+  const [authSource, accessSource] = await Promise.all([
+    readFile(new URL('../lib/auth.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../lib/ai-entitlement-access.ts', import.meta.url), 'utf8'),
+  ])
+  const capabilityBlock = authSource.slice(authSource.indexOf('export async function requireCapability'))
+  assert.match(capabilityBlock, /evaluateAiEntitlementAccess\(/)
   assert.match(capabilityBlock, /capability: 'buddy:chat'/)
   assert.match(capabilityBlock, /currentAccessAllowed: true/)
+  assert.match(accessSource, /runEntitlementGateShadow\(/)
 })

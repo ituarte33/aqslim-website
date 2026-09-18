@@ -94,7 +94,7 @@ test('meal type can be corrected directly from scan history', async () => {
 
 test('today view exposes a direct edit button for only the latest meal', async () => {
   const widget = await readFile(new URL('../app/food-log-widget.tsx', import.meta.url), 'utf8')
-  assert.match(widget, /period === 'today' && index === 0 && onMealTypeChange/)
+  assert.match(widget, /period === 'today' && index === 0[\s\S]*?Consumption Status[\s\S]*?Unconfirmed/)
   assert.match(widget, /className="flw-row-edit-latest"/)
   assert.match(widget, /editLatest: 'Editar'/)
   assert.match(widget, /editLatest: 'Edit'/)

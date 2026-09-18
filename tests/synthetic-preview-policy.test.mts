@@ -8,7 +8,9 @@ import {
   ENTITLEMENT_P5_1_PREVIEW_BRANCH,
   ENTITLEMENT_PREVIEW_BRANCH,
   isEntitlementEnforcementPreviewBranch,
+  isReanalysisAuditPreviewBranch,
   isSyntheticPreviewEnvironment,
+  MYAQ_CLIENT_PREVIEW_BRANCH,
   SYNTHETIC_PREVIEW_BRANCH,
 } from '../lib/nutrition/synthetic-preview-policy.ts'
 
@@ -40,7 +42,13 @@ test('the synthetic plan remains limited to the approved Preview branches', () =
     ...previewEnvironment,
     VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_1_PREVIEW_BRANCH,
   }), true)
+  assert.equal(isSyntheticPreviewEnvironment({
+    ...previewEnvironment,
+    VERCEL_GIT_COMMIT_REF: MYAQ_CLIENT_PREVIEW_BRANCH,
+  }), true)
   assert.equal(isEntitlementEnforcementPreviewBranch(ENTITLEMENT_P5_1_PREVIEW_BRANCH), true)
+  assert.equal(isEntitlementEnforcementPreviewBranch(MYAQ_CLIENT_PREVIEW_BRANCH), false)
+  assert.equal(isReanalysisAuditPreviewBranch(MYAQ_CLIENT_PREVIEW_BRANCH), true)
   assert.equal(isSyntheticPreviewEnvironment({
     VERCEL_ENV: 'production',
     VERCEL_GIT_COMMIT_REF: SYNTHETIC_PREVIEW_BRANCH,
@@ -94,6 +102,11 @@ test('an allowlisted internal reviewer can enter only in an approved Preview env
     role: 'patient',
     email: 'reviewer.two@example.test',
     environment: { ...previewEnvironment, VERCEL_GIT_COMMIT_REF: ENTITLEMENT_P5_1_PREVIEW_BRANCH },
+  }), true)
+  assert.equal(canReviewSyntheticPreview({
+    role: 'patient',
+    email: 'reviewer.two@example.test',
+    environment: { ...previewEnvironment, VERCEL_GIT_COMMIT_REF: MYAQ_CLIENT_PREVIEW_BRANCH },
   }), true)
   assert.equal(canReviewSyntheticPreview({
     role: 'patient',

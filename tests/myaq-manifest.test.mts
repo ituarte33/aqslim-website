@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import manifest from '../app/manifest.ts'
+import * as manifestModule from '../app/manifest.ts'
+
+const importedManifest = manifestModule.default as typeof manifestModule.default & {
+  default?: typeof manifestModule.default
+}
+const manifest = typeof importedManifest === 'function'
+  ? importedManifest
+  : importedManifest.default!
 
 test('My AQSLIM installs with Home as the canonical patient start route', () => {
   const value = manifest()

@@ -2,7 +2,7 @@ import 'server-only'
 
 import {
   SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID,
-  isEntitlementEnforcementPreviewBranch,
+  isReanalysisAuditPreviewBranch,
 } from './nutrition/synthetic-preview-policy'
 import {
   evaluateReanalysisUsage,
@@ -30,7 +30,7 @@ type ReanalysisUsageSnapshot = {
 
 function storeEnabled(): boolean {
   return process.env.VERCEL_ENV === 'preview'
-    && isEntitlementEnforcementPreviewBranch(process.env.VERCEL_GIT_COMMIT_REF)
+    && isReanalysisAuditPreviewBranch(process.env.VERCEL_GIT_COMMIT_REF)
     && process.env.AIRTABLE_BASE_ID === SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID
     && Boolean(process.env.AIRTABLE_PAT)
 }

@@ -19,7 +19,7 @@ test('Food Scan initial analysis follows identity -> entitlement -> usage -> pro
   const provider = post.indexOf('client.messages.create({')
   assert.ok(identity >= 0 && entitlement > identity && usage > entitlement && provider > usage)
   assert.match(post, /capability: 'food_scan:analyze'/)
-  assert.match(post, /usagePolicyForEntitlementTier/)
+  assert.match(source, /function effectiveUsageContext[\s\S]*?usagePolicyForEntitlementTier/)
 })
 
 test('Food Scan reanalysis verifies ownership and entitlement before its provider call', async () => {
@@ -45,10 +45,11 @@ test('Fridge detect and generation share the centralized entitlement access boun
 
 test('Restaurant Advisor uses centralized entitlement access before provider execution', async () => {
   const source = await readFile(new URL('../app/api/restaurant-advisor/route.ts', import.meta.url), 'utf8')
-  const entitlement = source.indexOf('evaluateAiEntitlementAccess({')
-  const provider = source.indexOf('client.messages.create({')
+  const post = source.slice(source.indexOf('export async function POST'))
+  const entitlement = post.indexOf('evaluateAiEntitlementAccess({')
+  const provider = post.indexOf('requestRestaurantAnalysis(')
   assert.ok(entitlement >= 0 && provider > entitlement)
-  assert.match(source, /capability: 'restaurant_menu:analyze'/)
+  assert.match(post, /capability: 'restaurant_menu:analyze'/)
 })
 
 test('Weekly Summary is entitlement-gated but remains deterministic without an AI provider call', async () => {

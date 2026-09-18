@@ -7,10 +7,14 @@ async function source(path: string) {
 }
 
 test('AQ Buddy observes entitlement shadow through the existing capability gate', async () => {
-  const authSource = await source('lib/auth.ts')
+  const [authSource, accessSource] = await Promise.all([
+    source('lib/auth.ts'),
+    source('lib/ai-entitlement-access.ts'),
+  ])
   assert.match(authSource, /capability === 'buddy:chat'/)
-  assert.match(authSource, /observeEntitlementShadow\(\{/)
+  assert.match(authSource, /evaluateAiEntitlementAccess\(\{/)
   assert.match(authSource, /capability: 'buddy:chat'/)
+  assert.match(accessSource, /runEntitlementGateShadow\(\{/)
 })
 
 test('Food Scan observes both initial analysis and correction reanalysis', async () => {
@@ -21,8 +25,9 @@ test('Food Scan observes both initial analysis and correction reanalysis', async
 
 test('Fridge Recipes observes both image detection and recipe generation', async () => {
   const route = await source('app/api/fridge-recipes/route.ts')
-  assert.match(route, /capability: 'fridge_recipe:detect'/)
-  assert.match(route, /capability: 'fridge_recipe:generate'/)
+  assert.match(route, /body\.action === 'detect'[\s\S]*?'fridge_recipe:detect'/)
+  assert.match(route, /body\.action === 'detect'[\s\S]*?'fridge_recipe:generate'/)
+  assert.match(route, /evaluateAiEntitlementAccess\(\{[\s\S]*?capability,/)
 })
 
 test('Restaurant Advisor retains the original canary observation', async () => {
