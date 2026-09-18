@@ -94,6 +94,22 @@ type ClinicAccessReadiness = {
       }>
     }
   }
+  activation: {
+    state: 'ready_for_authorization' | 'blocked' | 'no_action'
+    stateLabel: string
+    notice: string
+    checks: Array<{
+      key: 'patient_record' | 'email' | 'unique_account' | 'binding_conflict' | 'pilot_authorization'
+      label: string
+      passed: boolean
+    }>
+    steps: Array<{
+      key: 'patient_binding' | 'pilot_recognition' | 'preview_entitlement'
+      label: string
+      state: 'proposed' | 'complete' | 'decision_required' | 'blocked'
+      detail: string
+    }>
+  }
 }
 
 const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
@@ -847,11 +863,29 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         </div>
                         <div style={{ marginTop: 10, padding: 11, border: '1px solid rgba(201,168,76,.20)', borderRadius: 8, color: '#E2C87A', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.reconciliation.provenance.conclusion}</div>
                       </div>
+                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Propuesta de activación · no ejecutable</div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, marginTop: 9 }}>{accessReadiness.activation.stateLabel}</div>
+                        <div style={{ display: 'grid', gap: 9, marginTop: 12 }}>
+                          {accessReadiness.activation.steps.map(step => {
+                            const stateLabel = step.state === 'complete' ? '✓ Completo' : step.state === 'proposed' ? 'Propuesto' : step.state === 'decision_required' ? 'Decisión requerida' : 'Bloqueado'
+                            const stateColor = step.state === 'complete' ? '#9ED4A8' : step.state === 'proposed' || step.state === 'decision_required' ? '#E2C87A' : '#E0A0A0'
+                            return <div key={step.key} style={{ padding: 10, border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, background: 'rgba(255,255,255,.015)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#D9D5CF', fontSize: 11 }}>
+                                <span>{step.label}</span>
+                                <span style={{ color: stateColor, whiteSpace: 'nowrap' }}>{stateLabel}</span>
+                              </div>
+                              <div style={{ color: '#77716A', fontSize: 10, lineHeight: 1.45, marginTop: 5 }}>{step.detail}</div>
+                            </div>
+                          })}
+                        </div>
+                        <div style={{ marginTop: 10, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.activation.notice}</div>
+                      </div>
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
                     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
                       <button onClick={prepareAccessInvitation} disabled={!accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Activar acceso · bloqueado</button>
+                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Ejecutar activación · requiere autorización posterior</button>
                     </div>
                     {accessInvitationDrafts.length > 0 && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(106,160,116,.24)', borderRadius: 9, background: 'rgba(106,160,116,.05)' }}>
                       <div style={{ color: '#9ED4A8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{accessInvitationDrafts.length} borrador{accessInvitationDrafts.length === 1 ? '' : 'es'} guardado{accessInvitationDrafts.length === 1 ? '' : 's'}</div>
