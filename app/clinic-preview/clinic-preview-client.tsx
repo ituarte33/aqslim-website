@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 
 type Patient = {
@@ -30,7 +31,7 @@ type ClinicNote = {
   } | null
   messageDraft?: {
     channel: 'SMS' | 'Email' | 'WhatsApp'
-    purpose: 'Seguimiento' | 'Recordatorio' | 'Plan' | 'General'
+    purpose: 'Seguimiento' | 'Recordatorio' | 'Plan' | 'Acceso' | 'General'
     status: 'Borrador' | 'Listo para revisar' | 'Archivado'
     subject: string
     body: string
@@ -149,6 +150,10 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [accessReadiness, setAccessReadiness] = useState<ClinicAccessReadiness | null>(null)
   const [accessReadinessLoading, setAccessReadinessLoading] = useState(false)
   const [accessReadinessError, setAccessReadinessError] = useState('')
+  const [accessInvitationSubject, setAccessInvitationSubject] = useState('')
+  const [accessInvitationBody, setAccessInvitationBody] = useState('')
+  const [accessInvitationSaving, setAccessInvitationSaving] = useState(false)
+  const [accessInvitationMessage, setAccessInvitationMessage] = useState('')
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -163,25 +168,28 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const pendingFollowups = notes.filter(note => note.followupRequired)
   const structuredFollowups = notes.filter(note => note.noteType === 'Seguimiento' && note.followup)
   const messageDrafts = notes.filter(note => note.messageDraft)
+  const accessInvitationDrafts = messageDrafts.filter(note => note.messageDraft?.purpose === 'Acceso')
   const cadence = useMemo(() => resolveClinicCadence(visitCadenceDays), [visitCadenceDays])
   const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
   const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
 
-  async function loadNotes(patientId: string) {
+  async function loadNotes(patientId: string, signal?: AbortSignal) {
     setNotesLoading(true)
     setStatusMessage('')
     try {
-      const response = await fetch(`/api/preview/clinic-notes?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const response = await fetch(`/api/preview/clinic-notes?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store', signal })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('load_failed')
       const loadedNotes = Array.isArray(data.notes) ? data.notes as ClinicNote[] : []
+      if (signal?.aborted) return null
       setNotes(loadedNotes)
       return loadedNotes
-    } catch {
+    } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) return null
       setStatusMessage('No se pudieron cargar las notas Preview.')
       return null
     } finally {
-      setNotesLoading(false)
+      if (!signal?.aborted) setNotesLoading(false)
     }
   }
 
@@ -235,8 +243,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   useEffect(() => {
     let cancelled = false
     const accessController = new AbortController()
+    const notesController = new AbortController()
     if (selectedId) {
-      void loadNotes(selectedId)
+      void loadNotes(selectedId, notesController.signal)
       void loadConsultations(selectedId).then(loaded => {
         if (cancelled || !loaded) return
         const persistedAppointment = loaded.find(item => item.nextAppointment)?.nextAppointment
@@ -260,6 +269,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     return () => {
       cancelled = true
       accessController.abort()
+      notesController.abort()
     }
   }, [selectedId])
 
@@ -417,6 +427,52 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     }
   }
 
+  function prepareAccessInvitation() {
+    if (!selected || !accessReadiness?.readyForReview) return
+    const draft = buildClinicAccessInvitationDraft({
+      patientName: selected.name,
+      preferredLanguage: selected.language,
+    })
+    setAccessInvitationSubject(draft.subject)
+    setAccessInvitationBody(draft.body)
+    setAccessInvitationMessage('Borrador preparado localmente. Revísalo antes de guardarlo.')
+  }
+
+  async function saveAccessInvitationDraft() {
+    const draftBody = accessInvitationBody.trim()
+    const draftSubject = accessInvitationSubject.trim()
+    if (!selected || !accessReadiness?.readyForReview || !draftBody) return
+    setAccessInvitationSaving(true)
+    setAccessInvitationMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'messageDraft',
+          patientId: selected.id,
+          channel: 'Email',
+          purpose: 'Acceso',
+          messageStatus: 'Borrador',
+          subject: draftSubject,
+          messageBody: draftBody,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error('save_failed')
+      const refreshed = await loadNotes(selected.id)
+      if (!refreshed?.some(note => note.messageDraft?.purpose === 'Acceso'
+        && note.messageDraft.subject === draftSubject
+        && note.messageDraft.body === draftBody
+        && note.messageDraft.status === 'Borrador')) throw new Error('verify_failed')
+      setAccessInvitationMessage('✓ Borrador de invitación guardado y verificado. No fue enviado y no se creó ninguna cuenta.')
+    } catch {
+      setAccessInvitationMessage('No se pudo guardar el borrador de invitación. Intenta de nuevo.')
+    } finally {
+      setAccessInvitationSaving(false)
+    }
+  }
+
   async function saveConsultation() {
     if (!selected) return
     const selectedAppointment = nextAppointment
@@ -491,6 +547,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setVisitCadenceDays(null)
     setAccessReadiness(null)
     setAccessReadinessError('')
+    setAccessInvitationSubject('')
+    setAccessInvitationBody('')
+    setAccessInvitationMessage('')
   }
 
   function openNotes() { if (selected) setActiveTab('Notas') }
@@ -753,10 +812,32 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
                     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Preparar invitación · bloqueado</button>
+                      <button onClick={prepareAccessInvitation} disabled={!accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
                       <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Activar acceso · bloqueado</button>
                     </div>
+                    {accessInvitationDrafts.length > 0 && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(106,160,116,.24)', borderRadius: 9, background: 'rgba(106,160,116,.05)' }}>
+                      <div style={{ color: '#9ED4A8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{accessInvitationDrafts.length} borrador{accessInvitationDrafts.length === 1 ? '' : 'es'} guardado{accessInvitationDrafts.length === 1 ? '' : 's'}</div>
+                      <div style={{ color: '#D9D5CF', fontSize: 12, marginTop: 7 }}>{accessInvitationDrafts[0].messageDraft?.subject || 'Invitación My AQSLIM'}</div>
+                      <div style={{ color: '#77716A', fontSize: 10, marginTop: 5 }}>{accessInvitationDrafts[0].noteAt ? new Date(accessInvitationDrafts[0].noteAt).toLocaleString('es-US') : ''} · {accessInvitationDrafts[0].messageDraft?.status}</div>
+                    </div>}
                   </div>
+
+                  {accessInvitationBody && <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Borrador interno de invitación</div>
+                        <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 24, margin: '8px 0 0' }}>Preparar mensaje de acceso</h3>
+                      </div>
+                      <span style={{ color: '#9A9590', fontSize: 11 }}>Destino previsto: {selected.email || 'sin email válido'}</span>
+                    </div>
+                    <div style={{ marginTop: 12, padding: 11, border: '1px solid rgba(226,200,122,.25)', borderRadius: 9, color: '#E2C87A', fontSize: 12, lineHeight: 1.5 }}>Guardar registra únicamente un borrador interno en Clinic Preview. No envía el correo ni activa My AQSLIM.</div>
+                    <label style={{ ...labelStyle, marginTop: 14 }}>Asunto</label>
+                    <input value={accessInvitationSubject} onChange={event => setAccessInvitationSubject(event.target.value)} maxLength={500} placeholder="Asunto de la invitación" style={inputStyle} />
+                    <label style={{ ...labelStyle, marginTop: 12 }}>Mensaje</label>
+                    <textarea value={accessInvitationBody} onChange={event => setAccessInvitationBody(event.target.value)} rows={8} placeholder="Prepara primero la invitación para generar una plantilla editable…" style={{ ...inputStyle, resize: 'vertical' }} />
+                    <button onClick={saveAccessInvitationDraft} disabled={accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? 'rgba(201,168,76,.08)' : '#C9A84C', color: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? '#8E8881' : '#0A0A0A', cursor: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{accessInvitationSaving ? 'Guardando…' : 'Guardar borrador de invitación Preview'}</button>
+                    {accessInvitationMessage && <div style={{ marginTop: 12, color: accessInvitationMessage.startsWith('✓') ? '#9ED4A8' : accessInvitationMessage.startsWith('No se') ? '#E0A0A0' : '#E2C87A', fontSize: 12, lineHeight: 1.5 }}>{accessInvitationMessage}</div>}
+                  </div>}
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 16 }}>

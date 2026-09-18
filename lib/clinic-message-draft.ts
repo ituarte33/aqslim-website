@@ -1,5 +1,5 @@
 export const CLINIC_MESSAGE_CHANNELS = ['SMS', 'Email', 'WhatsApp'] as const
-export const CLINIC_MESSAGE_PURPOSES = ['Seguimiento', 'Recordatorio', 'Plan', 'General'] as const
+export const CLINIC_MESSAGE_PURPOSES = ['Seguimiento', 'Recordatorio', 'Plan', 'Acceso', 'General'] as const
 export const CLINIC_MESSAGE_STATUSES = ['Borrador', 'Listo para revisar', 'Archivado'] as const
 
 export type ClinicMessageChannel = typeof CLINIC_MESSAGE_CHANNELS[number]
