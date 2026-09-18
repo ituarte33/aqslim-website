@@ -41,3 +41,11 @@ export function suggestClinicAppointment(baseDate: string, days: number, now = n
 
   return `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}T${pad(base.getHours())}:${pad(base.getMinutes())}`
 }
+
+export function sameClinicAppointment(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) return false
+  const leftTime = Date.parse(left)
+  const rightTime = Date.parse(right)
+  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return false
+  return Math.abs(leftTime - rightTime) < 60_000
+}

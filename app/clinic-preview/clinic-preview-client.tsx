@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { resolveClinicCadence, suggestClinicAppointment } from '@/lib/clinic-scheduling'
+import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment } from '@/lib/clinic-scheduling'
 
 type Patient = {
   id: string
@@ -170,9 +170,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       const response = await fetch(`/api/preview/clinic-consultations?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('load_failed')
-      setConsultations(Array.isArray(data.consultations) ? data.consultations : [])
+      const loadedConsultations = Array.isArray(data.consultations) ? data.consultations as ClinicConsultation[] : []
+      setConsultations(loadedConsultations)
+      return loadedConsultations
     } catch {
       setConsultationMessage('No se pudieron cargar las consultas Preview.')
+      return null
     } finally {
       setConsultationsLoading(false)
     }
@@ -361,6 +364,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
   async function saveConsultation() {
     if (!selected) return
+    const selectedAppointment = nextAppointment
+    const appointmentIso = selectedAppointment ? new Date(selectedAppointment).toISOString() : ''
     setConsultationSaving(true)
     setConsultationMessage('')
     try {
@@ -382,7 +387,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
           phase,
           phaseWeek,
           recommendations,
-          nextAppointment,
+          nextAppointment: appointmentIso,
           consultationFee,
           amountCollected,
           paymentMethod,
@@ -400,10 +405,13 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       setChestCm('')
       setPhaseWeek('')
       setRecommendations('')
-      setNextAppointment('')
-      setNextAppointmentEdited(false)
-      setConsultationMessage('✓ Consulta guardada en AQSLIM Clinic Preview.')
-      await loadConsultations(selected.id)
+      const refreshed = await loadConsultations(selected.id)
+      if (!refreshed || (appointmentIso && !refreshed.some(item => sameClinicAppointment(item.nextAppointment, appointmentIso)))) {
+        throw new Error('verify_failed')
+      }
+      setConsultationMessage(selectedAppointment
+        ? '✓ Consulta y próxima cita guardadas y verificadas en Clinic Preview.'
+        : '✓ Consulta guardada y verificada en AQSLIM Clinic Preview.')
     } catch {
       setConsultationMessage('No se pudo guardar la consulta. Intenta de nuevo.')
     } finally {

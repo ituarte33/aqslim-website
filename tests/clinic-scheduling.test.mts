@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { resolveClinicCadence, suggestClinicAppointment } from '../lib/clinic-scheduling.ts'
+import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment } from '../lib/clinic-scheduling.ts'
 
 test('uses a valid plan cadence before the standard fallback', () => {
   assert.deepEqual(resolveClinicCadence(10), {
@@ -28,4 +28,10 @@ test('suggests a local appointment from the consultation date', () => {
 test('handles month boundaries without parsing the date as UTC', () => {
   const now = new Date(2026, 0, 1, 9, 58, 0)
   assert.equal(suggestClinicAppointment('2026-01-29', 7, now), '2026-02-05T10:00')
+})
+
+test('verifies a persisted appointment by instant', () => {
+  assert.equal(sameClinicAppointment('2026-09-27T20:35:00.000Z', '2026-09-27T20:35:20.000Z'), true)
+  assert.equal(sameClinicAppointment('2026-09-27T20:35:00.000Z', '2026-09-24T20:35:00.000Z'), false)
+  assert.equal(sameClinicAppointment('', '2026-09-27T20:35:00.000Z'), false)
 })
