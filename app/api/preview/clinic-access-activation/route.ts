@@ -16,6 +16,7 @@ function environment() {
     AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID,
     AIRTABLE_PAT: process.env.AIRTABLE_PAT,
     MYAQ_CLINIC_ACCESS_EXECUTION: process.env.MYAQ_CLINIC_ACCESS_EXECUTION,
+    MYAQ_CLINIC_PILOT_PATIENT_IDS: process.env.MYAQ_CLINIC_PILOT_PATIENT_IDS,
   }
 }
 
@@ -36,8 +37,10 @@ export async function POST(request: NextRequest) {
     const exact = clinicAccessOperationIsExact({
       actorEmail: actor.email,
       actorUserId: actor.clerkUserId,
+      patientId,
       patientEmail: snapshot.patientEmail,
       accountUserId: snapshot.accountUserId,
+      allowlistedPatientIds: currentEnvironment.MYAQ_CLINIC_PILOT_PATIENT_IDS,
       expectedFingerprint: snapshot.readiness.authorization.operationFingerprint,
       suppliedFingerprint: body.operationFingerprint,
       authorizationState: snapshot.readiness.authorization.state,
@@ -65,10 +68,13 @@ export async function POST(request: NextRequest) {
     if (!hasExplicitClinicAccessExecutionConfirmation(body.executionConfirmation)) {
       return NextResponse.json({ ok: false, error: 'execution_confirmation_required' }, { status: 409 })
     }
+    if (!snapshot.accountUserId) {
+      return NextResponse.json({ ok: false, error: 'account_not_resolved' }, { status: 409 })
+    }
 
     const result = await executeClinicAccessActivation({
       patientId,
-      clerkUserId: actor.clerkUserId,
+      clerkUserId: snapshot.accountUserId,
       fingerprint: snapshot.readiness.authorization.operationFingerprint as string,
       operation: migrationExecutionAuthorized ? 'migrate_p5_canary' : 'activate_internal_pilot',
     })

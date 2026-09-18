@@ -5,6 +5,7 @@ import type { AuthenticatedActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
 import { getClinicAccessActivationReadiness } from '@/lib/clinic-access-activation-readiness'
 import { getClinicAccessAuthorizationGate } from '@/lib/clinic-access-authorization'
+import { isClinicPilotPatientAllowlisted } from '@/lib/clinic-access-execution-policy'
 import { getClinicAccessReconciliation } from '@/lib/clinic-access-reconciliation'
 import { getClinicAccessReadiness } from '@/lib/clinic-access-readiness'
 import { getClinicEntitlementDecision } from '@/lib/clinic-entitlement-decision'
@@ -94,8 +95,13 @@ export async function resolveClinicAccessSnapshot({
     patientId,
     accounts: accounts?.map(({ clerkUserId: _clerkUserId, ...account }) => account) ?? null,
   })
-  const pilotRecognitionAuthorized = email === actor.email.trim().toLowerCase()
+  const currentSessionPatient = email === actor.email.trim().toLowerCase()
     && reconciliation.provenance.checks.some(check => check.key === 'session_identity' && check.state === 'confirmed')
+  const allowlistedPilotPatient = isClinicPilotPatientAllowlisted(
+    process.env.MYAQ_CLINIC_PILOT_PATIENT_IDS,
+    patientId,
+  )
+  const pilotRecognitionAuthorized = currentSessionPatient || allowlistedPilotPatient
   const entitlementDecision = getClinicEntitlementDecision({
     readiness,
     reconciliation,

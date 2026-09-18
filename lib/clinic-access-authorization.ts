@@ -41,7 +41,7 @@ export function getClinicAccessAuthorizationGate({
   const acknowledgements: ClinicAccessAuthorizationAcknowledgement[] = [
     { key: 'patient_identity', label: `Confirmo el expediente y el email ${email || 'no verificable'}.` },
     { key: 'preview_scope', label: isMigration ? 'Confirmo migrar el canary P5 a internal_pilot activo exclusivamente en Preview.' : 'Confirmo internal_pilot activo exclusivamente en Preview.' },
-    { key: 'no_external_effects', label: isMigration ? 'Confirmo conservar la evidencia histórica P5 y no generar cobros, invitaciones ni efectos en Producción.' : 'Confirmo que esta prueba no debe crear acceso, enviar invitaciones ni generar cobros.' },
+    { key: 'no_external_effects', label: isMigration ? 'Confirmo conservar la evidencia histórica P5 y no generar cobros, invitaciones ni efectos en Producción.' : 'Confirmo que esta activación no debe enviar invitaciones, generar cobros ni afectar Producción.' },
   ]
 
   if (activation.state === 'no_action') {

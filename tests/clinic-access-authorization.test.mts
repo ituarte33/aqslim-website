@@ -83,10 +83,10 @@ test('readiness remains read-only while execution requires a separate confirmed 
 
   assert.doesNotMatch(route, /export async function (POST|PUT|PATCH|DELETE)/)
   assert.doesNotMatch(route, /createPreviewEntitlement|updatePreviewEntitlement|users\.updateUser/)
-  assert.match(client, /Ejecutar migración y activación autorizadas/)
+  assert.match(client, /Ejecutar activación autorizada/)
   assert.match(client, /mode: 'validate'/)
   assert.match(client, /mode: 'execute'/)
-  assert.match(client, /executionConfirmation: 'ACTIVATE_ROM_PREVIEW'/)
+  assert.match(client, /executionConfirmation: 'ACTIVATE_PREVIEW_PILOT'/)
   assert.match(activationRoute, /migrationExecutionAuthorized/)
   assert.doesNotMatch(activationRoute, /migration_execution_not_enabled/)
 })

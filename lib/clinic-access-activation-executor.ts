@@ -2,6 +2,10 @@ import 'server-only'
 
 import { clerkClient } from '@clerk/nextjs/server'
 import { ACTIVE_PILOT_FEATURES, PILOT_COHORT_ID, pilotAccessFromMetadata } from './pilot-policy'
+import {
+  clinicAccessPilotRoleForOperation,
+  type ClinicAccessExecutionOperation,
+} from './clinic-access-execution-policy'
 import { withAqslimPatientBinding } from './patient-binding'
 import {
   ENTITLEMENT_RECORD_VERSION,
@@ -19,9 +23,7 @@ import {
   getPreviewEntitlementSourceRecordByPatientRecordId,
 } from './preview-entitlement-store'
 
-const ACTIVATION_REASON = 'MYAQ_CLINIC_001_FOUNDER_PREVIEW_ACTIVATION'
-
-export type ClinicAccessExecutionOperation = 'activate_internal_pilot' | 'migrate_p5_canary'
+const ACTIVATION_REASON = 'MYAQ_CLINIC_001_PREVIEW_PILOT_ACTIVATION'
 
 function headers(): HeadersInit {
   const pat = process.env.AIRTABLE_PAT
@@ -135,13 +137,17 @@ async function migrateP5Entitlement({
   return recordId
 }
 
-function activatedPrivateMetadata(current: Record<string, unknown>, patientId: string) {
+function activatedPrivateMetadata(
+  current: Record<string, unknown>,
+  patientId: string,
+  role: ReturnType<typeof clinicAccessPilotRoleForOperation>,
+) {
   return {
     ...withAqslimPatientBinding(current, patientId),
     pilot: {
       enabled: true,
       cohort: PILOT_COHORT_ID,
-      role: 'founder',
+      role,
       language: 'es',
       features: [...ACTIVE_PILOT_FEATURES],
       scope: 'preview_only',
@@ -168,6 +174,7 @@ export async function executeClinicAccessActivation({
     canonicalSubjectId: clerkUserId,
   })
   const migrating = operation === 'migrate_p5_canary'
+  const pilotRole = clinicAccessPilotRoleForOperation(operation)
   if (migrating) {
     if (patientId !== P5_FOUNDER_PATIENT_RECORD_ID
       || !before
@@ -184,11 +191,11 @@ export async function executeClinicAccessActivation({
   const user = await clerk.users.getUser(clerkUserId)
   const originalPrivateMetadata = user.privateMetadata
   const alreadyBound = user.privateMetadata?.aqslimPatientId === patientId
-  const alreadyPilot = pilotAccessFromMetadata(user.privateMetadata) !== null
+  const alreadyPilot = pilotAccessFromMetadata(user.privateMetadata)?.role === pilotRole
   const metadataChanged = !alreadyBound || !alreadyPilot
   if (!alreadyBound || !alreadyPilot) {
     await clerk.users.updateUserMetadata(clerkUserId, {
-      privateMetadata: activatedPrivateMetadata(user.privateMetadata, patientId),
+      privateMetadata: activatedPrivateMetadata(user.privateMetadata, patientId, pilotRole),
     })
   }
 
@@ -212,7 +219,7 @@ export async function executeClinicAccessActivation({
       try {
         await clerk.users.updateUserMetadata(clerkUserId, {
           privateMetadata: {
-            ...activatedPrivateMetadata(originalPrivateMetadata, patientId),
+            ...activatedPrivateMetadata(originalPrivateMetadata, patientId, pilotRole),
             aqslimPatientId: originalPrivateMetadata?.aqslimPatientId ?? null,
             pilot: originalPrivateMetadata?.pilot ?? null,
           },
@@ -238,7 +245,7 @@ export async function executeClinicAccessActivation({
     && isExactEntitlement(verifiedEntitlement.record, clerkUserId),
   )
   const accountVerified = verifiedUser.privateMetadata?.aqslimPatientId === patientId
-    && pilotAccessFromMetadata(verifiedUser.privateMetadata) !== null
+    && pilotAccessFromMetadata(verifiedUser.privateMetadata)?.role === pilotRole
   if (!entitlementVerified || !accountVerified) throw new Error('POST_WRITE_VERIFICATION_FAILED')
 
   return {

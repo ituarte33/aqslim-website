@@ -1,6 +1,7 @@
 {
   "env": {
     "MYAQ_P3_ENFORCEMENT": "enabled",
-    "MYAQ_P5_FOUNDER_CANARY": "enabled"
+    "MYAQ_P5_FOUNDER_CANARY": "enabled",
+    "MYAQ_CLINIC_ACCESS_EXECUTION": "enabled"
   }
 }
