@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { clerkClient } from '@clerk/nextjs/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
+import { getClinicAccessReconciliation } from '@/lib/clinic-access-reconciliation'
 import { getClinicAccessReadiness } from '@/lib/clinic-access-readiness'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { pendingPatientSubjectId } from '@/lib/p4-provisioning-policy'
+import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
 import { getPreviewEntitlementSourceRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
 
 function clinicEnvironment() {
@@ -19,11 +22,12 @@ async function requireFounder() {
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
   if (!isClinicFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  return actor
 }
 
 export async function GET(request: NextRequest) {
   try {
-    await requireFounder()
+    const actor = await requireFounder()
     const patientId = request.nextUrl.searchParams.get('patientId')?.trim() ?? ''
     if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) {
       return NextResponse.json({ ok: false, error: 'invalid_patient' }, { status: 400 })
@@ -32,15 +36,37 @@ export async function GET(request: NextRequest) {
     const patient = await getClienteById(patientId).catch(() => null)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
 
-    const pendingSubject = pendingPatientSubjectId(patientId)
-    const source = await getPreviewEntitlementSourceRecordByPatientRecordId({
-      patientRecordId: patientId,
-      canonicalSubjectId: pendingSubject,
-    })
     const fields = patient.fields
+    const email = String(fields['Email'] ?? '').trim().toLowerCase()
+    const pendingSubject = pendingPatientSubjectId(patientId)
+    const [sourceResult, accountResult] = await Promise.allSettled([
+      getPreviewEntitlementSourceRecordByPatientRecordId({
+        patientRecordId: patientId,
+        canonicalSubjectId: pendingSubject,
+      }),
+      email
+        ? clerkClient().then(async clerk => {
+            const result = await clerk.users.getUserList({ emailAddress: [email], limit: 3 })
+            return result.data
+              .filter(user => user.emailAddresses.some(address => address.emailAddress.trim().toLowerCase() === email))
+              .map(user => {
+                const boundPatientId = typeof user.privateMetadata?.aqslimPatientId === 'string'
+                  ? user.privateMetadata.aqslimPatientId.trim() || null
+                  : null
+                const hasExplicitPilot = pilotAccessFromMetadata(user.privateMetadata) !== null
+                const hasCurrentFounderPilot = user.id === actor.clerkUserId && actor.shadowPilotFeatures !== null
+                return {
+                  boundPatientId,
+                  hasPilotAccess: hasExplicitPilot || hasCurrentFounderPilot,
+                }
+              })
+          })
+        : Promise.resolve([]),
+    ])
+    const source = sourceResult.status === 'fulfilled' ? sourceResult.value : null
     const readiness = getClinicAccessReadiness({
       patientId,
-      email: String(fields['Email'] ?? ''),
+      email,
       phone: String(fields['Teléfono'] ?? ''),
       language: String(fields['Idioma Preferido'] ?? ''),
       entitlement: source ? {
@@ -50,8 +76,12 @@ export async function GET(request: NextRequest) {
         status: source.record.status,
       } : null,
     })
+    const reconciliation = getClinicAccessReconciliation({
+      patientId,
+      accounts: accountResult.status === 'fulfilled' ? accountResult.value : null,
+    })
 
-    return NextResponse.json({ ok: true, readiness })
+    return NextResponse.json({ ok: true, readiness: { ...readiness, reconciliation } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403

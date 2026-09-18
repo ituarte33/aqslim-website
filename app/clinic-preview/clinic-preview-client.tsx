@@ -78,6 +78,13 @@ type ClinicAccessReadiness = {
     tier: string | null
     status: string | null
   }
+  reconciliation: {
+    state: 'consistent' | 'review_needed' | 'no_account' | 'unavailable'
+    stateLabel: string
+    account: { state: 'found' | 'not_found' | 'ambiguous' | 'unavailable'; label: string }
+    binding: { state: 'matched' | 'email_match' | 'conflict' | 'not_applicable' | 'unavailable'; label: string }
+    pilot: { state: 'active' | 'not_confirmed' | 'not_applicable' | 'unavailable'; label: string }
+  }
 }
 
 const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
@@ -785,7 +792,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                       </div>
                       <span style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 999, padding: '8px 11px', color: '#E2C87A', fontSize: 11 }}>Sólo lectura</span>
                     </div>
-                    <p style={{ color: '#9A9590', lineHeight: 1.6, fontSize: 12, margin: '12px 0 18px' }}>Verifica datos mínimos y consulta el registro de acceso Preview asociado exclusivamente a este expediente.</p>
+                    <p style={{ color: '#9A9590', lineHeight: 1.6, fontSize: 12, margin: '12px 0 18px' }}>Verifica datos mínimos y reconcilia, sin modificar nada, la cuenta My AQSLIM, su vínculo, el piloto y el entitlement Preview.</p>
                     {accessReadinessLoading ? <div style={{ color: '#9A9590' }}>Verificando…</div> : accessReadinessError ? <div style={{ color: '#E0A0A0' }}>{accessReadinessError}</div> : accessReadiness ? (
                       <>
                         <div style={{ display: 'grid', gap: 10 }}>
@@ -802,12 +809,21 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                   </div>
 
                   <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
-                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Estado de acceso</div>
+                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Reconciliación de acceso · sólo lectura</div>
                     {accessReadinessLoading ? <div style={{ color: '#9A9590', marginTop: 14 }}>Consultando…</div> : accessReadiness ? <>
-                      <div style={{ fontFamily: 'Georgia, serif', fontSize: 23, marginTop: 12 }}>{accessReadiness.accessLabel}</div>
+                      <div style={{ fontFamily: 'Georgia, serif', fontSize: 23, marginTop: 12 }}>{accessReadiness.reconciliation.stateLabel}</div>
                       <div style={{ display: 'grid', gap: 9, marginTop: 16, color: '#9A9590', fontSize: 12 }}>
-                        <div>Tier: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.tier || 'No asignado'}</span></div>
-                        <div>Estado: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.status || 'No asignado'}</span></div>
+                        <div>Cuenta My AQSLIM: <span style={{ color: accessReadiness.reconciliation.account.state === 'found' ? '#9ED4A8' : accessReadiness.reconciliation.account.state === 'not_found' ? '#D9D5CF' : '#E2C87A' }}>{accessReadiness.reconciliation.account.label}</span></div>
+                        <div>Vínculo con expediente: <span style={{ color: accessReadiness.reconciliation.binding.state === 'conflict' ? '#E0A0A0' : '#D9D5CF' }}>{accessReadiness.reconciliation.binding.label}</span></div>
+                        <div>Acceso piloto: <span style={{ color: accessReadiness.reconciliation.pilot.state === 'active' ? '#9ED4A8' : '#D9D5CF' }}>{accessReadiness.reconciliation.pilot.label}</span></div>
+                      </div>
+                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Entitlement Preview</div>
+                        <div style={{ color: '#D9D5CF', fontSize: 12, marginTop: 8 }}>{accessReadiness.accessLabel}</div>
+                        <div style={{ display: 'grid', gap: 7, marginTop: 8, color: '#9A9590', fontSize: 12 }}>
+                          <div>Tier: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.tier || 'No asignado'}</span></div>
+                          <div>Estado: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.status || 'No asignado'}</span></div>
+                        </div>
                       </div>
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
