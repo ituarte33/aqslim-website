@@ -5,7 +5,9 @@ import { getClienteById } from '@/lib/airtable'
 import { getClinicAccessReconciliation } from '@/lib/clinic-access-reconciliation'
 import { getClinicAccessReadiness } from '@/lib/clinic-access-readiness'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isSyntheticPreviewEnvironment } from '@/lib/nutrition/synthetic-preview-policy'
 import { pendingPatientSubjectId } from '@/lib/p4-provisioning-policy'
+import { isP5FounderCanaryEnvironment } from '@/lib/p5-founder-canary-policy'
 import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
 import { getPreviewEntitlementSourceRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
 
@@ -39,6 +41,12 @@ export async function GET(request: NextRequest) {
     const fields = patient.fields
     const email = String(fields['Email'] ?? '').trim().toLowerCase()
     const pendingSubject = pendingPatientSubjectId(patientId)
+    const pilotPolicyEnvironment = {
+      ...clinicEnvironment(),
+      MYAQ_P5_FOUNDER_CANARY: process.env.MYAQ_P5_FOUNDER_CANARY,
+    }
+    const legacyPilotPolicyApplies = isSyntheticPreviewEnvironment(pilotPolicyEnvironment)
+      || isP5FounderCanaryEnvironment(pilotPolicyEnvironment)
     const [sourceResult, accountResult] = await Promise.allSettled([
       getPreviewEntitlementSourceRecordByPatientRecordId({
         patientRecordId: patientId,
@@ -54,10 +62,14 @@ export async function GET(request: NextRequest) {
                   ? user.privateMetadata.aqslimPatientId.trim() || null
                   : null
                 const hasExplicitPilot = pilotAccessFromMetadata(user.privateMetadata) !== null
-                const hasCurrentFounderPilot = user.id === actor.clerkUserId && actor.shadowPilotFeatures !== null
+                const isCurrentSession = user.id === actor.clerkUserId
+                const hasCurrentFounderPilot = isCurrentSession && actor.shadowPilotFeatures !== null
                 return {
                   boundPatientId,
                   hasPilotAccess: hasExplicitPilot || hasCurrentFounderPilot,
+                  isCurrentSession,
+                  hasExplicitPilotMetadata: hasExplicitPilot,
+                  legacyPilotPolicyApplies: isCurrentSession && legacyPilotPolicyApplies,
                 }
               })
           })

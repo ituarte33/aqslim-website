@@ -84,6 +84,15 @@ type ClinicAccessReadiness = {
     account: { state: 'found' | 'not_found' | 'ambiguous' | 'unavailable'; label: string }
     binding: { state: 'matched' | 'email_match' | 'conflict' | 'not_applicable' | 'unavailable'; label: string }
     pilot: { state: 'active' | 'not_confirmed' | 'not_applicable' | 'unavailable'; label: string }
+    provenance: {
+      conclusion: string
+      checks: Array<{
+        key: 'session_identity' | 'clinic_founder_policy' | 'explicit_pilot_metadata' | 'legacy_pilot_policy'
+        label: string
+        state: 'confirmed' | 'absent' | 'isolated' | 'not_applicable' | 'unavailable'
+        detail: string
+      }>
+    }
   }
 }
 
@@ -824,6 +833,19 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                           <div>Tier: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.tier || 'No asignado'}</span></div>
                           <div>Estado: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.status || 'No asignado'}</span></div>
                         </div>
+                      </div>
+                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                        <div style={{ color: '#C9A84C', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Diagnóstico de procedencia</div>
+                        <div style={{ display: 'grid', gap: 9, marginTop: 10 }}>
+                          {accessReadiness.reconciliation.provenance.checks.map(check => <div key={check.key} style={{ padding: 10, border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, background: 'rgba(255,255,255,.015)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#D9D5CF', fontSize: 11 }}>
+                              <span>{check.label}</span>
+                              <span style={{ color: check.state === 'confirmed' ? '#9ED4A8' : check.state === 'absent' ? '#E2C87A' : '#8E8881' }}>{check.state === 'confirmed' ? '✓ Confirmado' : check.state === 'absent' ? 'Ausente' : check.state === 'isolated' ? 'Aislado' : check.state === 'not_applicable' ? 'No aplica' : 'No verificable'}</span>
+                            </div>
+                            <div style={{ color: '#77716A', fontSize: 10, lineHeight: 1.45, marginTop: 5 }}>{check.detail}</div>
+                          </div>)}
+                        </div>
+                        <div style={{ marginTop: 10, padding: 11, border: '1px solid rgba(201,168,76,.20)', borderRadius: 8, color: '#E2C87A', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.reconciliation.provenance.conclusion}</div>
                       </div>
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>

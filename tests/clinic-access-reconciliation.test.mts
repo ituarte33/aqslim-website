@@ -4,23 +4,38 @@ import test from 'node:test'
 import { getClinicAccessReconciliation } from '../lib/clinic-access-reconciliation.ts'
 
 const patientId = 'recABCDEFGHIJKLMN'
+const account = (overrides: Partial<{
+  boundPatientId: string | null
+  hasPilotAccess: boolean
+  isCurrentSession: boolean
+  hasExplicitPilotMetadata: boolean
+  legacyPilotPolicyApplies: boolean
+}> = {}) => ({
+  boundPatientId: patientId,
+  hasPilotAccess: true,
+  isCurrentSession: true,
+  hasExplicitPilotMetadata: true,
+  legacyPilotPolicyApplies: false,
+  ...overrides,
+})
 
 test('reconciles an existing bound account with active pilot access', () => {
   const result = getClinicAccessReconciliation({
     patientId,
-    accounts: [{ boundPatientId: patientId, hasPilotAccess: true }],
+    accounts: [account()],
   })
 
   assert.equal(result.state, 'consistent')
   assert.equal(result.account.state, 'found')
   assert.equal(result.binding.state, 'matched')
   assert.equal(result.pilot.state, 'active')
+  assert.match(result.provenance.conclusion, /fuente válida/)
 })
 
 test('treats a unique email match without metadata as pending explicit binding', () => {
   const result = getClinicAccessReconciliation({
     patientId,
-    accounts: [{ boundPatientId: null, hasPilotAccess: true }],
+    accounts: [account({ boundPatientId: null })],
   })
 
   assert.equal(result.state, 'consistent')
@@ -31,7 +46,7 @@ test('treats a unique email match without metadata as pending explicit binding',
 test('flags a binding to another patient record for review', () => {
   const result = getClinicAccessReconciliation({
     patientId,
-    accounts: [{ boundPatientId: 'recZZZZZZZZZZZZZZ', hasPilotAccess: true }],
+    accounts: [account({ boundPatientId: 'recZZZZZZZZZZZZZZ' })],
   })
 
   assert.equal(result.state, 'review_needed')
@@ -52,8 +67,8 @@ test('fails closed when an email matches several accounts', () => {
   const result = getClinicAccessReconciliation({
     patientId,
     accounts: [
-      { boundPatientId: null, hasPilotAccess: true },
-      { boundPatientId: patientId, hasPilotAccess: true },
+      account({ boundPatientId: null }),
+      account(),
     ],
   })
 
@@ -64,11 +79,29 @@ test('fails closed when an email matches several accounts', () => {
 test('does not claim pilot access when it was not observed', () => {
   const result = getClinicAccessReconciliation({
     patientId,
-    accounts: [{ boundPatientId: patientId, hasPilotAccess: false }],
+    accounts: [account({ hasPilotAccess: false, hasExplicitPilotMetadata: false })],
   })
 
   assert.equal(result.state, 'review_needed')
   assert.equal(result.pilot.state, 'not_confirmed')
+})
+
+test('explains Clinic Founder-only access without claiming inherited pilot access', () => {
+  const result = getClinicAccessReconciliation({
+    patientId,
+    accounts: [account({
+      boundPatientId: null,
+      hasPilotAccess: false,
+      hasExplicitPilotMetadata: false,
+      legacyPilotPolicyApplies: false,
+    })],
+  })
+
+  assert.equal(result.provenance.checks.find(check => check.key === 'session_identity')?.state, 'confirmed')
+  assert.equal(result.provenance.checks.find(check => check.key === 'clinic_founder_policy')?.state, 'confirmed')
+  assert.equal(result.provenance.checks.find(check => check.key === 'explicit_pilot_metadata')?.state, 'absent')
+  assert.equal(result.provenance.checks.find(check => check.key === 'legacy_pilot_policy')?.state, 'isolated')
+  assert.match(result.provenance.conclusion, /Founder-only de Clinic Preview/)
 })
 
 test('the reconciliation route reads Clerk without provisioning or mutation calls', async () => {
