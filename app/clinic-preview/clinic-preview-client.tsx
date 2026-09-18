@@ -60,6 +60,25 @@ type ClinicConsultation = {
   authorLabel: string
 }
 
+type ClinicAccessReadiness = {
+  readyForReview: boolean
+  accessState: 'linked' | 'pending_binding' | 'not_provisioned'
+  accessLabel: string
+  checks: Array<{
+    key: 'patient_record' | 'email' | 'phone' | 'language'
+    label: string
+    passed: boolean
+    required: boolean
+  }>
+  blockers: string[]
+  entitlement: {
+    present: boolean
+    binding: 'pending' | 'linked' | 'none'
+    tier: string | null
+    status: string | null
+  }
+}
+
 const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
 type Tab = typeof tabs[number]
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -127,6 +146,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [consultationMessage, setConsultationMessage] = useState('')
   const [visitCadenceDays, setVisitCadenceDays] = useState<number | null>(null)
   const [nextAppointmentEdited, setNextAppointmentEdited] = useState(false)
+  const [accessReadiness, setAccessReadiness] = useState<ClinicAccessReadiness | null>(null)
+  const [accessReadinessLoading, setAccessReadinessLoading] = useState(false)
+  const [accessReadinessError, setAccessReadinessError] = useState('')
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -192,8 +214,27 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     }
   }
 
+  async function loadAccessReadiness(patientId: string, signal?: AbortSignal) {
+    setAccessReadinessLoading(true)
+    setAccessReadinessError('')
+    try {
+      const response = await fetch(`/api/preview/clinic-access-readiness?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store', signal })
+      const data = await response.json()
+      if (!response.ok || !data.ok || !data.readiness) throw new Error('load_failed')
+      if (signal?.aborted) return
+      setAccessReadiness(data.readiness as ClinicAccessReadiness)
+    } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) return
+      setAccessReadiness(null)
+      setAccessReadinessError('No se pudo verificar el estado de acceso Preview.')
+    } finally {
+      if (!signal?.aborted) setAccessReadinessLoading(false)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
+    const accessController = new AbortController()
     if (selectedId) {
       void loadNotes(selectedId)
       void loadConsultations(selectedId).then(loaded => {
@@ -208,12 +249,18 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       void getSchedulingCadence(selectedId).then(days => {
         if (!cancelled) setVisitCadenceDays(days)
       })
+      void loadAccessReadiness(selectedId, accessController.signal)
     } else {
       setNotes([])
       setConsultations([])
       setVisitCadenceDays(null)
+      setAccessReadiness(null)
+      setAccessReadinessError('')
     }
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      accessController.abort()
+    }
   }, [selectedId])
 
   useEffect(() => {
@@ -442,6 +489,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     setNextAppointment('')
     setNextAppointmentEdited(false)
     setVisitCadenceDays(null)
+    setAccessReadiness(null)
+    setAccessReadinessError('')
   }
 
   function openNotes() { if (selected) setActiveTab('Notas') }
@@ -665,6 +714,48 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     </div>
                     <button onClick={saveFollowup} disabled={followupSaving || !followupAction.trim()} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: followupSaving || !followupAction.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: followupSaving || !followupAction.trim() ? '#8E8881' : '#0A0A0A', cursor: followupSaving || !followupAction.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{followupSaving ? 'Guardando…' : 'Guardar seguimiento Preview'}</button>
                     {followupMessage && <div style={{ marginTop: 12, color: followupMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{followupMessage}</div>}
+                  </div>
+                </div>
+              ) : activeTab === 'My AQSLIM' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.8fr)', gap: 16, alignItems: 'start' }}>
+                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Acceso My AQSLIM</div>
+                        <h3 style={{ margin: '8px 0 0', fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Readiness del paciente</h3>
+                      </div>
+                      <span style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 999, padding: '8px 11px', color: '#E2C87A', fontSize: 11 }}>Sólo lectura</span>
+                    </div>
+                    <p style={{ color: '#9A9590', lineHeight: 1.6, fontSize: 12, margin: '12px 0 18px' }}>Verifica datos mínimos y consulta el registro de acceso Preview asociado exclusivamente a este expediente.</p>
+                    {accessReadinessLoading ? <div style={{ color: '#9A9590' }}>Verificando…</div> : accessReadinessError ? <div style={{ color: '#E0A0A0' }}>{accessReadinessError}</div> : accessReadiness ? (
+                      <>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {accessReadiness.checks.map(check => <div key={check.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: 12, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, background: 'rgba(255,255,255,.015)' }}>
+                            <span style={{ color: '#D9D5CF', fontSize: 12 }}>{check.label}{!check.required ? ' · recomendado' : ''}</span>
+                            <span style={{ color: check.passed ? '#9ED4A8' : check.required ? '#E0A0A0' : '#8E8881', fontSize: 12 }}>{check.passed ? '✓ Completo' : check.required ? 'Bloqueante' : 'Pendiente'}</span>
+                          </div>)}
+                        </div>
+                        <div style={{ marginTop: 16, padding: 14, border: `1px solid ${accessReadiness.readyForReview ? 'rgba(106,160,116,.32)' : 'rgba(226,142,142,.28)'}`, borderRadius: 10, background: accessReadiness.readyForReview ? 'rgba(106,160,116,.06)' : 'rgba(226,142,142,.05)', color: accessReadiness.readyForReview ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>
+                          {accessReadiness.readyForReview ? '✓ Expediente listo para revisión de acceso.' : `Falta completar: ${accessReadiness.blockers.join(', ')}.`}
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+
+                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
+                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Estado de acceso</div>
+                    {accessReadinessLoading ? <div style={{ color: '#9A9590', marginTop: 14 }}>Consultando…</div> : accessReadiness ? <>
+                      <div style={{ fontFamily: 'Georgia, serif', fontSize: 23, marginTop: 12 }}>{accessReadiness.accessLabel}</div>
+                      <div style={{ display: 'grid', gap: 9, marginTop: 16, color: '#9A9590', fontSize: 12 }}>
+                        <div>Tier: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.tier || 'No asignado'}</span></div>
+                        <div>Estado: <span style={{ color: '#D9D5CF' }}>{accessReadiness.entitlement.status || 'No asignado'}</span></div>
+                      </div>
+                    </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
+                    <div style={{ marginTop: 18, padding: 12, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>Esta pantalla no crea cuentas, no envía invitaciones y no modifica Clerk, permisos ni entitlements.</div>
+                    <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Preparar invitación · bloqueado</button>
+                      <button disabled style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.025)', color: '#77716A', textAlign: 'left' }}>Activar acceso · bloqueado</button>
+                    </div>
                   </div>
                 </div>
               ) : (
