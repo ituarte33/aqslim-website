@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment } from '@/lib/clinic-scheduling'
+import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 
 type Patient = {
   id: string
@@ -196,7 +196,15 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     let cancelled = false
     if (selectedId) {
       void loadNotes(selectedId)
-      void loadConsultations(selectedId)
+      void loadConsultations(selectedId).then(loaded => {
+        if (cancelled || !loaded) return
+        const persistedAppointment = loaded.find(item => item.nextAppointment)?.nextAppointment
+        const localAppointment = toClinicDateTimeLocal(persistedAppointment)
+        if (localAppointment) {
+          setNextAppointment(localAppointment)
+          setNextAppointmentEdited(true)
+        }
+      })
       void getSchedulingCadence(selectedId).then(days => {
         if (!cancelled) setVisitCadenceDays(days)
       })
@@ -566,7 +574,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     <div style={sectionTitle}>Próxima cita</div>
                     <input type="datetime-local" value={nextAppointment} onChange={e => { setNextAppointment(e.target.value); setNextAppointmentEdited(true) }} style={inputStyle} />
                     <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(201,168,76,.20)', borderRadius: 9, background: 'rgba(201,168,76,.04)' }}>
-                      <div style={{ color: '#9A9590', fontSize: 11 }}>Sugerencia activa · {cadence.label}</div>
+                      <div style={{ color: '#9A9590', fontSize: 11 }}>{nextAppointmentEdited ? `Fecha seleccionada o guardada · sugerencia del plan: ${cadence.days} días` : `Sugerencia activa · ${cadence.label}`}</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>{cadenceOptions.map(days => <button key={days} type="button" onClick={() => { setNextAppointment(suggestClinicAppointment(consultationDate, days)); setNextAppointmentEdited(true) }} style={{ padding: '8px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.35)', background: days === cadence.days ? 'rgba(201,168,76,.15)' : 'rgba(201,168,76,.08)', color: '#E2C87A', cursor: 'pointer', fontSize: 11 }}>+ {days} días{days === cadence.days ? cadence.source === 'plan' ? ' · plan' : ' · estándar' : ''}</button>)}</div>
                       <div style={{ color: '#6F6A64', fontSize: 10, lineHeight: 1.5, marginTop: 8 }}>Puedes cambiar la fecha manualmente antes de guardar la consulta.</div>
                     </div>
