@@ -23,11 +23,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: '/favicon.ico', sizes: 'any' },
       { url: '/icons/myaqslim-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icons/myaqslim-512.png', sizes: '512x512', type: 'image/png' },
     ],
+    shortcut: [{ url: '/favicon.ico' }],
     apple: [
-      { url: '/icons/myaqslim-apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 }
