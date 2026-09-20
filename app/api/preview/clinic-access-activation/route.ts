@@ -90,6 +90,14 @@ export async function POST(request: NextRequest) {
           : message === 'FORBIDDEN'
             ? 403
             : 409
+    const code = /^[A-Z0-9_]+$/.test(message) ? message : 'UNEXPECTED_ERROR'
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'clinic_access_activation_blocked',
+      code,
+      status,
+      requestId: request.headers.get('x-vercel-id'),
+    }))
     return NextResponse.json({ ok: false, error: 'activation_blocked' }, { status })
   }
 }

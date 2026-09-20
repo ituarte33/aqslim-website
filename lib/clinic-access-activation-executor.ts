@@ -46,7 +46,16 @@ function isExactEntitlement(record: CanonicalEntitlementRecord, clerkUserId: str
     && record.squareSubscriptionId === null
 }
 
-async function upsertEntitlement({
+function logActivationFailure(stage: string, status?: number) {
+  console.error(JSON.stringify({
+    level: 'error',
+    message: 'clinic_access_activation_failed',
+    stage,
+    ...(status ? { status } : {}),
+  }))
+}
+
+async function createEntitlement({
   patientId,
   clerkUserId,
   fingerprint,
@@ -57,39 +66,38 @@ async function upsertEntitlement({
   fingerprint: string
   now: Date
 }): Promise<string> {
+  const fields = {
+    [PREVIEW_ENTITLEMENT_FIELDS.SUBJECT_ID]: clerkUserId,
+    [PREVIEW_ENTITLEMENT_FIELDS.PATIENT_RECORD_ID]: patientId,
+    [PREVIEW_ENTITLEMENT_FIELDS.TIER]: 'internal_pilot',
+    [PREVIEW_ENTITLEMENT_FIELDS.STATUS]: 'active',
+    [PREVIEW_ENTITLEMENT_FIELDS.SOURCE]: 'internal_pilot',
+    [PREVIEW_ENTITLEMENT_FIELDS.TRIAL_STARTS]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.TRIAL_ENDS]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.PAID_THROUGH]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.LAST_COMPLETED_VISIT]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.GRACE_ENDS]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.ACCESS_EXPIRES]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.SQUARE_SUBSCRIPTION_ID]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.REASON]: `${ACTIVATION_REASON}; fingerprint=${fingerprint}`,
+    [PREVIEW_ENTITLEMENT_FIELDS.LAST_ACCESS_CHANGE]: now.toISOString(),
+    [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE_REASON]: null,
+    [PREVIEW_ENTITLEMENT_FIELDS.RECORD_VERSION]: ENTITLEMENT_RECORD_VERSION,
+    [PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY]: true,
+  }
   const response = await fetch(airtableUrl(), {
     method: 'POST',
     headers: headers(),
     cache: 'no-store',
-    body: JSON.stringify({
-      performUpsert: { fieldsToMergeOn: [PREVIEW_ENTITLEMENT_FIELDS.PATIENT_RECORD_ID] },
-      records: [{
-        fields: {
-          [PREVIEW_ENTITLEMENT_FIELDS.SUBJECT_ID]: clerkUserId,
-          [PREVIEW_ENTITLEMENT_FIELDS.PATIENT_RECORD_ID]: patientId,
-          [PREVIEW_ENTITLEMENT_FIELDS.TIER]: 'internal_pilot',
-          [PREVIEW_ENTITLEMENT_FIELDS.STATUS]: 'active',
-          [PREVIEW_ENTITLEMENT_FIELDS.SOURCE]: 'internal_pilot',
-          [PREVIEW_ENTITLEMENT_FIELDS.TRIAL_STARTS]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.TRIAL_ENDS]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.PAID_THROUGH]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.LAST_COMPLETED_VISIT]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.GRACE_ENDS]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.ACCESS_EXPIRES]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.SQUARE_SUBSCRIPTION_ID]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.REASON]: `${ACTIVATION_REASON}; fingerprint=${fingerprint}`,
-          [PREVIEW_ENTITLEMENT_FIELDS.LAST_ACCESS_CHANGE]: now.toISOString(),
-          [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE_REASON]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.RECORD_VERSION]: ENTITLEMENT_RECORD_VERSION,
-          [PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY]: true,
-        },
-      }],
-    }),
+    body: JSON.stringify({ fields }),
   })
-  if (!response.ok) throw new Error('ENTITLEMENT_WRITE_FAILED')
-  const payload = await response.json() as { records?: Array<{ id?: string }> }
-  const recordId = payload.records?.[0]?.id
+  if (!response.ok) {
+    logActivationFailure('entitlement_create', response.status)
+    throw new Error('ENTITLEMENT_WRITE_FAILED')
+  }
+  const payload = await response.json() as { id?: string }
+  const recordId = payload.id
   if (!recordId) throw new Error('ENTITLEMENT_WRITE_UNVERIFIED')
   return recordId
 }
@@ -208,7 +216,7 @@ export async function executeClinicAccessActivation({
           fingerprint,
           now,
         })
-      : before?.airtableRecordId ?? await upsertEntitlement({
+      : before?.airtableRecordId ?? await createEntitlement({
           patientId,
           clerkUserId,
           fingerprint,
