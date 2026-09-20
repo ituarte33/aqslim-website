@@ -22,9 +22,9 @@ test('My AQSLIM installs with Home as the canonical patient start route', () => 
   assert.deepEqual(
     value.icons?.map(icon => [icon.src, icon.sizes, icon.purpose]),
     [
-      ['/icons/myaqslim-192.png', '192x192', 'any'],
-      ['/icons/myaqslim-512.png', '512x512', 'any'],
-      ['/icons/myaqslim-512.png', '512x512', 'maskable'],
+      ['https://www.aqslim.com/icons/myaqslim-192.png', '192x192', 'any'],
+      ['https://www.aqslim.com/icons/myaqslim-512.png', '512x512', 'any'],
+      ['https://www.aqslim.com/icons/myaqslim-512.png', '512x512', 'maskable'],
     ],
   )
 })
@@ -47,16 +47,17 @@ test('public patient authentication always lands on My AQSLIM Home', async () =>
   }
 })
 
-test('Home Screen metadata and fallback icons consistently use the My AQSLIM mascot', async () => {
-  const [layout, favicon, appleTouchIcon] = await Promise.all([
+test('Home Screen metadata uses publicly fetchable My AQSLIM mascot icons', async () => {
+  const [layout, portalLayout, favicon, appleTouchIcon] = await Promise.all([
     readFile(new URL('../app/layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/my-aqslim/layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../public/favicon.ico', import.meta.url)),
     readFile(new URL('../public/apple-touch-icon.png', import.meta.url)),
   ])
 
-  assert.match(layout, /url: '\/favicon\.ico'/)
-  assert.match(layout, /shortcut: \[\{ url: '\/favicon\.ico' \}\]/)
-  assert.match(layout, /url: '\/apple-touch-icon\.png', sizes: '180x180'/)
+  assert.match(layout, /url: 'https:\/\/www\.aqslim\.com\/icons\/myaqslim-192\.png'/)
+  assert.match(layout, /url: 'https:\/\/www\.aqslim\.com\/icons\/myaqslim-apple-touch-icon\.png'/)
+  assert.match(portalLayout, /title: 'My AQSLIM'/)
   assert.deepEqual([...favicon.subarray(0, 4)], [0, 0, 1, 0])
   assert.deepEqual([...appleTouchIcon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
 })
