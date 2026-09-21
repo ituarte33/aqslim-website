@@ -1,4 +1,5 @@
 import type { CanonicalEntitlementRecord } from './entitlement-record.ts'
+import { pendingPatientSubjectId } from './p4-provisioning-policy.ts'
 
 export const AUTHORIZED_TRIAL_MIGRATION_REASON = 'MYAQ_CLINIC_001_AUTHORIZED_TRIAL_MIGRATION' as const
 
@@ -13,6 +14,19 @@ export function isExactAuthorizedClinicTrial(
     && !record.entitlementReason.includes('P5_FOUNDER_REAL_USER_CANARY')
     && record.paidThrough === null
     && record.squareSubscriptionId === null
+}
+
+export function isAuthorizedClinicTrialStoredSubject({
+  storedSubjectId,
+  clerkUserId,
+  patientId,
+}: {
+  storedSubjectId: string
+  clerkUserId: string
+  patientId: string
+}): boolean {
+  return storedSubjectId === clerkUserId
+    || storedSubjectId === pendingPatientSubjectId(patientId)
 }
 
 function auditValue(value: string | null): string {

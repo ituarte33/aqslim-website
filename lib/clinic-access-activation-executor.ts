@@ -19,6 +19,7 @@ import {
 } from './clinic-p5-migration'
 import {
   authorizedTrialMigrationAuditReason,
+  isAuthorizedClinicTrialStoredSubject,
   isExactAuthorizedClinicTrial,
 } from './clinic-trial-migration'
 import {
@@ -108,12 +109,14 @@ async function createEntitlement({
 
 async function migrateTrialEntitlement({
   recordId,
+  clerkUserId,
   before,
   fingerprint,
   now,
   reason,
 }: {
   recordId: string
+  clerkUserId: string
   before: CanonicalEntitlementRecord
   fingerprint: string
   now: Date
@@ -127,6 +130,7 @@ async function migrateTrialEntitlement({
       records: [{
         id: recordId,
         fields: {
+          [PREVIEW_ENTITLEMENT_FIELDS.SUBJECT_ID]: clerkUserId,
           [PREVIEW_ENTITLEMENT_FIELDS.TIER]: 'internal_pilot',
           [PREVIEW_ENTITLEMENT_FIELDS.STATUS]: 'active',
           [PREVIEW_ENTITLEMENT_FIELDS.SOURCE]: 'internal_pilot',
@@ -201,7 +205,11 @@ export async function executeClinicAccessActivation({
     }
   } else if (migratingClinicTrial) {
     if (!before
-      || before.storedSubjectId !== clerkUserId
+      || !isAuthorizedClinicTrialStoredSubject({
+        storedSubjectId: before.storedSubjectId,
+        clerkUserId,
+        patientId,
+      })
       || !isExactAuthorizedClinicTrial(before.record, clerkUserId)) {
       throw new Error('CLINIC_TRIAL_MIGRATION_CONFLICT')
     }
@@ -226,6 +234,7 @@ export async function executeClinicAccessActivation({
     entitlementRecordId = migrating
       ? await migrateTrialEntitlement({
           recordId: before!.airtableRecordId,
+          clerkUserId,
           before: before!.record,
           fingerprint,
           now,

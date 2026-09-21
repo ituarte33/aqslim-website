@@ -4,6 +4,7 @@ import { createCanonicalEntitlementRecord } from '../lib/entitlement-record.ts'
 import {
   AUTHORIZED_TRIAL_MIGRATION_REASON,
   authorizedTrialMigrationAuditReason,
+  isAuthorizedClinicTrialStoredSubject,
   isExactAuthorizedClinicTrial,
 } from '../lib/clinic-trial-migration.ts'
 
@@ -27,6 +28,31 @@ test('recognizes only an exact unpaid non-P5 clinic trial for the same account',
   assert.equal(isExactAuthorizedClinicTrial({ ...ordinaryTrial, source: 'clinic_ai_paid' }, userId), false)
   assert.equal(isExactAuthorizedClinicTrial({ ...ordinaryTrial, entitlementReason: 'P5_FOUNDER_REAL_USER_CANARY' }, userId), false)
   assert.equal(isExactAuthorizedClinicTrial({ ...ordinaryTrial, paidThrough: '2026-10-01' }, userId), false)
+})
+
+test('accepts only the real account or the exact pending subject for the same patient', () => {
+  const patientId = 'recABCDEFGHIJKLMN'
+
+  assert.equal(isAuthorizedClinicTrialStoredSubject({
+    storedSubjectId: userId,
+    clerkUserId: userId,
+    patientId,
+  }), true)
+  assert.equal(isAuthorizedClinicTrialStoredSubject({
+    storedSubjectId: `patient:${patientId}`,
+    clerkUserId: userId,
+    patientId,
+  }), true)
+  assert.equal(isAuthorizedClinicTrialStoredSubject({
+    storedSubjectId: 'patient:recOTHERPATIENT12',
+    clerkUserId: userId,
+    patientId,
+  }), false)
+  assert.equal(isAuthorizedClinicTrialStoredSubject({
+    storedSubjectId: 'user_other',
+    clerkUserId: userId,
+    patientId,
+  }), false)
 })
 
 test('preserves the original trial evidence in the migration audit reason', () => {

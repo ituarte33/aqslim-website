@@ -118,5 +118,7 @@ test('activation route validates on the server but execution remains feature-gat
   assert.match(executor, /POST_WRITE_VERIFICATION_FAILED/)
   assert.match(executor, /users\.updateUserMetadata/)
   assert.match(executor, /getPreviewEntitlementSourceRecordByPatientRecordId/)
+  assert.match(executor, /isAuthorizedClinicTrialStoredSubject/)
+  assert.match(executor, /\[PREVIEW_ENTITLEMENT_FIELDS\.SUBJECT_ID\]: clerkUserId/)
   assert.match(vercel, /"MYAQ_CLINIC_ACCESS_EXECUTION"\s*:\s*"enabled"/)
 })
