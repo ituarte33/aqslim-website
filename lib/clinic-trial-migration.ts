@@ -2,6 +2,11 @@ import type { CanonicalEntitlementRecord } from './entitlement-record.ts'
 import { pendingPatientSubjectId } from './p4-provisioning-policy.ts'
 
 export const AUTHORIZED_TRIAL_MIGRATION_REASON = 'MYAQ_CLINIC_001_AUTHORIZED_TRIAL_MIGRATION' as const
+export const AUTHORIZED_CLINIC_TRIAL_CANARY = {
+  patientId: 'recVF3zCGu95AhKnU',
+  entitlementRecordId: 'recunW4Za6YVgIgVW',
+  subjectId: 'canary_clinic_ai_romtest_v1',
+} as const
 
 export function isExactAuthorizedClinicTrial(
   record: CanonicalEntitlementRecord,
@@ -20,13 +25,18 @@ export function isAuthorizedClinicTrialStoredSubject({
   storedSubjectId,
   clerkUserId,
   patientId,
+  entitlementRecordId,
 }: {
   storedSubjectId: string
   clerkUserId: string
   patientId: string
+  entitlementRecordId: string
 }): boolean {
   return storedSubjectId === clerkUserId
     || storedSubjectId === pendingPatientSubjectId(patientId)
+    || (patientId === AUTHORIZED_CLINIC_TRIAL_CANARY.patientId
+      && entitlementRecordId === AUTHORIZED_CLINIC_TRIAL_CANARY.entitlementRecordId
+      && storedSubjectId === AUTHORIZED_CLINIC_TRIAL_CANARY.subjectId)
 }
 
 function auditValue(value: string | null): string {
@@ -36,10 +46,12 @@ function auditValue(value: string | null): string {
 export function authorizedTrialMigrationAuditReason(
   record: CanonicalEntitlementRecord,
   fingerprint: string,
+  originalStoredSubjectId: string,
 ): string {
   return [
     AUTHORIZED_TRIAL_MIGRATION_REASON,
     `fingerprint=${fingerprint}`,
+    `original_subject=${auditValue(originalStoredSubjectId)}`,
     `original_tier=${record.tier}`,
     `original_status=${record.status}`,
     `original_source=${record.source}`,

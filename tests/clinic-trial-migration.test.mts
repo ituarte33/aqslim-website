@@ -3,6 +3,7 @@ import test from 'node:test'
 import { createCanonicalEntitlementRecord } from '../lib/entitlement-record.ts'
 import {
   AUTHORIZED_TRIAL_MIGRATION_REASON,
+  AUTHORIZED_CLINIC_TRIAL_CANARY,
   authorizedTrialMigrationAuditReason,
   isAuthorizedClinicTrialStoredSubject,
   isExactAuthorizedClinicTrial,
@@ -37,29 +38,46 @@ test('accepts only the real account or the exact pending subject for the same pa
     storedSubjectId: userId,
     clerkUserId: userId,
     patientId,
+    entitlementRecordId: 'recENTITLEMENT0001',
   }), true)
   assert.equal(isAuthorizedClinicTrialStoredSubject({
     storedSubjectId: `patient:${patientId}`,
     clerkUserId: userId,
     patientId,
+    entitlementRecordId: 'recENTITLEMENT0001',
   }), true)
   assert.equal(isAuthorizedClinicTrialStoredSubject({
     storedSubjectId: 'patient:recOTHERPATIENT12',
     clerkUserId: userId,
     patientId,
+    entitlementRecordId: 'recENTITLEMENT0001',
   }), false)
   assert.equal(isAuthorizedClinicTrialStoredSubject({
     storedSubjectId: 'user_other',
     clerkUserId: userId,
     patientId,
+    entitlementRecordId: 'recENTITLEMENT0001',
+  }), false)
+  assert.equal(isAuthorizedClinicTrialStoredSubject({
+    storedSubjectId: AUTHORIZED_CLINIC_TRIAL_CANARY.subjectId,
+    clerkUserId: userId,
+    patientId: AUTHORIZED_CLINIC_TRIAL_CANARY.patientId,
+    entitlementRecordId: AUTHORIZED_CLINIC_TRIAL_CANARY.entitlementRecordId,
+  }), true)
+  assert.equal(isAuthorizedClinicTrialStoredSubject({
+    storedSubjectId: AUTHORIZED_CLINIC_TRIAL_CANARY.subjectId,
+    clerkUserId: userId,
+    patientId: AUTHORIZED_CLINIC_TRIAL_CANARY.patientId,
+    entitlementRecordId: 'recWRONGRECORD0001',
   }), false)
 })
 
 test('preserves the original trial evidence in the migration audit reason', () => {
-  const reason = authorizedTrialMigrationAuditReason(ordinaryTrial, 'armando123456789')
+  const reason = authorizedTrialMigrationAuditReason(ordinaryTrial, 'armando123456789', 'canary_subject')
 
   assert.match(reason, new RegExp(`^${AUTHORIZED_TRIAL_MIGRATION_REASON}`))
   assert.match(reason, /fingerprint=armando123456789/)
+  assert.match(reason, /original_subject=canary_subject/)
   assert.match(reason, /original_tier=clinic_ai/)
   assert.match(reason, /original_status=trial/)
   assert.match(reason, /original_source=clinic_ai_trial/)

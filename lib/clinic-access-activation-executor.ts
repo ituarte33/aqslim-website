@@ -209,6 +209,7 @@ export async function executeClinicAccessActivation({
         storedSubjectId: before.storedSubjectId,
         clerkUserId,
         patientId,
+        entitlementRecordId: before.airtableRecordId,
       })
       || !isExactAuthorizedClinicTrial(before.record, clerkUserId)) {
       throw new Error('CLINIC_TRIAL_MIGRATION_CONFLICT')
@@ -240,7 +241,11 @@ export async function executeClinicAccessActivation({
           now,
           reason: migratingP5
             ? p5MigrationAuditReason(before!.record, fingerprint)
-            : authorizedTrialMigrationAuditReason(before!.record, fingerprint),
+            : authorizedTrialMigrationAuditReason(
+                before!.record,
+                fingerprint,
+                before!.storedSubjectId,
+              ),
         })
       : before?.airtableRecordId ?? await createEntitlement({
           patientId,
