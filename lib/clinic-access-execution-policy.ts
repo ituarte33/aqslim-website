@@ -12,7 +12,7 @@ export const CLINIC_ACCESS_ACKNOWLEDGEMENTS = [
 ] as const
 
 export type ClinicAccessAcknowledgementKey = typeof CLINIC_ACCESS_ACKNOWLEDGEMENTS[number]
-export type ClinicAccessExecutionOperation = 'activate_internal_pilot' | 'migrate_p5_canary'
+export type ClinicAccessExecutionOperation = 'activate_internal_pilot' | 'migrate_p5_canary' | 'migrate_clinic_trial'
 
 const AIRTABLE_RECORD_ID = /^rec[A-Za-z0-9]{14}$/
 

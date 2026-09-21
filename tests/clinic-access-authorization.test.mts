@@ -12,6 +12,7 @@ const recommended = {
   scope: 'preview_only' as const,
   billing: 'none' as const,
   lifecycle: 'pilot_only' as const,
+  migrationKind: null,
   migrationFrom: null,
   reason: 'authorized',
   notice: 'read-only',
@@ -57,6 +58,7 @@ test('creates a distinct stable fingerprint for an exact P5 canary migration', (
   const migration = {
     ...recommended,
     state: 'migration_recommended' as const,
+    migrationKind: 'p5_founder_canary' as const,
     migrationFrom: {
       tier: 'clinic_ai',
       status: 'trial',

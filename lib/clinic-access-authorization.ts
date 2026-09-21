@@ -38,10 +38,11 @@ export function getClinicAccessAuthorizationGate({
     && entitlementDecision.lifecycle === 'pilot_only'
 
   const isMigration = entitlementDecision.state === 'migration_recommended'
+  const isP5Migration = entitlementDecision.migrationKind === 'p5_founder_canary'
   const acknowledgements: ClinicAccessAuthorizationAcknowledgement[] = [
     { key: 'patient_identity', label: `Confirmo el expediente y el email ${email || 'no verificable'}.` },
-    { key: 'preview_scope', label: isMigration ? 'Confirmo migrar el canary P5 a internal_pilot activo exclusivamente en Preview.' : 'Confirmo internal_pilot activo exclusivamente en Preview.' },
-    { key: 'no_external_effects', label: isMigration ? 'Confirmo conservar la evidencia histórica P5 y no generar cobros, invitaciones ni efectos en Producción.' : 'Confirmo que esta activación no debe enviar invitaciones, generar cobros ni afectar Producción.' },
+    { key: 'preview_scope', label: isMigration ? 'Confirmo migrar el entitlement Preview existente a internal_pilot activo exclusivamente en Preview.' : 'Confirmo internal_pilot activo exclusivamente en Preview.' },
+    { key: 'no_external_effects', label: isP5Migration ? 'Confirmo conservar la evidencia histórica P5 y no generar cobros, invitaciones ni efectos en Producción.' : isMigration ? 'Confirmo conservar la auditoría del trial anterior y no generar cobros, invitaciones ni efectos en Producción.' : 'Confirmo que esta activación no debe enviar invitaciones, generar cobros ni afectar Producción.' },
   ]
 
   if (activation.state === 'no_action') {
@@ -72,7 +73,11 @@ export function getClinicAccessAuthorizationGate({
     .update([
       patientId,
       email,
-      isMigration ? 'migrate_p5_canary' : 'activate_internal_pilot',
+      entitlementDecision.migrationKind === 'p5_founder_canary'
+        ? 'migrate_p5_canary'
+        : entitlementDecision.migrationKind === 'authorized_clinic_trial'
+          ? 'migrate_clinic_trial'
+          : 'activate_internal_pilot',
       entitlementDecision.migrationFrom?.tier ?? 'none',
       entitlementDecision.migrationFrom?.status ?? 'none',
       entitlementDecision.migrationFrom?.source ?? 'none',

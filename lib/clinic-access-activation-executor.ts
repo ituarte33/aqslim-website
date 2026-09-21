@@ -18,6 +18,10 @@ import {
   p5MigrationAuditReason,
 } from './clinic-p5-migration'
 import {
+  authorizedTrialMigrationAuditReason,
+  isExactAuthorizedClinicTrial,
+} from './clinic-trial-migration'
+import {
   PREVIEW_ENTITLEMENTS_TABLE,
   PREVIEW_ENTITLEMENT_FIELDS,
   getPreviewEntitlementSourceRecordByPatientRecordId,
@@ -102,16 +106,18 @@ async function createEntitlement({
   return recordId
 }
 
-async function migrateP5Entitlement({
+async function migrateTrialEntitlement({
   recordId,
   before,
   fingerprint,
   now,
+  reason,
 }: {
   recordId: string
   before: CanonicalEntitlementRecord
   fingerprint: string
   now: Date
+  reason: string
 }): Promise<string> {
   const response = await fetch(airtableUrl(), {
     method: 'PATCH',
@@ -129,7 +135,7 @@ async function migrateP5Entitlement({
           [PREVIEW_ENTITLEMENT_FIELDS.PAID_THROUGH]: null,
           [PREVIEW_ENTITLEMENT_FIELDS.ACCESS_EXPIRES]: null,
           [PREVIEW_ENTITLEMENT_FIELDS.SQUARE_SUBSCRIPTION_ID]: null,
-          [PREVIEW_ENTITLEMENT_FIELDS.REASON]: p5MigrationAuditReason(before, fingerprint),
+          [PREVIEW_ENTITLEMENT_FIELDS.REASON]: reason,
           [PREVIEW_ENTITLEMENT_FIELDS.LAST_ACCESS_CHANGE]: now.toISOString(),
           [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE]: null,
           [PREVIEW_ENTITLEMENT_FIELDS.OVERRIDE_REASON]: null,
@@ -181,15 +187,23 @@ export async function executeClinicAccessActivation({
     patientRecordId: patientId,
     canonicalSubjectId: clerkUserId,
   })
-  const migrating = operation === 'migrate_p5_canary'
+  const migratingP5 = operation === 'migrate_p5_canary'
+  const migratingClinicTrial = operation === 'migrate_clinic_trial'
+  const migrating = migratingP5 || migratingClinicTrial
   const pilotRole = clinicAccessPilotRoleForOperation(operation)
-  if (migrating) {
+  if (migratingP5) {
     if (patientId !== P5_FOUNDER_PATIENT_RECORD_ID
       || !before
       || before.airtableRecordId !== P5_FOUNDER_ENTITLEMENT_RECORD_ID
       || before.storedSubjectId !== clerkUserId
       || !isExactP5FounderCanary(before.record, clerkUserId)) {
       throw new Error('P5_MIGRATION_CONFLICT')
+    }
+  } else if (migratingClinicTrial) {
+    if (!before
+      || before.storedSubjectId !== clerkUserId
+      || !isExactAuthorizedClinicTrial(before.record, clerkUserId)) {
+      throw new Error('CLINIC_TRIAL_MIGRATION_CONFLICT')
     }
   } else if (before && (!isExactEntitlement(before.record, clerkUserId) || before.storedSubjectId !== clerkUserId)) {
     throw new Error('ENTITLEMENT_CONFLICT')
@@ -210,11 +224,14 @@ export async function executeClinicAccessActivation({
   let entitlementRecordId: string
   try {
     entitlementRecordId = migrating
-      ? await migrateP5Entitlement({
+      ? await migrateTrialEntitlement({
           recordId: before!.airtableRecordId,
           before: before!.record,
           fingerprint,
           now,
+          reason: migratingP5
+            ? p5MigrationAuditReason(before!.record, fingerprint)
+            : authorizedTrialMigrationAuditReason(before!.record, fingerprint),
         })
       : before?.airtableRecordId ?? await createEntitlement({
           patientId,

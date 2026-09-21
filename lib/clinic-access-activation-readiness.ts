@@ -95,9 +95,13 @@ export function getClinicAccessActivationReadiness({
   const entitlementStep: ClinicAccessActivationStep = entitlementDecision.state === 'migration_recommended'
     ? {
         key: 'preview_entitlement',
-        label: 'Migrar canary P5 conservando auditoría',
+        label: entitlementDecision.migrationKind === 'p5_founder_canary'
+          ? 'Migrar canary P5 conservando auditoría'
+          : 'Migrar trial Clinic AI conservando auditoría',
         state: 'proposed',
-        detail: 'Propuesto: reemplazar el estado operativo clinic_ai/trial por internal_pilot/active, preservando en la razón de auditoría el origen P5 y sus fechas originales.',
+        detail: entitlementDecision.migrationKind === 'p5_founder_canary'
+          ? 'Propuesto: reemplazar el estado operativo clinic_ai/trial por internal_pilot/active, preservando en la razón de auditoría el origen P5 y sus fechas originales.'
+          : 'Propuesto: reemplazar el trial Clinic AI Preview por internal_pilot/active, preservando en la razón de auditoría el origen, las fechas y el motivo anteriores.',
       }
     : entitlementDecision.state === 'existing'
     ? {

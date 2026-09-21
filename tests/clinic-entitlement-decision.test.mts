@@ -24,6 +24,7 @@ test('recommends internal_pilot active only for an authorized Preview candidate'
   })
 
   assert.equal(result.state, 'recommended')
+  assert.equal(result.migrationKind, null)
   assert.equal(result.tier, 'internal_pilot')
   assert.equal(result.status, 'active')
   assert.equal(result.source, 'internal_pilot')
@@ -76,6 +77,7 @@ test('recommends a controlled migration only for the exact linked Founder P5 can
   })
 
   assert.equal(result.state, 'migration_recommended')
+  assert.equal(result.migrationKind, 'p5_founder_canary')
   assert.equal(result.tier, 'internal_pilot')
   assert.equal(result.status, 'active')
   assert.equal(result.migrationFrom?.tier, 'clinic_ai')
@@ -83,7 +85,7 @@ test('recommends a controlled migration only for the exact linked Founder P5 can
   assert.match(result.notice, /no fueron modificados/)
 })
 
-test('does not migrate a generic clinic_ai trial without the exact P5 audit marker', () => {
+test('recommends migration for an authorized generic clinic_ai trial', () => {
   const result = scenario({
     accounts: [{ boundPatientId: patientId, hasPilotAccess: true, isCurrentSession: true, hasExplicitPilotMetadata: true, legacyPilotPolicyApplies: false }],
     entitlement: {
@@ -96,7 +98,28 @@ test('does not migrate a generic clinic_ai trial without the exact P5 audit mark
     },
   })
 
+  assert.equal(result.state, 'migration_recommended')
+  assert.equal(result.migrationKind, 'authorized_clinic_trial')
+  assert.equal(result.tier, 'internal_pilot')
+  assert.equal(result.status, 'active')
+})
+
+test('protects a generic clinic_ai trial when pilot authorization is absent', () => {
+  const result = scenario({
+    authorized: false,
+    accounts: [{ boundPatientId: patientId, hasPilotAccess: false, isCurrentSession: false, hasExplicitPilotMetadata: false, legacyPilotPolicyApplies: false }],
+    entitlement: {
+      present: true,
+      binding: 'linked',
+      tier: 'clinic_ai',
+      status: 'trial',
+      source: 'clinic_ai_trial',
+      reason: 'ordinary clinic trial',
+    },
+  })
+
   assert.equal(result.state, 'existing')
+  assert.equal(result.migrationKind, null)
 })
 
 test('the Clinic readiness route has no entitlement, Clerk, or account mutation wiring', async () => {

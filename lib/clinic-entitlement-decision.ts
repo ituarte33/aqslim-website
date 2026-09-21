@@ -3,6 +3,7 @@ import type { ClinicAccessReconciliation } from './clinic-access-reconciliation'
 
 export type ClinicEntitlementDecision = {
   state: 'recommended' | 'migration_recommended' | 'existing' | 'blocked'
+  migrationKind: 'p5_founder_canary' | 'authorized_clinic_trial' | null
   stateLabel: string
   tier: string | null
   status: string | null
@@ -43,10 +44,17 @@ export function getClinicEntitlementDecision({
     && existing.status === 'trial'
     && existing.source === 'clinic_ai_trial'
     && existing.reason?.includes('P5_FOUNDER_REAL_USER_CANARY') === true
+  const authorizedClinicTrial = existing.present
+    && existing.tier === 'clinic_ai'
+    && existing.status === 'trial'
+    && existing.source === 'clinic_ai_trial'
+    && existing.reason?.includes('P5_FOUNDER_REAL_USER_CANARY') !== true
+    && eligible
 
   if (p5FounderCanary && eligible) {
     return {
       state: 'migration_recommended',
+      migrationKind: 'p5_founder_canary',
       stateLabel: 'Migración controlada del canary P5 recomendada',
       tier: 'internal_pilot',
       status: 'active',
@@ -68,9 +76,35 @@ export function getClinicEntitlementDecision({
     }
   }
 
+  if (authorizedClinicTrial) {
+    return {
+      state: 'migration_recommended',
+      migrationKind: 'authorized_clinic_trial',
+      stateLabel: 'Migración controlada del trial Clinic AI recomendada',
+      tier: 'internal_pilot',
+      status: 'active',
+      source: 'internal_pilot',
+      scope: 'preview_only',
+      billing: 'none',
+      lifecycle: 'pilot_only',
+      migrationFrom: {
+        tier: existing.tier as string,
+        status: existing.status as string,
+        source: existing.source as string,
+        trialStarts: existing.trialStarts ?? null,
+        trialEnds: existing.trialEnds ?? null,
+        lastAccessChange: existing.lastAccessChange ?? 'unknown',
+        reason: existing.reason ?? 'ordinary clinic_ai trial',
+      },
+      reason: 'El expediente pertenece a la cohorte privada autorizada y tiene un trial Clinic AI Preview sin cobro. Se propone migrarlo a internal_pilot activo conservando los valores anteriores en la auditoría.',
+      notice: 'Propuesta solamente; el entitlement existente y la cuenta no fueron modificados.',
+    }
+  }
+
   if (readiness.entitlement.present) {
     return {
       state: 'existing',
+      migrationKind: null,
       stateLabel: 'Conservar entitlement Preview existente',
       tier: readiness.entitlement.tier,
       status: readiness.entitlement.status,
@@ -87,6 +121,7 @@ export function getClinicEntitlementDecision({
   if (!eligible) {
     return {
       state: 'blocked',
+      migrationKind: null,
       stateLabel: 'Entitlement no determinable con seguridad',
       tier: null,
       status: null,
@@ -102,6 +137,7 @@ export function getClinicEntitlementDecision({
 
   return {
     state: 'recommended',
+    migrationKind: null,
     stateLabel: 'Entitlement Preview recomendado',
     tier: 'internal_pilot',
     status: 'active',

@@ -76,7 +76,11 @@ export async function POST(request: NextRequest) {
       patientId,
       clerkUserId: snapshot.accountUserId,
       fingerprint: snapshot.readiness.authorization.operationFingerprint as string,
-      operation: migrationExecutionAuthorized ? 'migrate_p5_canary' : 'activate_internal_pilot',
+      operation: snapshot.readiness.entitlementDecision.migrationKind === 'p5_founder_canary'
+        ? 'migrate_p5_canary'
+        : snapshot.readiness.entitlementDecision.migrationKind === 'authorized_clinic_trial'
+          ? 'migrate_clinic_trial'
+          : 'activate_internal_pilot',
     })
     return NextResponse.json({ ok: true, result })
   } catch (error) {

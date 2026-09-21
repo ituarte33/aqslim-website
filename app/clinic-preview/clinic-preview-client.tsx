@@ -100,6 +100,7 @@ type ClinicAccessReadiness = {
   }
   entitlementDecision: {
     state: 'recommended' | 'migration_recommended' | 'existing' | 'blocked'
+    migrationKind: 'p5_founder_canary' | 'authorized_clinic_trial' | null
     stateLabel: string
     tier: string | null
     status: string | null
@@ -425,7 +426,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
       setActivationComplete(true)
       setAuthorizationExecutionEnabled(false)
       setAuthorizationMessage(data.result.state === 'migrated'
-        ? '✓ Migración P5 completada y verificada. Auditoría histórica preservada; acceso internal_pilot activo sólo en Preview.'
+        ? '✓ Migración completada y verificada. Auditoría histórica preservada; acceso internal_pilot activo sólo en Preview.'
         : '✓ Activación Preview completada y verificada por el servidor.')
     } catch {
       setAuthorizationMessage('No se completó la activación. El servidor la bloqueó o requiere revisión; no vuelvas a intentarlo hasta verificar el estado.')
@@ -1008,7 +1009,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                         {accessReadiness.entitlementDecision.state === 'migration_recommended' && accessReadiness.entitlementDecision.migrationFrom ? <div style={{ marginTop: 10, display: 'grid', gap: 7, padding: 11, border: '1px solid rgba(201,168,76,.22)', borderRadius: 8, background: 'rgba(201,168,76,.04)', color: '#9A9590', fontSize: 11 }}>
                           <div><span style={{ color: '#D9D5CF' }}>Antes:</span> {accessReadiness.entitlementDecision.migrationFrom.tier} / {accessReadiness.entitlementDecision.migrationFrom.status} / {accessReadiness.entitlementDecision.migrationFrom.source}</div>
                           <div><span style={{ color: '#D9D5CF' }}>Después:</span> internal_pilot / active / internal_pilot</div>
-                          <div><span style={{ color: '#D9D5CF' }}>Evidencia:</span> origen P5, razón y fechas originales preservadas en auditoría.</div>
+                          <div><span style={{ color: '#D9D5CF' }}>Evidencia:</span> {accessReadiness.entitlementDecision.migrationKind === 'p5_founder_canary' ? 'origen P5, razón y fechas originales' : 'origen, razón y fechas originales del trial'} preservadas en auditoría.</div>
                         </div> : null}
                         <div style={{ marginTop: 10, padding: 11, border: `1px solid ${accessReadiness.entitlementDecision.state === 'blocked' ? 'rgba(226,142,142,.22)' : 'rgba(201,168,76,.20)'}`, borderRadius: 8, color: accessReadiness.entitlementDecision.state === 'blocked' ? '#E0A0A0' : '#E2C87A', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.reason}</div>
                         <div style={{ marginTop: 8, color: '#9ED4A8', fontSize: 11, lineHeight: 1.5 }}>{accessReadiness.entitlementDecision.notice}</div>

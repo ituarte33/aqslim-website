@@ -54,6 +54,7 @@ test('pilot allowlist accepts only exact stable Airtable record IDs', () => {
 
 test('activation assigns founder only to the protected P5 migration', () => {
   assert.equal(clinicAccessPilotRoleForOperation('migrate_p5_canary'), 'founder')
+  assert.equal(clinicAccessPilotRoleForOperation('migrate_clinic_trial'), 'participant')
   assert.equal(clinicAccessPilotRoleForOperation('activate_internal_pilot'), 'participant')
 })
 
