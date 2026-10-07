@@ -21,13 +21,13 @@ export function buildClinicAccessInvitationDraft({
     return {
       language: 'en',
       subject: 'Your My AQSLIM access',
-      body: `Hello ${name},\n\nWe are preparing your access to My AQSLIM, where you will be able to review your AQSLIM plan and available support tools.\n\nWe will send you the activation instructions once your access is ready.\n\nStrong, Healthy and Happy.\nAQSLIM`,
+      body: `Hello ${name},\n\nWe are preparing your access to My AQSLIM, where you will be able to review your AQSLIM plan and available support tools.\n\nAs soon as you receive this message, please reply with your current weight and tell us whether it is in pounds or kilograms. We will update it in your AQSLIM Clinic record.\n\nWe will send you the activation instructions once your access is ready.\n\nStrong, Healthy and Happy.\nAQSLIM`,
     }
   }
 
   return {
     language: 'es',
     subject: 'Tu acceso a My AQSLIM',
-    body: `Hola ${name},\n\nEstamos preparando tu acceso a My AQSLIM, donde podrás consultar tu plan AQSLIM y las herramientas de apoyo disponibles.\n\nTe enviaremos las instrucciones de activación cuando tu acceso esté listo.\n\nFuerte, Sano y Feliz.\nAQSLIM`,
+    body: `Hola ${name},\n\nEstamos preparando tu acceso a My AQSLIM, donde podrás consultar tu plan AQSLIM y las herramientas de apoyo disponibles.\n\nEn cuanto recibas este mensaje, por favor respóndenos con tu peso actual e indícanos si está en libras o kilogramos. Lo actualizaremos en tu expediente de AQSLIM Clinic.\n\nTe enviaremos las instrucciones de activación cuando tu acceso esté listo.\n\nFuerte, Sano y Feliz.\nAQSLIM`,
   }
 }

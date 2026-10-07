@@ -605,7 +605,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     })
     setAccessInvitationSubject(draft.subject)
     setAccessInvitationBody(draft.body)
-    setAccessInvitationMessage('Borrador preparado localmente. Revísalo antes de guardarlo.')
+    setAccessInvitationMessage('Borrador preparado localmente con la solicitud de peso actual. Revísalo antes de guardarlo.')
   }
 
   async function saveAccessInvitationDraft() {

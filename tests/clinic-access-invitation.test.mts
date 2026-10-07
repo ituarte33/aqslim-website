@@ -8,6 +8,9 @@ test('builds the patient access invitation in Spanish by default', () => {
   assert.equal(draft.language, 'es')
   assert.match(draft.subject, /My AQSLIM/)
   assert.match(draft.body, /Hola Paciente Prueba/)
+  assert.match(draft.body, /peso actual/)
+  assert.match(draft.body, /libras o kilogramos/)
+  assert.match(draft.body, /expediente de AQSLIM Clinic/)
   assert.match(draft.body, /instrucciones de activación/)
 })
 
@@ -15,6 +18,9 @@ test('builds the patient access invitation in English when preferred', () => {
   const draft = buildClinicAccessInvitationDraft({ patientName: 'Test Patient', preferredLanguage: 'English' })
   assert.equal(draft.language, 'en')
   assert.match(draft.body, /Hello Test Patient/)
+  assert.match(draft.body, /current weight/)
+  assert.match(draft.body, /pounds or kilograms/)
+  assert.match(draft.body, /AQSLIM Clinic record/)
   assert.match(draft.body, /activation instructions/)
 })
 
