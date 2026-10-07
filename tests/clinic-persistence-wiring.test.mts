@@ -24,3 +24,13 @@ test('Clinic date inputs expose stable labels and capture input events', async (
   assert.match(plan, /aria-label="Inicio tratamiento"[^>]+onInput=/)
   assert.match(plan, /plansMatch\(intendedDraft/)
 })
+
+test('Clinic weight replies are validated and verified without becoming visits', async () => {
+  const route = await readFile(new URL('../app/api/preview/clinic-consultations/route.ts', import.meta.url), 'utf8')
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  assert.match(route, /normalizeClinicWeightEntry\(body\.weight, body\.weightUnit\)/)
+  assert.match(route, /returnFieldsByFieldId=true/)
+  assert.match(route, /CLINIC_WEIGHT_UPDATE_TYPE/)
+  assert.match(preview, /Registrar peso recibido/)
+  assert.match(preview, /clinicWeightEntryMatches\(item, intended\)/)
+})

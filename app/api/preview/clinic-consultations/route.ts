@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
+import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { CLINIC_WEIGHT_UPDATE_TYPE, normalizeClinicWeightEntry } from '@/lib/clinic-weight-entry'
 
 const TABLE_ID = 'tbl0cTWsYqv4R5n3u'
 
@@ -128,18 +130,30 @@ export async function POST(request: NextRequest) {
     const patient = await getClienteById(patientId)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
 
+    const weightUpdateMode = body.mode === 'weightUpdate'
     const allowedTypes = ['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio', 'Seguimiento']
     const allowedPhases = ['Jing', 'Qi', 'Xue', 'Yang Sheng', 'Sin fase']
     const allowedUnits = ['lb', 'kg']
     const allowedPayments = ['Efectivo', 'Card', 'Venmo', 'Zelle', 'Transferencia', 'Sin especificar']
 
-    const consultationType = allowedTypes.includes(body.consultationType) ? body.consultationType : 'Cliente subsecuente'
+    const consultationType = weightUpdateMode
+      ? CLINIC_WEIGHT_UPDATE_TYPE
+      : allowedTypes.includes(body.consultationType) ? body.consultationType : 'Cliente subsecuente'
     const phase = allowedPhases.includes(body.phase) ? body.phase : 'Sin fase'
     const weightUnit = allowedUnits.includes(body.weightUnit) ? body.weightUnit : 'lb'
     const paymentMethod = allowedPayments.includes(body.paymentMethod) ? body.paymentMethod : 'Sin especificar'
 
-    const consultationDate = safeText(body.consultationDate, 20)
-    const weight = safeNumber(body.weight)
+    const consultationDate = weightUpdateMode
+      ? normalizeClinicIsoDate(body.consultationDate)
+      : safeText(body.consultationDate, 20)
+    if (weightUpdateMode && !consultationDate) {
+      return NextResponse.json({ ok: false, error: 'invalid_date' }, { status: 400 })
+    }
+    const normalizedWeight = weightUpdateMode ? normalizeClinicWeightEntry(body.weight, body.weightUnit) : null
+    if (normalizedWeight && !normalizedWeight.ok) {
+      return NextResponse.json({ ok: false, error: normalizedWeight.error }, { status: 400 })
+    }
+    const weight = normalizedWeight?.ok ? normalizedWeight.weight : safeNumber(body.weight)
     const bodyFat = safeNumber(body.bodyFat)
     const waistCm = safeNumber(body.waistCm)
     const hipsCm = safeNumber(body.hipsCm)
@@ -147,10 +161,12 @@ export async function POST(request: NextRequest) {
     const thighsCm = safeNumber(body.thighsCm)
     const chestCm = safeNumber(body.chestCm)
     const phaseWeek = safeNumber(body.phaseWeek)
-    const recommendations = safeText(body.recommendations, 5000)
+    const recommendations = weightUpdateMode
+      ? 'Peso informado por el paciente y registrado manualmente en Clinic Preview.'
+      : safeText(body.recommendations, 5000)
     const nextAppointment = safeText(body.nextAppointment, 40)
-    const consultationFee = safeNumber(body.consultationFee)
-    const amountCollected = safeNumber(body.amountCollected)
+    const consultationFee = weightUpdateMode ? null : safeNumber(body.consultationFee)
+    const amountCollected = weightUpdateMode ? null : safeNumber(body.amountCollected)
 
     const now = new Date().toISOString()
     const fields: Record<string, unknown> = {
@@ -160,7 +176,7 @@ export async function POST(request: NextRequest) {
       [F.PATIENT_NAME]: String(patient.fields['Nombre Completo'] ?? 'Paciente'),
       [F.CONSULTATION_AT]: now,
       [F.TYPE]: consultationType,
-      [F.WEIGHT_UNIT]: weightUnit,
+      [F.WEIGHT_UNIT]: normalizedWeight?.ok ? normalizedWeight.unit : weightUnit,
       [F.PHASE]: phase,
       [F.PAYMENT_METHOD]: paymentMethod,
       [F.AUTHOR_EMAIL]: actor.email,
@@ -182,12 +198,24 @@ export async function POST(request: NextRequest) {
     if (consultationFee !== null) fields[F.CONSULTATION_FEE] = consultationFee
     if (amountCollected !== null) fields[F.AMOUNT_COLLECTED] = amountCollected
 
-    const response = await fetch(baseUrl(), {
+    const response = await fetch(`${baseUrl()}?returnFieldsByFieldId=true`, {
       method: 'POST', headers: headers(), cache: 'no-store',
       body: JSON.stringify({ records: [{ fields }], typecast: true }),
     })
     if (!response.ok) return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
-    return NextResponse.json({ ok: true, saved: true })
+    const saved = await response.json()
+    const savedRecord = saved.records?.[0]
+    if (!savedRecord?.id) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    if (weightUpdateMode) {
+      const savedFields = savedRecord.fields ?? {}
+      const verified = savedFields[F.PATIENT_ID] === patientId
+        && savedFields[F.TYPE] === CLINIC_WEIGHT_UPDATE_TYPE
+        && savedFields[F.WEIGHT] === weight
+        && savedFields[F.WEIGHT_UNIT] === normalizedWeight?.unit
+        && savedFields[F.PREVIEW_ONLY] === true
+      if (!verified) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, saved: true, recordId: savedRecord.id })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403

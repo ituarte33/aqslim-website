@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
+import { clinicWeightEntryMatches, normalizeClinicWeightEntry, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 
 type Patient = {
   id: string
@@ -215,6 +216,11 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [paymentMethod, setPaymentMethod] = useState('Sin especificar')
   const [consultationSaving, setConsultationSaving] = useState(false)
   const [consultationMessage, setConsultationMessage] = useState('')
+  const [reportedWeight, setReportedWeight] = useState('')
+  const [reportedWeightUnit, setReportedWeightUnit] = useState<ClinicWeightUnit>('lb')
+  const [reportedWeightDate, setReportedWeightDate] = useState(todayLocal())
+  const [reportedWeightSaving, setReportedWeightSaving] = useState(false)
+  const [reportedWeightMessage, setReportedWeightMessage] = useState('')
   const [visitCadenceDays, setVisitCadenceDays] = useState<number | null>(null)
   const [nextAppointmentEdited, setNextAppointmentEdited] = useState(false)
   const [accessReadiness, setAccessReadiness] = useState<ClinicAccessReadiness | null>(null)
@@ -250,6 +256,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const cadence = useMemo(() => resolveClinicCadence(visitCadenceDays), [visitCadenceDays])
   const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
   const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
+  const latestWeight = consultations.find(item => item.weight !== null) ?? null
 
   async function loadNotes(patientId: string, signal?: AbortSignal) {
     setNotesLoading(true)
@@ -700,11 +707,54 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     }
   }
 
+  async function saveReportedWeight() {
+    if (!selected) return
+    const normalized = normalizeClinicWeightEntry(reportedWeight, reportedWeightUnit)
+    if (!normalized.ok) {
+      setReportedWeightMessage(normalized.error === 'weight_out_of_range'
+        ? 'Revisa el peso y la unidad; el valor está fuera del rango permitido.'
+        : 'Escribe un peso válido y selecciona libras o kilogramos.')
+      return
+    }
+    const intended = { date: reportedWeightDate, weight: normalized.weight, unit: normalized.unit }
+    setReportedWeightSaving(true)
+    setReportedWeightMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-consultations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'weightUpdate',
+          patientId: selected.id,
+          consultationDate: intended.date,
+          weight: intended.weight,
+          weightUnit: intended.unit,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok || !data.recordId) throw new Error('save_failed')
+      const refreshed = await loadConsultations(selected.id)
+      if (!refreshed?.some(item => item.id === data.recordId && clinicWeightEntryMatches(item, intended))) {
+        throw new Error('verify_failed')
+      }
+      setReportedWeight('')
+      setReportedWeightMessage(`✓ Peso actualizado y verificado: ${intended.weight} ${intended.unit}.`)
+    } catch {
+      setReportedWeightMessage('No se pudo guardar y verificar el peso. Intenta de nuevo.')
+    } finally {
+      setReportedWeightSaving(false)
+    }
+  }
+
   function choosePatient(id: string) {
     setSelectedId(id)
     setActiveTab('Consultas')
     setStatusMessage('')
     setConsultationMessage('')
+    setReportedWeight('')
+    setReportedWeightUnit('lb')
+    setReportedWeightDate(todayLocal())
+    setReportedWeightMessage('')
     setFollowupMessage('')
     setFollowupAction('')
     setFollowupPriority('Normal')
@@ -947,6 +997,27 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                 </div>
               ) : activeTab === 'My AQSLIM' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.8fr)', gap: 16, alignItems: 'start' }}>
+                  <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.28)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.045)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Respuesta del cliente</div>
+                        <h3 style={{ margin: '8px 0 0', fontFamily: 'Georgia, serif', fontSize: 25, fontWeight: 400 }}>Registrar peso recibido</h3>
+                        <p style={{ color: '#9A9590', lineHeight: 1.55, fontSize: 12, margin: '9px 0 0' }}>Captura manualmente el peso que el cliente envió. Se guardará en su historial clínico Preview, sin enviar mensajes ni modificar Producción.</p>
+                      </div>
+                      <div style={{ minWidth: 190, padding: '10px 12px', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, background: 'rgba(255,255,255,.02)' }}>
+                        <div style={{ color: '#6F6A64', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Peso actual registrado</div>
+                        <div style={{ color: latestWeight ? '#FAFAF8' : '#8E8881', fontFamily: 'Georgia, serif', fontSize: 21, marginTop: 6 }}>{latestWeight ? `${latestWeight.weight} ${latestWeight.weightUnit}` : 'Sin peso registrado'}</div>
+                        {latestWeight && <div style={{ color: '#77716A', fontSize: 10, marginTop: 4 }}>{latestWeight.consultationDate || (latestWeight.consultationAt ? new Date(latestWeight.consultationAt).toLocaleDateString('es-US') : '')}</div>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, alignItems: 'end', marginTop: 16 }}>
+                      <div><label style={labelStyle}>Peso informado</label><input aria-label="Peso informado por el cliente" inputMode="decimal" value={reportedWeight} onChange={event => setReportedWeight(event.target.value)} placeholder="Ej. 184.5" style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Unidad</label><select aria-label="Unidad del peso informado" value={reportedWeightUnit} onChange={event => setReportedWeightUnit(event.target.value as ClinicWeightUnit)} style={inputStyle}><option value="lb">lb</option><option value="kg">kg</option></select></div>
+                      <div><label style={labelStyle}>Fecha recibida</label><input aria-label="Fecha del peso informado" type="date" value={reportedWeightDate} onChange={event => setReportedWeightDate(event.target.value)} style={inputStyle} /></div>
+                      <button type="button" onClick={() => void saveReportedWeight()} disabled={reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate} style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? 'rgba(201,168,76,.08)' : '#C9A84C', color: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? '#8E8881' : '#0A0A0A', cursor: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{reportedWeightSaving ? 'Guardando…' : 'Actualizar peso Preview'}</button>
+                    </div>
+                    {reportedWeightMessage && <div style={{ marginTop: 12, color: reportedWeightMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{reportedWeightMessage}</div>}
+                  </div>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                       <div>
