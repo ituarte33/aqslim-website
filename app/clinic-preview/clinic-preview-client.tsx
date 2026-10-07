@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
-import { clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
+import { buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 
 type Patient = {
   id: string
@@ -168,6 +168,45 @@ function feeForType(type: string) {
   return '0'
 }
 
+function ClinicWeightHistory({ history, loading }: {
+  history: Array<{ date: string | null; weight: number; unit: ClinicWeightUnit }>
+  loading: boolean
+}) {
+  const visibleHistory = history.slice(-8)
+  const values = visibleHistory.map(entry => entry.weight)
+  const minimum = values.length > 0 ? Math.min(...values) : 0
+  const maximum = values.length > 0 ? Math.max(...values) : 0
+  const range = maximum - minimum
+  const chartPoints = visibleHistory.map((entry, index) => ({
+    ...entry,
+    x: visibleHistory.length === 1 ? 340 : 40 + (index * 600) / (visibleHistory.length - 1),
+    y: range === 0 ? 62 : 20 + ((maximum - entry.weight) / range) * 82,
+  }))
+  const polyline = chartPoints.map(point => `${point.x},${point.y}`).join(' ')
+
+  return <div style={{ border: '1px solid rgba(201,168,76,.18)', borderRadius: 12, padding: 16, marginTop: 18, background: 'rgba(201,168,76,.025)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+      <div>
+        <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.11em' }}>Historial visual del peso</div>
+        <div style={{ color: '#77716A', fontSize: 10, marginTop: 4 }}>Hasta los 8 registros más recientes · sólo lectura</div>
+      </div>
+      <div style={{ color: '#8E8881', fontSize: 11 }}>{history.length} {history.length === 1 ? 'registro' : 'registros'}</div>
+    </div>
+    {loading ? <div style={{ color: '#9A9590', padding: '24px 0 6px' }}>Cargando historial…</div> : visibleHistory.length === 0 ? <div style={{ color: '#9A9590', padding: '24px 0 6px' }}>Todavía no hay pesos registrados.</div> : <>
+      <svg viewBox="0 0 680 140" role="img" aria-label={`Evolución de ${visibleHistory.length} registros de peso`} style={{ width: '100%', height: 150, display: 'block', marginTop: 8 }}>
+        <line x1="40" y1="103" x2="640" y2="103" stroke="rgba(255,255,255,.08)" />
+        {chartPoints.length > 1 ? <polyline points={polyline} fill="none" stroke="#C9A84C" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {chartPoints.map((point, index) => <g key={`${point.date}-${point.weight}-${index}`}>
+          <circle cx={point.x} cy={point.y} r="5" fill="#C9A84C" stroke="#0A0A0A" strokeWidth="2" />
+          <text x={point.x} y={Math.max(13, point.y - 10)} textAnchor="middle" fill="#FAFAF8" fontSize="11">{point.weight.toFixed(1)} {point.unit}</text>
+          <text x={point.x} y="125" textAnchor="middle" fill="#77716A" fontSize="10">{point.date ? point.date.slice(5).replace('-', '/') : 'Sin fecha'}</text>
+        </g>)}
+      </svg>
+      {visibleHistory.length === 1 ? <div style={{ color: '#9A9590', fontSize: 11, textAlign: 'center', marginTop: -4 }}>Se necesita un segundo registro para mostrar la tendencia.</div> : null}
+    </>}
+  </div>
+}
+
 export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -258,6 +297,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
   const latestWeight = consultations.find(item => item.weight !== null) ?? null
   const weightSummary = useMemo(() => summarizeClinicWeights(consultations), [consultations])
+  const weightHistory = useMemo(() => buildClinicWeightHistory(consultations), [consultations])
   const accumulatedWeightChange = weightSummary.change === null
     ? 'Requiere 2 registros'
     : weightSummary.change === 0
@@ -881,6 +921,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(390px,.9fr)', gap: 16, alignItems: 'start' }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span></div>
+                    <ClinicWeightHistory history={weightHistory} loading={consultationsLoading} />
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
                       {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Próxima consulta preliminar</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
                       {consultationsLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : consultations.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay consultas registradas en Clinic Preview.</div> : consultations.map(item => <div key={item.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  buildClinicWeightHistory,
   CLINIC_WEIGHT_UPDATE_TYPE,
   clinicWeightEntryMatches,
   clinicWeightInKg,
@@ -60,4 +61,23 @@ test('ignores invalid weight records in the clinical summary', () => {
     { weight: 83.7, weightUnit: 'kg' },
     { weight: 900, weightUnit: 'lb' },
   ]), { currentWeight: 83.7, currentUnit: 'kg', change: null, count: 1 })
+})
+
+test('builds a chronological weight history in the latest unit', () => {
+  assert.deepEqual(buildClinicWeightHistory([
+    { weight: 184.5, weightUnit: 'lb', consultationDate: '2026-10-07', consultationAt: null },
+    { weight: 90, weightUnit: 'kg', consultationDate: '2026-09-30', consultationAt: null },
+  ]), [
+    { date: '2026-09-30', weight: 198.4, unit: 'lb' },
+    { date: '2026-10-07', weight: 184.5, unit: 'lb' },
+  ])
+})
+
+test('uses the consultation timestamp date and excludes invalid history entries', () => {
+  assert.deepEqual(buildClinicWeightHistory([
+    { weight: null, weightUnit: 'lb', consultationDate: '2026-10-07', consultationAt: null },
+    { weight: 83.7, weightUnit: 'kg', consultationDate: null, consultationAt: '2026-09-30T18:00:00.000Z' },
+  ]), [
+    { date: '2026-09-30', weight: 83.7, unit: 'kg' },
+  ])
 })

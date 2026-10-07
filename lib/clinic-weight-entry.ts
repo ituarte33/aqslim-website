@@ -74,3 +74,35 @@ export function summarizeClinicWeights(
     count: validEntries.length,
   }
 }
+
+export function buildClinicWeightHistory(
+  entries: readonly {
+    weight: number | null
+    weightUnit: string
+    consultationDate: string | null
+    consultationAt: string | null
+  }[],
+) {
+  const validEntries = entries.flatMap(entry => {
+    const normalized = normalizeClinicWeightEntry(entry.weight, entry.weightUnit)
+    if (!normalized.ok) return []
+    return [{
+      weight: normalized.weight,
+      unit: normalized.unit,
+      date: entry.consultationDate ?? entry.consultationAt?.slice(0, 10) ?? null,
+    }]
+  })
+
+  const displayUnit = validEntries[0]?.unit ?? null
+  if (!displayUnit) return []
+
+  return validEntries.reverse().map(entry => {
+    const convertedWeight = entry.unit === displayUnit
+      ? entry.weight
+      : displayUnit === 'kg'
+        ? clinicWeightInKg(entry.weight, entry.unit)
+        : Math.round(entry.weight * 2.2046226218 * 10) / 10
+
+    return { date: entry.date, weight: convertedWeight, unit: displayUnit }
+  })
+}
