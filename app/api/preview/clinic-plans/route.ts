@@ -3,6 +3,7 @@ import { getActor } from '@/lib/auth'
 import { getClienteById, getClientes, getPlanById } from '@/lib/airtable'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
+import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 
 const TABLE_ID = 'tblSaxNRZxJLpsnIm'
 
@@ -239,7 +240,9 @@ export async function POST(request: NextRequest) {
     const dateFields: Array<[string, unknown]> = [[F.TREATMENT_START, body.treatmentStart], [F.PHASE_START, body.phaseStart]]
     for (const [field, value] of dateFields) {
       const clean = text(value, 20)
-      fields[field] = clean || null
+      const normalized = clean ? normalizeClinicIsoDate(clean) : null
+      if (clean && !normalized) return NextResponse.json({ ok: false, error: 'invalid_plan_date' }, { status: 400 })
+      fields[field] = normalized
     }
 
     const numberFields: Array<[string, unknown]> = [
@@ -265,7 +268,7 @@ export async function POST(request: NextRequest) {
     const existingData = await existingResponse.json()
     const existing = existingData.records?.[0]
 
-    const response = await fetch(baseUrl(), {
+    const response = await fetch(`${baseUrl()}?returnFieldsByFieldId=true`, {
       method: existing ? 'PATCH' : 'POST',
       headers: headers(),
       cache: 'no-store',
@@ -273,9 +276,31 @@ export async function POST(request: NextRequest) {
         ? { records: [{ id: existing.id, fields }], typecast: true }
         : { records: [{ fields }], typecast: true }),
     })
-    if (!response.ok) return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+    if (!response.ok) {
+      console.error('clinic_plan_save_failed', { status: response.status, updating: Boolean(existing) })
+      return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+    }
     const saved = await response.json()
-    return NextResponse.json({ ok: true, draft: mapDraft(saved.records?.[0]) })
+    const savedRecord = saved.records?.[0]
+    if (!savedRecord?.id) {
+      console.error('clinic_plan_verify_failed', { reason: 'missing_record' })
+      return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
+
+    const verifyResponse = await fetch(`${baseUrl()}/${savedRecord.id}?returnFieldsByFieldId=true`, {
+      headers: headers(),
+      cache: 'no-store',
+    })
+    if (!verifyResponse.ok) {
+      console.error('clinic_plan_verify_failed', { status: verifyResponse.status })
+      return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
+    const verified = await verifyResponse.json()
+    if (verified.fields?.[F.KEY] !== key || verified.fields?.[F.PATIENT_ID] !== patient.id) {
+      console.error('clinic_plan_verify_failed', { reason: 'identity_mismatch' })
+      return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, draft: mapDraft(verified) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403

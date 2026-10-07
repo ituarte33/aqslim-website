@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import {
   CLINIC_FOLLOWUP_PRIORITIES,
   CLINIC_FOLLOWUP_STATUSES,
@@ -74,6 +75,24 @@ function escapeFormula(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
+function mapNote(record: any) {
+  const rawNote = record?.fields?.[F.NOTE] ?? ''
+  const followup = decodeClinicFollowup(rawNote)
+  const messageDraft = decodeClinicMessageDraft(rawNote)
+  return {
+    id: record?.id ?? '',
+    noteAt: record?.fields?.[F.NOTE_AT] ?? null,
+    authorEmail: record?.fields?.[F.AUTHOR_EMAIL] ?? '',
+    authorLabel: record?.fields?.[F.AUTHOR_LABEL] ?? '',
+    noteType: record?.fields?.[F.NOTE_TYPE] ?? 'General',
+    note: followup?.action ?? messageDraft?.body ?? rawNote,
+    followupRequired: record?.fields?.[F.FOLLOWUP_REQUIRED] === true,
+    followupDate: record?.fields?.[F.FOLLOWUP_DATE] ?? null,
+    followup,
+    messageDraft,
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await requireFounder()
@@ -92,23 +111,7 @@ export async function GET(request: NextRequest) {
     if (!response.ok) return NextResponse.json({ ok: false }, { status: 500 })
     const data = await response.json()
 
-    const notes = (data.records ?? []).map((record: any) => {
-      const rawNote = record.fields?.[F.NOTE] ?? ''
-      const followup = decodeClinicFollowup(rawNote)
-      const messageDraft = decodeClinicMessageDraft(rawNote)
-      return {
-        id: record.id,
-        noteAt: record.fields?.[F.NOTE_AT] ?? null,
-        authorEmail: record.fields?.[F.AUTHOR_EMAIL] ?? '',
-        authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
-        noteType: record.fields?.[F.NOTE_TYPE] ?? 'General',
-        note: followup?.action ?? messageDraft?.body ?? rawNote,
-        followupRequired: record.fields?.[F.FOLLOWUP_REQUIRED] === true,
-        followupDate: record.fields?.[F.FOLLOWUP_DATE] ?? null,
-        followup,
-        messageDraft,
-      }
-    })
+    const notes = (data.records ?? []).map(mapNote)
 
     return NextResponse.json({ ok: true, notes })
   } catch (error) {
@@ -159,10 +162,14 @@ export async function POST(request: NextRequest) {
         ? 'General'
         : ['Consulta', 'Entrevista', 'Seguimiento', 'General'].includes(body.noteType) ? body.noteType : 'General'
     const followupRequired = isStructuredFollowup ? clinicFollowupIsPending(status) : body.followupRequired === true
-    const followupDate = followupRequired ? safeText(body.followupDate, 20) : ''
+    const rawFollowupDate = followupRequired ? safeText(body.followupDate, 20) : ''
+    const followupDate = rawFollowupDate ? normalizeClinicIsoDate(rawFollowupDate) : null
 
     if (!patientId.startsWith('rec') || !note || (isStructuredFollowup && !action) || (isMessageDraft && !messageBody)) {
       return NextResponse.json({ ok: false, error: 'invalid_input' }, { status: 400 })
+    }
+    if (rawFollowupDate && !followupDate) {
+      return NextResponse.json({ ok: false, error: 'invalid_followup_date' }, { status: 400 })
     }
 
     const patient = await getClienteById(patientId)
@@ -187,15 +194,37 @@ export async function POST(request: NextRequest) {
     }
     if (followupDate) fields[F.FOLLOWUP_DATE] = followupDate
 
-    const response = await fetch(baseUrl(), {
+    const response = await fetch(`${baseUrl()}?returnFieldsByFieldId=true`, {
       method: 'POST',
       headers: headers(),
       cache: 'no-store',
       body: JSON.stringify({ records: [{ fields }], typecast: true }),
     })
-    if (!response.ok) return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+    if (!response.ok) {
+      console.error('clinic_notes_save_failed', { status: response.status })
+      return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+    }
+    const saved = await response.json()
+    const savedRecordId = saved.records?.[0]?.id
+    if (!savedRecordId) {
+      console.error('clinic_notes_verify_failed', { reason: 'missing_record' })
+      return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
+    const verifyResponse = await fetch(`${baseUrl()}/${savedRecordId}?returnFieldsByFieldId=true`, {
+      headers: headers(),
+      cache: 'no-store',
+    })
+    if (!verifyResponse.ok) {
+      console.error('clinic_notes_verify_failed', { status: verifyResponse.status })
+      return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
+    const savedNote = mapNote(await verifyResponse.json())
+    if (!savedNote.id || (followupDate && savedNote.followupDate !== followupDate)) {
+      console.error('clinic_notes_verify_failed', { hasRecord: Boolean(savedNote.id), expectedDate: Boolean(followupDate) })
+      return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    }
 
-    return NextResponse.json({ ok: true, saved: true })
+    return NextResponse.json({ ok: true, saved: savedNote })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403

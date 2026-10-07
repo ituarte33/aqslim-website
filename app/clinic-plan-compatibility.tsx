@@ -65,6 +65,16 @@ function normalizePlan(plan: PlanData): PlanData {
   return { ...plan, goalWeightKg: normalizeClinicWeightKg(plan.goalWeightKg) }
 }
 
+const verifiedPlanFields: Array<keyof PlanData> = [
+  'status', 'planLabel', 'treatmentStart', 'phase', 'phaseWeek', 'phaseStart',
+  'calorieTarget', 'dietName', 'specialInstructions', 'kenkhoTier', 'visitCadenceDays',
+  'startingWeightKg', 'currentWeightKg', 'goalWeightKg',
+]
+
+function plansMatch(expected: PlanData, actual: PlanData) {
+  return verifiedPlanFields.every(key => (expected[key] ?? '') === (actual[key] ?? ''))
+}
+
 export function ClinicPlanCompatibility() {
   const pathname = usePathname()
   const [host, setHost] = useState<HTMLElement | null>(null)
@@ -196,30 +206,32 @@ export function ClinicPlanCompatibility() {
 
   async function persistDraft(status: 'Draft' | 'Ready for Review') {
     if (!patientId || !identity) return
+    const intendedDraft = normalizePlan({ ...draft, status })
     setSaving(true)
     setMessage('')
     try {
       const response = await fetch('/api/preview/clinic-plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patientId, ...draft, status }),
+        body: JSON.stringify({ patientId, ...intendedDraft }),
       })
       const data = await response.json()
-      if (!response.ok || !data.ok) throw new Error('save_failed')
+      if (!response.ok || !data.ok) throw new Error(data.error || 'save_failed')
 
       const verifyResponse = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
       const verifyData = await verifyResponse.json()
-      if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft || verifyData.draft.status !== status) throw new Error('verify_failed')
+      if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft || !plansMatch(intendedDraft, normalizePlan(verifyData.draft))) throw new Error('verify_failed')
 
       setDraft(normalizePlan({ ...emptyPlan, ...verifyData.draft }))
       setLivePlan(verifyData.livePlan ?? livePlan)
       setMessage(status === 'Ready for Review'
         ? '✓ Plan marcado Listo para publicar y verificado en Clinic Preview. My AQSLIM todavía no fue modificado.'
         : '✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'save_failed'
       setMessage(status === 'Ready for Review'
-        ? 'El plan no pudo marcarse como listo. Revisa los requisitos pendientes.'
-        : 'No se pudo guardar y verificar el borrador. Intenta de nuevo.')
+        ? `El plan no pudo marcarse como listo (${reason}). Revisa los requisitos pendientes.`
+        : `No se pudo guardar y verificar el borrador (${reason}). Intenta de nuevo.`)
     } finally {
       setSaving(false)
     }
@@ -278,8 +290,8 @@ export function ClinicPlanCompatibility() {
             <div style={{ marginTop: 14 }}>{fieldLabel('Nombre / etiqueta del plan')}<input value={draft.planLabel || ''} onChange={e => set('planLabel', e.target.value)} placeholder="Ej. FAST 36 + Plan Hipocalórico" style={field} /></div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
-              <div>{fieldLabel('Inicio tratamiento')}<input type="date" value={draft.treatmentStart || ''} onChange={e => set('treatmentStart', e.target.value)} style={field} /></div>
-              <div>{fieldLabel('Inicio fase')}<input type="date" value={draft.phaseStart || ''} onChange={e => set('phaseStart', e.target.value)} style={field} /></div>
+              <div>{fieldLabel('Inicio tratamiento')}<input aria-label="Inicio tratamiento" type="date" value={draft.treatmentStart || ''} onInput={event => set('treatmentStart', event.currentTarget.value)} onChange={event => set('treatmentStart', event.currentTarget.value)} style={field} /></div>
+              <div>{fieldLabel('Inicio fase')}<input aria-label="Inicio fase" type="date" value={draft.phaseStart || ''} onInput={event => set('phaseStart', event.currentTarget.value)} onChange={event => set('phaseStart', event.currentTarget.value)} style={field} /></div>
               <div>{fieldLabel('Fase')}<select value={draft.phase || 'Sin fase'} onChange={e => set('phase', e.target.value)} style={field}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select></div>
               <div>{fieldLabel('Semana en fase')}<input type="number" min="0" value={numeric(draft.phaseWeek)} onChange={e => set('phaseWeek', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
             </div>
@@ -311,7 +323,7 @@ export function ClinicPlanCompatibility() {
             <button onClick={markReady} disabled={saving || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
             <button disabled style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.20)', background: 'rgba(226,142,142,.035)', color: '#9A7070', cursor: 'not-allowed', fontWeight: 600 }}>Publicar en My AQSLIM · bloqueado</button>
             <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>La publicación real requiere una autorización posterior y no está implementada en esta etapa.</div>
-            {message && <div style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
+            {message && <div role="status" aria-live="polite" style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
           </div>
 
           <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 20, background: 'rgba(255,255,255,.02)' }}>
