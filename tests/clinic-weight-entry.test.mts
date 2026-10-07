@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   CLINIC_WEIGHT_UPDATE_TYPE,
   clinicWeightEntryMatches,
+  clinicWeightInKg,
   normalizeClinicWeightEntry,
 } from '../lib/clinic-weight-entry.ts'
 import { isQualifyingClinicVisitType } from '../lib/clinic-visit-policy.ts'
@@ -32,4 +33,9 @@ test('matches the exact persisted weight update after reload', () => {
 
 test('a weight reply does not count as a completed clinical visit', () => {
   assert.equal(isQualifyingClinicVisitType(CLINIC_WEIGHT_UPDATE_TYPE), false)
+})
+
+test('converts the latest recorded weight to the kilograms used by Clinic plans', () => {
+  assert.equal(clinicWeightInKg(184.5, 'lb'), 83.7)
+  assert.equal(clinicWeightInKg(83.68, 'kg'), 83.7)
 })

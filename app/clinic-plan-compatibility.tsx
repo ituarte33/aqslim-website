@@ -25,6 +25,7 @@ type PlanData = {
 }
 
 type PatientIdentity = { name: string; email: string; phone: string }
+type LatestWeightSuggestion = { weight: number; unit: 'lb' | 'kg'; weightKg: number; date: string | null }
 
 type PlanPrepareDetail = {
   livePlan?: PlanData | null
@@ -83,6 +84,7 @@ export function ClinicPlanCompatibility() {
   const [patientId, setPatientId] = useState('')
   const [draft, setDraft] = useState<PlanData>(emptyPlan)
   const [livePlan, setLivePlan] = useState<PlanData | null>(null)
+  const [latestWeight, setLatestWeight] = useState<LatestWeightSuggestion | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -187,6 +189,7 @@ export function ClinicPlanCompatibility() {
         if (!response.ok || !data.ok) throw new Error('load_failed')
         setPatientId(data.patient?.id ?? '')
         setLivePlan(data.livePlan ?? null)
+        setLatestWeight(data.latestWeight ?? null)
         setDraft(data.draft ? normalizePlan({ ...emptyPlan, ...data.draft }) : emptyPlan)
       })
       .catch(() => { if (!cancelled) setMessage('No se pudo cargar el plan Preview de este paciente.') })
@@ -252,6 +255,12 @@ export function ClinicPlanCompatibility() {
     setMessage('Plan actual copiado al borrador. Revisa y guarda antes de continuar.')
   }
 
+  function applyLatestWeightToDraft() {
+    if (!latestWeight) return
+    setDraft(prev => ({ ...prev, currentWeightKg: latestWeight.weightKg, status: 'Draft' }))
+    setMessage(`Sugerencia aplicada: ${latestWeight.weight} ${latestWeight.unit} = ${latestWeight.weightKg} kg. Revisa y guarda el borrador Preview si deseas conservarla.`)
+  }
+
   if (!active || !host || !identity) return null
 
   const set = (key: keyof PlanData, value: any) => setDraft(prev => ({ ...prev, [key]: value, status: 'Draft' }))
@@ -311,6 +320,10 @@ export function ClinicPlanCompatibility() {
               <div>{fieldLabel('Peso actual kg')}<input type="number" step="0.1" value={numeric(draft.currentWeightKg)} onChange={e => set('currentWeightKg', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
               <div>{fieldLabel('Peso meta kg')}<input type="number" step="0.1" value={numeric(draft.goalWeightKg)} onChange={e => set('goalWeightKg', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
             </div>
+            {latestWeight && <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(201,168,76,.24)', borderRadius: 9, background: 'rgba(201,168,76,.045)', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div><div style={{ color: '#E2C87A', fontSize: 11 }}>Último peso registrado: {latestWeight.weight} {latestWeight.unit} · {latestWeight.weightKg} kg</div><div style={{ color: '#77716A', fontSize: 10, marginTop: 4 }}>Sugerencia únicamente; no cambia el borrador hasta que la uses.</div></div>
+              <button type="button" onClick={applyLatestWeightToDraft} style={{ padding: '9px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.38)', background: 'rgba(201,168,76,.10)', color: '#E2C87A', cursor: 'pointer' }}>Usar como peso actual →</button>
+            </div>}
 
             <div style={{ marginTop: 18, border: '1px solid rgba(255,255,255,.08)', borderRadius: 11, padding: 14, background: 'rgba(255,255,255,.018)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><strong style={{ fontSize: 12, color: '#D9D5CF' }}>Validación previa</strong><span style={{ fontSize: 11, color: readiness.ready ? '#9ED4A8' : '#E2C87A' }}>{readiness.checks.filter(item => item.passed).length}/{readiness.checks.length}</span></div>

@@ -37,3 +37,8 @@ export function clinicWeightEntryMatches(
     && entry.weight === expected.weight
     && entry.weightUnit === expected.unit
 }
+
+export function clinicWeightInKg(weight: number, unit: ClinicWeightUnit) {
+  const kilograms = unit === 'kg' ? weight : weight / 2.2046226218
+  return Math.round(kilograms * 10) / 10
+}

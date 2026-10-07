@@ -36,3 +36,15 @@ test('Clinic weight replies are validated and verified without becoming visits',
   assert.match(preview, /Registrar peso recibido/)
   assert.match(preview, /clinicWeightEntryMatches\(item, intended\)/)
 })
+
+test('the latest verified weight stays an explicit suggestion for consultation and plan forms', async () => {
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  const plan = await readFile(new URL('../app/clinic-plan-compatibility.tsx', import.meta.url), 'utf8')
+  const route = await readFile(new URL('../app/api/preview/clinic-plans/route.ts', import.meta.url), 'utf8')
+  assert.match(preview, /Usar en esta consulta/)
+  assert.match(preview, /La consulta todavía no se ha guardado/)
+  assert.match(plan, /Usar como peso actual/)
+  assert.match(plan, /no cambia el borrador hasta que la uses/)
+  assert.match(route, /Promise\.all/)
+  assert.match(route, /getLatestWeightSuggestion\(patient\.id\)/)
+})

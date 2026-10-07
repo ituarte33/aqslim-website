@@ -4,8 +4,17 @@ import { getClienteById, getClientes, getPlanById } from '@/lib/airtable'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
+import { clinicWeightInKg, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 
 const TABLE_ID = 'tblSaxNRZxJLpsnIm'
+const CONSULTATIONS_TABLE_ID = 'tbl0cTWsYqv4R5n3u'
+const CONSULTATION_FIELDS = {
+  PATIENT_ID: 'fld0XkzcSxuahpefr',
+  CONSULTATION_AT: 'fldZR2iJwQaN7SXzi',
+  CONSULTATION_DATE: 'fldrvTUQukYeqYtsi',
+  WEIGHT: 'fldWZT9PKGJACROwu',
+  WEIGHT_UNIT: 'fldocfmCBmCS0Unis',
+} as const
 
 const F = {
   KEY: 'fldveDoqvsLCaIX7F',
@@ -68,6 +77,38 @@ function numberOrNull(value: unknown) {
 
 function escapeFormula(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+async function getLatestWeightSuggestion(patientId: string) {
+  try {
+    const params = new URLSearchParams({
+      pageSize: '100',
+      filterByFormula: `{Patient Record ID} = "${escapeFormula(patientId)}"`,
+      returnFieldsByFieldId: 'true',
+    })
+    params.append('sort[0][field]', 'Consultation At')
+    params.append('sort[0][direction]', 'desc')
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${CONSULTATIONS_TABLE_ID}?${params}`
+    const response = await fetch(url, { headers: headers(), cache: 'no-store' })
+    if (!response.ok) return null
+    const data = await response.json()
+    const record = (data.records ?? []).find((item: any) => {
+      const weight = Number(item.fields?.[CONSULTATION_FIELDS.WEIGHT])
+      const unit = item.fields?.[CONSULTATION_FIELDS.WEIGHT_UNIT]
+      return Number.isFinite(weight) && weight > 0 && (unit === 'lb' || unit === 'kg')
+    })
+    if (!record) return null
+    const weight = Number(record.fields[CONSULTATION_FIELDS.WEIGHT])
+    const unit = record.fields[CONSULTATION_FIELDS.WEIGHT_UNIT] as ClinicWeightUnit
+    return {
+      weight,
+      unit,
+      weightKg: clinicWeightInKg(weight, unit),
+      date: record.fields[CONSULTATION_FIELDS.CONSULTATION_DATE] ?? record.fields[CONSULTATION_FIELDS.CONSULTATION_AT] ?? null,
+    }
+  } catch {
+    return null
+  }
 }
 
 async function resolvePatient(request: NextRequest, body?: Record<string, unknown>) {
@@ -151,22 +192,23 @@ export async function GET(request: NextRequest) {
       filterByFormula: `{Plan Key} = "${escapeFormula(key)}"`,
       returnFieldsByFieldId: 'true',
     })
-    const response = await fetch(`${baseUrl()}?${params}`, { headers: headers(), cache: 'no-store' })
+    const livePlanIds = patient.fields['Plan AQSLIM']
+    const livePlanId = Array.isArray(livePlanIds) && livePlanIds[0] ? String(livePlanIds[0]) : null
+    const [response, livePlan, latestWeight] = await Promise.all([
+      fetch(`${baseUrl()}?${params}`, { headers: headers(), cache: 'no-store' }),
+      livePlanId ? getPlanById(livePlanId).then(mapLivePlan).catch(() => null) : Promise.resolve(null),
+      getLatestWeightSuggestion(patient.id),
+    ])
     if (!response.ok) return NextResponse.json({ ok: false, error: 'draft_load_failed' }, { status: 500 })
     const data = await response.json()
     const draftRecord = data.records?.[0] ?? null
-
-    let livePlan = null
-    const livePlanIds = patient.fields['Plan AQSLIM']
-    if (Array.isArray(livePlanIds) && livePlanIds[0]) {
-      try { livePlan = mapLivePlan(await getPlanById(String(livePlanIds[0]))) } catch { livePlan = null }
-    }
 
     return NextResponse.json({
       ok: true,
       patient: { id: patient.id, name: patient.fields['Nombre Completo'] ?? 'Paciente' },
       draft: draftRecord ? mapDraft(draftRecord) : null,
       livePlan,
+      latestWeight,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
