@@ -69,6 +69,12 @@ function safeNumber(value: unknown) {
   return Number.isFinite(n) ? n : null
 }
 
+function selectName(value: unknown) {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && 'name' in value && typeof value.name === 'string') return value.name
+  return ''
+}
+
 function escapeFormula(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
@@ -207,11 +213,16 @@ export async function POST(request: NextRequest) {
     const savedRecord = saved.records?.[0]
     if (!savedRecord?.id) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
     if (weightUpdateMode) {
-      const savedFields = savedRecord.fields ?? {}
+      const verificationResponse = await fetch(`${baseUrl()}/${savedRecord.id}?returnFieldsByFieldId=true`, {
+        headers: headers(), cache: 'no-store',
+      })
+      if (!verificationResponse.ok) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+      const verifiedRecord = await verificationResponse.json()
+      const savedFields = verifiedRecord.fields ?? {}
       const verified = savedFields[F.PATIENT_ID] === patientId
-        && savedFields[F.TYPE] === CLINIC_WEIGHT_UPDATE_TYPE
-        && savedFields[F.WEIGHT] === weight
-        && savedFields[F.WEIGHT_UNIT] === normalizedWeight?.unit
+        && selectName(savedFields[F.TYPE]) === CLINIC_WEIGHT_UPDATE_TYPE
+        && Number(savedFields[F.WEIGHT]) === weight
+        && selectName(savedFields[F.WEIGHT_UNIT]) === normalizedWeight?.unit
         && savedFields[F.PREVIEW_ONLY] === true
       if (!verified) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
     }

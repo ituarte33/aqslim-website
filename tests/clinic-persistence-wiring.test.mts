@@ -31,6 +31,8 @@ test('Clinic weight replies are validated and verified without becoming visits',
   assert.match(route, /normalizeClinicWeightEntry\(body\.weight, body\.weightUnit\)/)
   assert.match(route, /returnFieldsByFieldId=true/)
   assert.match(route, /CLINIC_WEIGHT_UPDATE_TYPE/)
+  assert.match(route, /verificationResponse/)
+  assert.match(route, /selectName\(savedFields\[F\.WEIGHT_UNIT\]\)/)
   assert.match(preview, /Registrar peso recibido/)
   assert.match(preview, /clinicWeightEntryMatches\(item, intended\)/)
 })
