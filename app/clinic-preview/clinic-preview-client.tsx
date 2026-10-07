@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
-import { clinicWeightEntryMatches, normalizeClinicWeightEntry, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
+import { clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 
 type Patient = {
   id: string
@@ -257,6 +257,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
   const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
   const latestWeight = consultations.find(item => item.weight !== null) ?? null
+  const weightSummary = useMemo(() => summarizeClinicWeights(consultations), [consultations])
+  const accumulatedWeightChange = weightSummary.change === null
+    ? 'Requiere 2 registros'
+    : weightSummary.change === 0
+      ? 'Sin cambio'
+      : `${weightSummary.change > 0 ? '+' : '−'}${Math.abs(weightSummary.change).toFixed(1)} ${weightSummary.currentUnit}`
 
   async function loadNotes(patientId: string, signal?: AbortSignal) {
     setNotesLoading(true)
@@ -828,6 +834,21 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', color: '#9A9590', fontSize: 13 }}>
                   {selected.phone && <span>{selected.phone}</span>}{selected.email && <span>{selected.email}</span>}{selected.status && <span>Estado: {selected.status}</span>}{selected.language && <span>Idioma: {selected.language}</span>}
                 </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 20 }}>
+                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px', background: 'rgba(0,0,0,.14)' }}>
+                    <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Peso actual</div>
+                    <div style={{ color: '#FAFAF8', fontSize: 17, marginTop: 5 }}>{consultationsLoading ? 'Cargando…' : weightSummary.currentWeight === null ? 'Sin registro' : `${weightSummary.currentWeight.toFixed(1)} ${weightSummary.currentUnit}`}</div>
+                  </div>
+                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px', background: 'rgba(0,0,0,.14)' }}>
+                    <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Cambio acumulado</div>
+                    <div style={{ color: weightSummary.change !== null && weightSummary.change < 0 ? '#9BC7A3' : '#FAFAF8', fontSize: 17, marginTop: 5 }}>{consultationsLoading ? 'Cargando…' : accumulatedWeightChange}</div>
+                  </div>
+                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px', background: 'rgba(0,0,0,.14)' }}>
+                    <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Registros de peso</div>
+                    <div style={{ color: '#FAFAF8', fontSize: 17, marginTop: 5 }}>{consultationsLoading ? '—' : weightSummary.count}</div>
+                  </div>
+                </div>
+                <div style={{ color: '#6F6A64', fontSize: 10, marginTop: 8 }}>Sólo lectura · calculado desde el historial de pesos.</div>
               </div>
 
               <nav style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>

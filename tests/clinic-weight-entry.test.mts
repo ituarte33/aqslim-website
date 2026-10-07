@@ -5,6 +5,7 @@ import {
   clinicWeightEntryMatches,
   clinicWeightInKg,
   normalizeClinicWeightEntry,
+  summarizeClinicWeights,
 } from '../lib/clinic-weight-entry.ts'
 import { isQualifyingClinicVisitType } from '../lib/clinic-visit-policy.ts'
 
@@ -38,4 +39,25 @@ test('a weight reply does not count as a completed clinical visit', () => {
 test('converts the latest recorded weight to the kilograms used by Clinic plans', () => {
   assert.equal(clinicWeightInKg(184.5, 'lb'), 83.7)
   assert.equal(clinicWeightInKg(83.68, 'kg'), 83.7)
+})
+
+test('summarizes one weight without inventing an accumulated change', () => {
+  assert.deepEqual(summarizeClinicWeights([
+    { weight: 184.5, weightUnit: 'lb' },
+  ]), { currentWeight: 184.5, currentUnit: 'lb', change: null, count: 1 })
+})
+
+test('calculates accumulated change in the latest weight unit', () => {
+  assert.deepEqual(summarizeClinicWeights([
+    { weight: 184.5, weightUnit: 'lb' },
+    { weight: 90, weightUnit: 'kg' },
+  ]), { currentWeight: 184.5, currentUnit: 'lb', change: -13.9, count: 2 })
+})
+
+test('ignores invalid weight records in the clinical summary', () => {
+  assert.deepEqual(summarizeClinicWeights([
+    { weight: null, weightUnit: 'lb' },
+    { weight: 83.7, weightUnit: 'kg' },
+    { weight: 900, weightUnit: 'lb' },
+  ]), { currentWeight: 83.7, currentUnit: 'kg', change: null, count: 1 })
 })

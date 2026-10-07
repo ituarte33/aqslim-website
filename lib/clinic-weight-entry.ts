@@ -42,3 +42,35 @@ export function clinicWeightInKg(weight: number, unit: ClinicWeightUnit) {
   const kilograms = unit === 'kg' ? weight : weight / 2.2046226218
   return Math.round(kilograms * 10) / 10
 }
+
+export function summarizeClinicWeights(
+  entries: readonly { weight: number | null; weightUnit: string }[],
+) {
+  const validEntries = entries.flatMap(entry => {
+    const normalized = normalizeClinicWeightEntry(entry.weight, entry.weightUnit)
+    return normalized.ok ? [normalized] : []
+  })
+
+  const latest = validEntries[0] ?? null
+  if (!latest) {
+    return { currentWeight: null, currentUnit: null, change: null, count: 0 }
+  }
+
+  if (validEntries.length < 2) {
+    return { currentWeight: latest.weight, currentUnit: latest.unit, change: null, count: 1 }
+  }
+
+  const earliest = validEntries[validEntries.length - 1]
+  const earliestInLatestUnit = latest.unit === earliest.unit
+    ? earliest.weight
+    : latest.unit === 'kg'
+      ? clinicWeightInKg(earliest.weight, earliest.unit)
+      : earliest.weight * 2.2046226218
+
+  return {
+    currentWeight: latest.weight,
+    currentUnit: latest.unit,
+    change: Math.round((latest.weight - earliestInLatestUnit) * 10) / 10,
+    count: validEntries.length,
+  }
+}
