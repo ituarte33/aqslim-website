@@ -23,7 +23,11 @@ body.marketing { cursor:none; }
 
 /* Clinic Preview responsive shell */
 @media (max-width: 860px) {
-  .clinic-preview-header { flex-wrap: wrap; padding: 14px 16px !important; }
+  .clinic-preview-header {
+    position: static !important;
+    flex-wrap: wrap;
+    padding: 14px 16px !important;
+  }
   .clinic-preview-shell { grid-template-columns: minmax(0, 1fr) !important; }
   .clinic-preview-sidebar {
     border-right: 0 !important;

@@ -98,6 +98,7 @@ test('Clinic Preview consultation workspace has responsive mobile breakpoints', 
   assert.match(preview, /className="clinic-preview-consultations-grid"/)
   assert.match(preview, /className="clinic-preview-review-grid"/)
   assert.match(preview, /className="clinic-preview-readiness-grid"/)
+  assert.match(globalStyles, /@media \(max-width: 860px\)[\s\S]*?\.clinic-preview-header \{[\s\S]*?position: static !important;/)
   assert.match(globalStyles, /@media \(max-width: 860px\)[\s\S]*?\.clinic-preview-shell \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
   assert.match(globalStyles, /@media \(max-width: 560px\)[\s\S]*?\.clinic-preview-review-grid,[\s\S]*?\.clinic-preview-readiness-grid \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
 })

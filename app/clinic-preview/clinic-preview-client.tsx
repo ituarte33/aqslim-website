@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { normalizeClinicSearch } from '@/lib/clinic-search'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
@@ -358,10 +359,10 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const consultationSubmitGuard = useRef<ClinicSubmitGuard>({ active: false })
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = normalizeClinicSearch(query)
     if (!q) return patients
     return patients.filter(patient =>
-      [patient.name, patient.email, patient.phone].some(value => value.toLowerCase().includes(q))
+      [patient.name, patient.email, patient.phone].some(value => normalizeClinicSearch(value).includes(q))
     )
   }, [patients, query])
 
