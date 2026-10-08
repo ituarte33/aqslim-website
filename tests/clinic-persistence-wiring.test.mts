@@ -90,3 +90,14 @@ test('consultation readiness blocks invalid dates and payment amounts before per
   assert.match(route, /normalizeClinicIsoDate\(body\.consultationDate\)/)
   assert.match(route, /error: 'invalid_payment'/)
 })
+
+test('Clinic Preview consultation workspace has responsive mobile breakpoints', async () => {
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  const globalStyles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8')
+  assert.match(preview, /className="clinic-preview-shell"/)
+  assert.match(preview, /className="clinic-preview-consultations-grid"/)
+  assert.match(preview, /className="clinic-preview-review-grid"/)
+  assert.match(preview, /className="clinic-preview-readiness-grid"/)
+  assert.match(globalStyles, /@media \(max-width: 860px\)[\s\S]*?\.clinic-preview-shell \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
+  assert.match(globalStyles, /@media \(max-width: 560px\)[\s\S]*?\.clinic-preview-review-grid,[\s\S]*?\.clinic-preview-readiness-grid \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
+})

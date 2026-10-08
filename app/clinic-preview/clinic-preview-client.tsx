@@ -263,7 +263,7 @@ function ClinicConsultationReview({
   return <div style={{ marginTop: 16, padding: 14, border: '1px solid rgba(226,200,122,.32)', borderRadius: 10, background: 'rgba(201,168,76,.055)' }}>
     <div style={{ color: '#E2C87A', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Revisión antes de guardar</div>
     <div style={{ color: '#8E8881', fontSize: 10, lineHeight: 1.5, marginTop: 5 }}>Esto es exactamente lo que se enviará al expediente de Clinic Preview.</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9, marginTop: 12 }}>
+    <div className="clinic-preview-review-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9, marginTop: 12 }}>
       <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Consulta</div><div style={{ color: '#D9D5CF', fontSize: 11, marginTop: 4 }}>{consultationType} · {consultationDate || 'Sin fecha'}</div></div>
       <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Plan actual</div><div style={{ color: '#D9D5CF', fontSize: 11, marginTop: 4 }}>{phaseLabel}</div></div>
       <div style={{ gridColumn: '1 / -1', padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Mediciones</div><div style={{ color: measurements.length > 0 ? '#D9D5CF' : '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 4 }}>{measurements.length > 0 ? measurements.join(' · ') : 'Sin mediciones ingresadas'}</div></div>
@@ -278,7 +278,7 @@ function ClinicConsultationReview({
 function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; checks: ClinicConsultationReadinessCheck[] }) {
   return <div style={{ marginTop: 12, padding: 12, border: `1px solid ${ready ? 'rgba(158,212,168,.28)' : 'rgba(224,160,160,.35)'}`, borderRadius: 10, background: ready ? 'rgba(158,212,168,.045)' : 'rgba(224,160,160,.055)' }}>
     <div style={{ color: ready ? '#9ED4A8' : '#E0A0A0', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{ready ? 'Lista para guardar' : 'Revisa antes de guardar'}</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7, marginTop: 9 }}>
+    <div className="clinic-preview-readiness-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7, marginTop: 9 }}>
       {checks.map(check => <div key={check.key} style={{ color: check.passed ? '#B7C5B9' : '#E0A0A0', fontSize: 10, lineHeight: 1.4 }}>{check.passed ? '✓' : '○'} {check.label}</div>)}
     </div>
     <div style={{ color: '#77716A', fontSize: 10, lineHeight: 1.45, marginTop: 9 }}>Las mediciones, recomendaciones y próxima cita pueden quedar vacías.</div>
@@ -934,7 +934,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
   return (
     <main style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8', fontFamily: 'Montserrat, Arial, sans-serif' }}>
-      <header style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(10,10,10,.96)', borderBottom: '1px solid rgba(201,168,76,.28)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <header className="clinic-preview-header" style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(10,10,10,.96)', borderBottom: '1px solid rgba(201,168,76,.28)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 24, letterSpacing: '.08em' }}>AQ<span style={{ color: '#C9A84C' }}>SLIM</span> Clinic</div>
           <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>MYAQ-001-CLINIC-001 · PREVIEW · Founder-only</div>
@@ -942,13 +942,13 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
         <a href="/my-aqslim" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Abrir mi My AQSLIM ↗</a>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', minHeight: 'calc(100vh - 80px)' }}>
-        <aside style={{ borderRight: '1px solid rgba(201,168,76,.18)', padding: 20 }}>
+      <div className="clinic-preview-shell" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', minHeight: 'calc(100vh - 80px)' }}>
+        <aside className="clinic-preview-sidebar" style={{ borderRight: '1px solid rgba(201,168,76,.18)', padding: 20 }}>
           <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Pacientes</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 30, margin: '6px 0 16px' }}>Atención clínica</h1>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar nombre, email o teléfono…" style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(201,168,76,.28)', color: '#FAFAF8', padding: '12px 14px', borderRadius: 10, outline: 'none', marginBottom: 14 }} />
           <div style={{ color: '#6F6A64', fontSize: 12, marginBottom: 10 }}>{filtered.length} pacientes</div>
-          <div style={{ display: 'grid', gap: 8, maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', paddingRight: 4 }}>
+          <div className="clinic-preview-patient-list" style={{ display: 'grid', gap: 8, maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', paddingRight: 4 }}>
             {filtered.map(patient => {
               const active = selectedId === patient.id
               return <button key={patient.id} onClick={() => choosePatient(patient.id)} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 10, padding: '13px 14px', border: active ? '1px solid #C9A84C' : '1px solid rgba(255,255,255,.08)', background: active ? 'rgba(201,168,76,.11)' : 'rgba(255,255,255,.025)', color: '#FAFAF8' }}>
@@ -959,7 +959,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
           </div>
         </aside>
 
-        <section style={{ padding: 28 }}>
+        <section className="clinic-preview-content" style={{ padding: 28 }}>
           {!selected ? (
             <div style={{ maxWidth: 760, margin: '70px auto', border: '1px solid rgba(201,168,76,.22)', background: 'rgba(255,255,255,.025)', borderRadius: 18, padding: 34 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>AQSLIM Clinic</div>
@@ -968,13 +968,13 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
             </div>
           ) : (
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-              <div style={{ border: '1px solid rgba(201,168,76,.25)', borderRadius: 18, padding: 26, background: 'linear-gradient(135deg, rgba(201,168,76,.07), rgba(255,255,255,.02))', marginBottom: 18 }}>
+              <div className="clinic-preview-patient-header" style={{ border: '1px solid rgba(201,168,76,.25)', borderRadius: 18, padding: 26, background: 'linear-gradient(135deg, rgba(201,168,76,.07), rgba(255,255,255,.02))', marginBottom: 18 }}>
                 <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Expediente</div>
                 <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 38, margin: '8px 0 10px' }}>{selected.name}</h2>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', color: '#9A9590', fontSize: 13 }}>
                   {selected.phone && <span>{selected.phone}</span>}{selected.email && <span>{selected.email}</span>}{selected.status && <span>Estado: {selected.status}</span>}{selected.language && <span>Idioma: {selected.language}</span>}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 20 }}>
+                <div className="clinic-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 20 }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px', background: 'rgba(0,0,0,.14)' }}>
                     <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Peso actual</div>
                     <div style={{ color: '#FAFAF8', fontSize: 17, marginTop: 5 }}>{consultationsLoading ? 'Cargando…' : weightSummary.currentWeight === null ? 'Sin registro' : `${weightSummary.currentWeight.toFixed(1)} ${weightSummary.currentUnit}`}</div>
@@ -991,7 +991,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                 <div style={{ color: '#6F6A64', fontSize: 10, marginTop: 8 }}>Sólo lectura · calculado desde el historial de pesos.</div>
               </div>
 
-              <nav style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>
+              <nav className="clinic-preview-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>
                 {tabs.map(label => <button key={label} onClick={() => setActiveTab(label)} style={{ cursor: 'pointer', border: '1px solid rgba(201,168,76,.18)', borderRadius: 10, padding: '12px 10px', textAlign: 'center', color: activeTab === label ? '#C9A84C' : '#8E8881', background: activeTab === label ? 'rgba(201,168,76,.08)' : 'rgba(255,255,255,.02)', fontSize: 12 }}>{label}</button>)}
               </nav>
 
@@ -1018,8 +1018,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                   </div>
                 </div>
               ) : activeTab === 'Consultas' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(390px,.9fr)', gap: 16, alignItems: 'start' }}>
-                  <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                <div className="clinic-preview-consultations-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(390px,.9fr)', gap: 16, alignItems: 'start' }}>
+                  <div className="clinic-preview-card" style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span></div>
                     <ClinicWeightHistory history={weightHistory} loading={consultationsLoading} />
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
@@ -1039,7 +1039,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     </div>
                   </div>
 
-                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
+                  <div className="clinic-preview-card" style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
                     <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Registrar consulta</div>
 
                     <div style={sectionTitle}>Tipo y fecha</div>
