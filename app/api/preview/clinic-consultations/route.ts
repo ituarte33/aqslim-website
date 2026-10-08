@@ -69,6 +69,14 @@ function safeNumber(value: unknown) {
   return Number.isFinite(n) ? n : null
 }
 
+function optionalNonNegativeNumber(value: unknown) {
+  if (value === '' || value == null) return { valid: true, value: null }
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) && number >= 0
+    ? { valid: true, value: number }
+    : { valid: false, value: null }
+}
+
 function selectName(value: unknown) {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object' && 'name' in value && typeof value.name === 'string') return value.name
@@ -149,10 +157,8 @@ export async function POST(request: NextRequest) {
     const weightUnit = allowedUnits.includes(body.weightUnit) ? body.weightUnit : 'lb'
     const paymentMethod = allowedPayments.includes(body.paymentMethod) ? body.paymentMethod : 'Sin especificar'
 
-    const consultationDate = weightUpdateMode
-      ? normalizeClinicIsoDate(body.consultationDate)
-      : safeText(body.consultationDate, 20)
-    if (weightUpdateMode && !consultationDate) {
+    const consultationDate = normalizeClinicIsoDate(body.consultationDate)
+    if (!consultationDate) {
       return NextResponse.json({ ok: false, error: 'invalid_date' }, { status: 400 })
     }
     const normalizedWeight = weightUpdateMode ? normalizeClinicWeightEntry(body.weight, body.weightUnit) : null
@@ -171,8 +177,13 @@ export async function POST(request: NextRequest) {
       ? 'Peso informado por el paciente y registrado manualmente en Clinic Preview.'
       : safeText(body.recommendations, 5000)
     const nextAppointment = safeText(body.nextAppointment, 40)
-    const consultationFee = weightUpdateMode ? null : safeNumber(body.consultationFee)
-    const amountCollected = weightUpdateMode ? null : safeNumber(body.amountCollected)
+    const normalizedFee = weightUpdateMode ? { valid: true, value: null } : optionalNonNegativeNumber(body.consultationFee)
+    const normalizedCollected = weightUpdateMode ? { valid: true, value: null } : optionalNonNegativeNumber(body.amountCollected)
+    if (!normalizedFee.valid || !normalizedCollected.valid) {
+      return NextResponse.json({ ok: false, error: 'invalid_payment' }, { status: 400 })
+    }
+    const consultationFee = normalizedFee.value
+    const amountCollected = normalizedCollected.value
 
     const now = new Date().toISOString()
     const fields: Record<string, unknown> = {

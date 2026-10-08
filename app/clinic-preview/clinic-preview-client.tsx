@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
+import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
@@ -274,6 +275,16 @@ function ClinicConsultationReview({
   </div>
 }
 
+function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; checks: ClinicConsultationReadinessCheck[] }) {
+  return <div style={{ marginTop: 12, padding: 12, border: `1px solid ${ready ? 'rgba(158,212,168,.28)' : 'rgba(224,160,160,.35)'}`, borderRadius: 10, background: ready ? 'rgba(158,212,168,.045)' : 'rgba(224,160,160,.055)' }}>
+    <div style={{ color: ready ? '#9ED4A8' : '#E0A0A0', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{ready ? 'Lista para guardar' : 'Revisa antes de guardar'}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7, marginTop: 9 }}>
+      {checks.map(check => <div key={check.key} style={{ color: check.passed ? '#B7C5B9' : '#E0A0A0', fontSize: 10, lineHeight: 1.4 }}>{check.passed ? '✓' : '○'} {check.label}</div>)}
+    </div>
+    <div style={{ color: '#77716A', fontSize: 10, lineHeight: 1.45, marginTop: 9 }}>Las mediciones, recomendaciones y próxima cita pueden quedar vacías.</div>
+  </div>
+}
+
 export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -366,6 +377,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const latestWeight = consultations.find(item => item.weight !== null) ?? null
   const weightSummary = useMemo(() => summarizeClinicWeights(consultations), [consultations])
   const weightHistory = useMemo(() => buildClinicWeightHistory(consultations), [consultations])
+  const consultationReadiness = useMemo(() => assessClinicConsultationReadiness({
+    patientId: selectedId,
+    consultationDate,
+    consultationFee,
+    amountCollected,
+  }), [selectedId, consultationDate, consultationFee, amountCollected])
   const accumulatedWeightChange = weightSummary.change === null
     ? 'Requiere 2 registros'
     : weightSummary.change === 0
@@ -766,6 +783,10 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
   async function saveConsultation() {
     if (!selected) return
+    if (!consultationReadiness.ready) {
+      setConsultationMessage('Revisa los datos marcados antes de guardar la consulta.')
+      return
+    }
     if (!beginClinicSubmit(consultationSubmitGuard.current)) return
     const selectedAppointment = nextAppointment
     const appointmentIso = selectedAppointment ? new Date(selectedAppointment).toISOString() : ''
@@ -1059,7 +1080,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
                     <ClinicConsultationReview consultationType={consultationType} consultationDate={consultationDate} weight={weight} weightUnit={weightUnit} bodyFat={bodyFat} waistCm={waistCm} hipsCm={hipsCm} armsCm={armsCm} thighsCm={thighsCm} chestCm={chestCm} phase={phase} phaseWeek={phaseWeek} recommendations={recommendations} nextAppointment={nextAppointment} consultationFee={consultationFee} amountCollected={amountCollected} paymentMethod={paymentMethod} />
 
-                    <button onClick={saveConsultation} disabled={consultationSaving} aria-busy={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando una sola vez…' : 'Guardar consulta Preview'}</button>
+                    <ClinicConsultationReadinessPanel ready={consultationReadiness.ready} checks={consultationReadiness.checks} />
+
+                    <button onClick={saveConsultation} disabled={consultationSaving || !consultationReadiness.ready} aria-busy={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving || !consultationReadiness.ready ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving || !consultationReadiness.ready ? '#8E8881' : '#0A0A0A', cursor: consultationSaving || !consultationReadiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando una sola vez…' : consultationReadiness.ready ? 'Guardar consulta Preview' : 'Revisa los datos para guardar'}</button>
                     <div style={{ marginTop: 8, color: '#77716A', fontSize: 10, lineHeight: 1.45 }}>Protección contra doble guardado activa: mientras se procesa esta consulta, los clics repetidos se ignoran.</div>
                     {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
                   </div>
