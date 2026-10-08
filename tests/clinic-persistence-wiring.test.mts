@@ -19,6 +19,7 @@ test('Clinic plan writes verify the exact saved Airtable record', async () => {
 test('Clinic date inputs expose stable labels and capture input events', async () => {
   const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
   const plan = await readFile(new URL('../app/clinic-plan-compatibility.tsx', import.meta.url), 'utf8')
+  assert.match(preview, /aria-label="Fecha de consulta"[^>]+onInput=/)
   assert.match(preview, /aria-label="Fecha de seguimiento de la nota"[^>]+onInput=/)
   assert.match(preview, /aria-label="Fecha objetivo del seguimiento"[^>]+onInput=/)
   assert.match(plan, /aria-label="Inicio tratamiento"[^>]+onInput=/)

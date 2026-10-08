@@ -1044,7 +1044,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
                     <div style={sectionTitle}>Tipo y fecha</div>
                     <select value={consultationType} onChange={e => changeConsultationType(e.target.value)} style={inputStyle}><option>Cliente Nuevo</option><option>Cliente subsecuente</option><option>Cliente Re-Inicio</option><option>Seguimiento</option></select>
-                    <label style={{ ...labelStyle, marginTop: 10 }}>Fecha de consulta</label><input type="date" value={consultationDate} onChange={e => setConsultationDate(e.target.value)} style={inputStyle} />
+                    <label style={{ ...labelStyle, marginTop: 10 }}>Fecha de consulta</label><input aria-label="Fecha de consulta" type="date" value={consultationDate} onInput={e => setConsultationDate(e.currentTarget.value)} onChange={e => setConsultationDate(e.target.value)} style={inputStyle} />
 
                     <div style={sectionTitle}>Mediciones</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 95px', gap: 8 }}><input inputMode="decimal" value={weight} onChange={e => setWeight(e.target.value)} placeholder="Peso" style={inputStyle} /><select value={weightUnit} onChange={e => setWeightUnit(e.target.value)} style={inputStyle}><option>lb</option><option>kg</option></select></div>
