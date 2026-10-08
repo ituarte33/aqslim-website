@@ -48,3 +48,14 @@ test('the latest verified weight stays an explicit suggestion for consultation a
   assert.match(route, /Promise\.all/)
   assert.match(route, /getLatestWeightSuggestion\(patient\.id\)/)
 })
+
+test('follow-up quick actions navigate to every implemented Clinic workspace', async () => {
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  assert.match(preview, /function openPlan\(\).*setActiveTab\('Plan'\)/)
+  assert.match(preview, /function openMyAqslim\(\).*setActiveTab\('My AQSLIM'\)/)
+  assert.match(preview, /function openMessages\(\).*setActiveTab\('Mensajes'\)/)
+  assert.match(preview, /onClick=\{openPlan\}[^>]*>Crear o actualizar plan alimentario →/)
+  assert.match(preview, /onClick=\{openMyAqslim\}[^>]*>Dar acceso \/ revisar My AQSLIM →/)
+  assert.match(preview, /onClick=\{openMessages\}[^>]*>Ver mensajes del paciente →/)
+  assert.doesNotMatch(preview, /siguiente paso/)
+})
