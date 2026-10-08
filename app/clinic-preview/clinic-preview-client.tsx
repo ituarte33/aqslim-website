@@ -1061,6 +1061,17 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                     <button onClick={saveFollowup} disabled={followupSaving || !followupAction.trim()} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: followupSaving || !followupAction.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: followupSaving || !followupAction.trim() ? '#8E8881' : '#0A0A0A', cursor: followupSaving || !followupAction.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{followupSaving ? 'Guardando…' : 'Guardar seguimiento Preview'}</button>
                     {followupMessage && <div style={{ marginTop: 12, color: followupMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{followupMessage}</div>}
                   </div>
+                  <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 18, background: 'rgba(201,168,76,.035)' }}>
+                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Continuar en el expediente</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10, marginTop: 12 }}>
+                      <button onClick={openConsultations} style={quickActionStyle}>Registrar consulta →</button>
+                      <button onClick={openNotes} style={quickActionStyle}>Agregar nota / entrevista →</button>
+                      <button onClick={openPlan} style={quickActionStyle}>Crear o actualizar plan →</button>
+                      <button onClick={openMyAqslim} style={quickActionStyle}>Revisar My AQSLIM →</button>
+                      <button onClick={openMessages} style={quickActionStyle}>Ver mensajes →</button>
+                    </div>
+                    <div style={{ color: '#77716A', fontSize: 10, marginTop: 9 }}>Estos accesos sólo cambian de área; no guardan, publican ni envían información.</div>
+                  </div>
                 </div>
               ) : activeTab === 'My AQSLIM' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.8fr)', gap: 16, alignItems: 'start' }}>
@@ -1246,7 +1257,6 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
                       <div><div style={{ color: '#6F6A64', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Uso de alimentos</div><div style={{ marginTop: 5, color: '#8E8881' }}>Food Scanner y registro de comidas permanecen exclusivamente dentro de My AQSLIM.</div></div>
                     </div>
                   </div>
-                  <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Acciones rápidas</div><div style={{ display: 'grid', gap: 10, marginTop: 14 }}><button onClick={openConsultations} style={quickActionStyle}>Registrar consulta →</button><button onClick={openNotes} style={quickActionStyle}>Agregar nota / entrevista →</button><button onClick={openPlan} style={quickActionStyle}>Crear o actualizar plan alimentario →</button><button onClick={openMyAqslim} style={quickActionStyle}>Dar acceso / revisar My AQSLIM →</button><button onClick={openMessages} style={quickActionStyle}>Ver mensajes del paciente →</button></div></div>
                 </div>
               )}
             </div>
