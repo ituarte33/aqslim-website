@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
+import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 
 type Patient = {
@@ -343,6 +344,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [activationExecuting, setActivationExecuting] = useState(false)
   const [activationComplete, setActivationComplete] = useState(false)
   const authorizationRequestId = useRef(0)
+  const consultationSubmitGuard = useRef<ClinicSubmitGuard>({ active: false })
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -764,6 +766,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
   async function saveConsultation() {
     if (!selected) return
+    if (!beginClinicSubmit(consultationSubmitGuard.current)) return
     const selectedAppointment = nextAppointment
     const appointmentIso = selectedAppointment ? new Date(selectedAppointment).toISOString() : ''
     setConsultationSaving(true)
@@ -815,6 +818,7 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
     } catch {
       setConsultationMessage('No se pudo guardar la consulta. Intenta de nuevo.')
     } finally {
+      finishClinicSubmit(consultationSubmitGuard.current)
       setConsultationSaving(false)
     }
   }
@@ -1055,7 +1059,8 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
                     <ClinicConsultationReview consultationType={consultationType} consultationDate={consultationDate} weight={weight} weightUnit={weightUnit} bodyFat={bodyFat} waistCm={waistCm} hipsCm={hipsCm} armsCm={armsCm} thighsCm={thighsCm} chestCm={chestCm} phase={phase} phaseWeek={phaseWeek} recommendations={recommendations} nextAppointment={nextAppointment} consultationFee={consultationFee} amountCollected={amountCollected} paymentMethod={paymentMethod} />
 
-                    <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta Preview'}</button>
+                    <button onClick={saveConsultation} disabled={consultationSaving} aria-busy={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando una sola vez…' : 'Guardar consulta Preview'}</button>
+                    <div style={{ marginTop: 8, color: '#77716A', fontSize: 10, lineHeight: 1.45 }}>Protección contra doble guardado activa: mientras se procesa esta consulta, los clics repetidos se ignoran.</div>
                     {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
                   </div>
                 </div>

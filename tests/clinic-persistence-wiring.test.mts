@@ -71,3 +71,11 @@ test('consultation review mirrors the Preview payload before saving', async () =
   assert.match(preview, /La cita seguirá siendo preliminar hasta confirmarla por separado en Square/)
   assert.match(preview, /Guardar consulta Preview/)
 })
+
+test('consultation submission has a synchronous duplicate-save guard', async () => {
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  assert.match(preview, /if \(!beginClinicSubmit\(consultationSubmitGuard\.current\)\) return/)
+  assert.match(preview, /finishClinicSubmit\(consultationSubmitGuard\.current\)/)
+  assert.match(preview, /aria-busy=\{consultationSaving\}/)
+  assert.match(preview, /Protección contra doble guardado activa/)
+})
