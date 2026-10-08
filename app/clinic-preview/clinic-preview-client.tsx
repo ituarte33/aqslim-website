@@ -820,7 +820,12 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
   function openNotes() { if (selected) setActiveTab('Notas') }
   function openConsultations() { if (selected) setActiveTab('Consultas') }
-  function openPlan() { if (selected) setActiveTab('Plan') }
+  function openPlan() {
+    if (!selected) return
+    const planButton = [...document.querySelectorAll<HTMLButtonElement>('nav button')]
+      .find(button => button.textContent?.trim() === 'Plan')
+    planButton?.click()
+  }
   function openMyAqslim() { if (selected) setActiveTab('My AQSLIM') }
   function openMessages() { if (selected) setActiveTab('Mensajes') }
 
