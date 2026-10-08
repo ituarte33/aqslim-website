@@ -61,3 +61,13 @@ test('follow-up quick actions navigate to every implemented Clinic workspace', a
   assert.match(preview, /no guardan, publican ni envían información/)
   assert.doesNotMatch(preview, /siguiente paso/)
 })
+
+test('consultation review mirrors the Preview payload before saving', async () => {
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  assert.match(preview, /Revisión antes de guardar/)
+  assert.match(preview, /Esto es exactamente lo que se enviará al expediente de Clinic Preview/)
+  assert.match(preview, /Sin mediciones ingresadas/)
+  assert.match(preview, /Sin recomendaciones ingresadas/)
+  assert.match(preview, /La cita seguirá siendo preliminar hasta confirmarla por separado en Square/)
+  assert.match(preview, /Guardar consulta Preview/)
+})

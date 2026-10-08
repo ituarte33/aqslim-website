@@ -207,6 +207,72 @@ function ClinicWeightHistory({ history, loading }: {
   </div>
 }
 
+function ClinicConsultationReview({
+  consultationType,
+  consultationDate,
+  weight,
+  weightUnit,
+  bodyFat,
+  waistCm,
+  hipsCm,
+  armsCm,
+  thighsCm,
+  chestCm,
+  phase,
+  phaseWeek,
+  recommendations,
+  nextAppointment,
+  consultationFee,
+  amountCollected,
+  paymentMethod,
+}: {
+  consultationType: string
+  consultationDate: string
+  weight: string
+  weightUnit: string
+  bodyFat: string
+  waistCm: string
+  hipsCm: string
+  armsCm: string
+  thighsCm: string
+  chestCm: string
+  phase: string
+  phaseWeek: string
+  recommendations: string
+  nextAppointment: string
+  consultationFee: string
+  amountCollected: string
+  paymentMethod: string
+}) {
+  const measurements = [
+    weight ? `Peso ${weight} ${weightUnit}` : '',
+    bodyFat ? `Grasa ${bodyFat}%` : '',
+    waistCm ? `Cintura ${waistCm} cm` : '',
+    hipsCm ? `Cadera ${hipsCm} cm` : '',
+    armsCm ? `Brazos ${armsCm} cm` : '',
+    thighsCm ? `Muslos ${thighsCm} cm` : '',
+    chestCm ? `Pecho/Busto ${chestCm} cm` : '',
+  ].filter(Boolean)
+  const phaseLabel = phase === 'Sin fase' ? 'Sin fase definida' : `${phase}${phaseWeek ? ` · semana ${phaseWeek}` : ' · sin semana'}`
+  const appointmentLabel = nextAppointment
+    ? new Date(nextAppointment).toLocaleString('es-US')
+    : 'Sin próxima cita'
+
+  return <div style={{ marginTop: 16, padding: 14, border: '1px solid rgba(226,200,122,.32)', borderRadius: 10, background: 'rgba(201,168,76,.055)' }}>
+    <div style={{ color: '#E2C87A', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em' }}>Revisión antes de guardar</div>
+    <div style={{ color: '#8E8881', fontSize: 10, lineHeight: 1.5, marginTop: 5 }}>Esto es exactamente lo que se enviará al expediente de Clinic Preview.</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9, marginTop: 12 }}>
+      <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Consulta</div><div style={{ color: '#D9D5CF', fontSize: 11, marginTop: 4 }}>{consultationType} · {consultationDate || 'Sin fecha'}</div></div>
+      <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Plan actual</div><div style={{ color: '#D9D5CF', fontSize: 11, marginTop: 4 }}>{phaseLabel}</div></div>
+      <div style={{ gridColumn: '1 / -1', padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Mediciones</div><div style={{ color: measurements.length > 0 ? '#D9D5CF' : '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 4 }}>{measurements.length > 0 ? measurements.join(' · ') : 'Sin mediciones ingresadas'}</div></div>
+      <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Próxima cita preliminar</div><div style={{ color: '#D9D5CF', fontSize: 11, marginTop: 4 }}>{appointmentLabel}</div></div>
+      <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Pago registrado</div><div style={{ color: '#D9D5CF', fontSize: 11, marginTop: 4 }}>${consultationFee || '0'} cargo · ${amountCollected || '0'} cobrado · {paymentMethod}</div></div>
+      <div style={{ gridColumn: '1 / -1', padding: 10, border: '1px solid rgba(255,255,255,.07)', borderRadius: 8 }}><div style={{ color: '#6F6A64', fontSize: 9, textTransform: 'uppercase' }}>Recomendaciones</div><div style={{ color: recommendations.trim() ? '#D9D5CF' : '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap' }}>{recommendations.trim() || 'Sin recomendaciones ingresadas'}</div></div>
+    </div>
+    <div style={{ color: '#9A9590', fontSize: 10, lineHeight: 1.5, marginTop: 10 }}>No se guardará nada hasta que pulses “Guardar consulta Preview”. La cita seguirá siendo preliminar hasta confirmarla por separado en Square.</div>
+  </div>
+}
+
 export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -987,7 +1053,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
                     {consultationType === 'Cliente Re-Inicio' && <div style={{ marginTop: 12, padding: 12, border: '1px solid rgba(201,168,76,.2)', borderRadius: 9, color: '#9A9590', fontSize: 12, lineHeight: 1.5 }}>El email de re-inicio anterior permanece desactivado aquí porque todavía apunta al cuestionario viejo. Lo reconectaremos al nuevo flujo de My AQSLIM/entrevista antes de habilitarlo.</div>}
 
-                    <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta'}</button>
+                    <ClinicConsultationReview consultationType={consultationType} consultationDate={consultationDate} weight={weight} weightUnit={weightUnit} bodyFat={bodyFat} waistCm={waistCm} hipsCm={hipsCm} armsCm={armsCm} thighsCm={thighsCm} chestCm={chestCm} phase={phase} phaseWeek={phaseWeek} recommendations={recommendations} nextAppointment={nextAppointment} consultationFee={consultationFee} amountCollected={amountCollected} paymentMethod={paymentMethod} />
+
+                    <button onClick={saveConsultation} disabled={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving ? '#8E8881' : '#0A0A0A', cursor: consultationSaving ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando…' : 'Guardar consulta Preview'}</button>
                     {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
                   </div>
                 </div>
