@@ -50,6 +50,13 @@ test('the latest verified weight stays an explicit suggestion for consultation a
   assert.match(route, /getLatestWeightSuggestion\(patient\.id\)/)
 })
 
+test('Clinic plan workspace canonicalizes legacy phases before showing or copying them', async () => {
+  const plan = await readFile(new URL('../app/clinic-plan-compatibility.tsx', import.meta.url), 'utf8')
+  assert.match(plan, /toCanonicalPhaseName/)
+  assert.match(plan, /canonicalPhase && CLINIC_PHASES\.has\(canonicalPhase\) \? canonicalPhase : 'Sin fase'/)
+  assert.match(plan, /setLivePlan\(data\.livePlan \? normalizePlan\(data\.livePlan\) : null\)/)
+})
+
 test('follow-up quick actions navigate to every implemented Clinic workspace', async () => {
   const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
   assert.match(preview, /function openPlan\(\)[\s\S]*?textContent\?\.trim\(\) === 'Plan'[\s\S]*?planButton\?\.click\(\)/)

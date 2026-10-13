@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { normalizeClinicWeightKg } from '@/lib/clinic-plan-format'
 import { compareClinicPlans, getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
+import { toCanonicalPhaseName } from '@/lib/phase-names'
 
 type PlanData = {
   status?: string
@@ -50,6 +51,8 @@ const emptyPlan: PlanData = {
   goalWeightKg: null,
 }
 
+const CLINIC_PHASES = new Set(['Jing', 'Qi', 'Xue', 'Yang Sheng'])
+
 function inputStyle(): React.CSSProperties {
   return { width: '100%', boxSizing: 'border-box', padding: '11px 12px', borderRadius: 9, background: '#111', color: '#FAFAF8', border: '1px solid rgba(201,168,76,.25)' }
 }
@@ -63,7 +66,12 @@ function numeric(value: number | null | undefined) {
 }
 
 function normalizePlan(plan: PlanData): PlanData {
-  return { ...plan, goalWeightKg: normalizeClinicWeightKg(plan.goalWeightKg) }
+  const canonicalPhase = toCanonicalPhaseName(plan.phase ?? null)
+  return {
+    ...plan,
+    phase: canonicalPhase && CLINIC_PHASES.has(canonicalPhase) ? canonicalPhase : 'Sin fase',
+    goalWeightKg: normalizeClinicWeightKg(plan.goalWeightKg),
+  }
 }
 
 const verifiedPlanFields: Array<keyof PlanData> = [
@@ -188,7 +196,7 @@ export function ClinicPlanCompatibility() {
         if (cancelled) return
         if (!response.ok || !data.ok) throw new Error('load_failed')
         setPatientId(data.patient?.id ?? '')
-        setLivePlan(data.livePlan ?? null)
+        setLivePlan(data.livePlan ? normalizePlan(data.livePlan) : null)
         setLatestWeight(data.latestWeight ?? null)
         setDraft(data.draft ? normalizePlan({ ...emptyPlan, ...data.draft }) : emptyPlan)
       })
@@ -226,7 +234,7 @@ export function ClinicPlanCompatibility() {
       if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft || !plansMatch(intendedDraft, normalizePlan(verifyData.draft))) throw new Error('verify_failed')
 
       setDraft(normalizePlan({ ...emptyPlan, ...verifyData.draft }))
-      setLivePlan(verifyData.livePlan ?? livePlan)
+      setLivePlan(verifyData.livePlan ? normalizePlan(verifyData.livePlan) : livePlan)
       setMessage(status === 'Ready for Review'
         ? '✓ Plan marcado Listo para publicar y verificado en Clinic Preview. My AQSLIM todavía no fue modificado.'
         : '✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
