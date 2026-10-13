@@ -137,3 +137,11 @@ test('Clinic and patient credentials land in their separate applications', async
   assert.match(clinicLogin, /isClinicPreviewEnvironment/)
   assert.match(patientLogin, /forceRedirectUrl="\/my-aqslim\/welcome"/)
 })
+
+test('Clinic entry is isolated from the global language gate', async () => {
+  const languageModal = await readFile(new URL('../app/language-modal.tsx', import.meta.url), 'utf8')
+
+  assert.match(languageModal, /pathname\.startsWith\('\/clinic-preview'\)/)
+  assert.match(languageModal, /if \(hasDedicatedEntry\) return/)
+  assert.match(languageModal, /if \(!visible \|\| hasDedicatedEntry\) return null/)
+})
