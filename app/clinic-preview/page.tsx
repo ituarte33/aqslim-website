@@ -20,7 +20,7 @@ export default async function ClinicPreviewPage({ searchParams }: ClinicPreviewP
   if (!isClinicPreviewEnvironment(environment)) redirect('/my-aqslim')
 
   const actor = await getActor()
-  if (!actor) redirect('/sign-in')
+  if (!actor) redirect('/clinic-preview/login')
   if (!isClinicFounderIdentity({ email: actor.email, environment })) redirect('/my-aqslim')
 
   const patients = await getClientes()

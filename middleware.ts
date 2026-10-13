@@ -12,9 +12,11 @@ const isPublicRoute = createRouteMatcher([
   '/signed-out',
   '/fast(.*)',
   '/my-aqslim/login(.*)',
+  '/clinic-preview/login(.*)',
 ])
 
 const isPatientPortalRoute = createRouteMatcher(['/my-aqslim(.*)'])
+const isClinicPreviewRoute = createRouteMatcher(['/clinic-preview(.*)'])
 
 function isOperationalRoute(pathname: string) {
   if (pathname === '/dashboard/plan-preview' || pathname.startsWith('/dashboard/plan-preview/')) {
@@ -51,6 +53,13 @@ export default clerkMiddleware(async (auth, req) => {
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.redirect(new URL('/my-aqslim/login', req.url))
+    }
+  }
+
+  if (isClinicPreview && isClinicPreviewRoute(req) && !isPublicRoute(req)) {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.redirect(new URL('/clinic-preview/login', req.url))
     }
   }
 

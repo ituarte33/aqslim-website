@@ -123,3 +123,17 @@ test('Clinic Preview restores the selected patient after returning from My AQSLI
   assert.match(preview, /clinicUrl\.searchParams\.set\('patient', id\)/)
   assert.match(preview, /window\.history\.replaceState\(window\.history\.state/)
 })
+
+test('Clinic and patient credentials land in their separate applications', async () => {
+  const middleware = await readFile(new URL('../middleware.ts', import.meta.url), 'utf8')
+  const clinicPage = await readFile(new URL('../app/clinic-preview/page.tsx', import.meta.url), 'utf8')
+  const clinicLogin = await readFile(new URL('../app/clinic-preview/login/[[...login]]/page.tsx', import.meta.url), 'utf8')
+  const patientLogin = await readFile(new URL('../app/my-aqslim/login/[[...login]]/login-view.tsx', import.meta.url), 'utf8')
+
+  assert.match(middleware, /'\/clinic-preview\/login\(\.\*\)'/)
+  assert.match(middleware, /isClinicPreviewRoute\(req\)[\s\S]*?new URL\('\/clinic-preview\/login'/)
+  assert.match(clinicPage, /if \(!actor\) redirect\('\/clinic-preview\/login'\)/)
+  assert.match(clinicLogin, /forceRedirectUrl="\/clinic-preview"/)
+  assert.match(clinicLogin, /isClinicPreviewEnvironment/)
+  assert.match(patientLogin, /forceRedirectUrl="\/my-aqslim\/welcome"/)
+})
