@@ -112,3 +112,14 @@ test('Clinic Preview consultation workspace has responsive mobile breakpoints', 
   assert.match(globalStyles, /@media \(max-width: 860px\)[\s\S]*?\.clinic-preview-shell \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
   assert.match(globalStyles, /@media \(max-width: 560px\)[\s\S]*?\.clinic-preview-review-grid,[\s\S]*?\.clinic-preview-readiness-grid \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
 })
+
+test('Clinic Preview restores the selected patient after returning from My AQSLIM', async () => {
+  const page = await readFile(new URL('../app/clinic-preview/page.tsx', import.meta.url), 'utf8')
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  assert.match(page, /const requestedPatient = \(await searchParams\)\.patient/)
+  assert.match(page, /items\.some\(patient => patient\.id === requestedPatientId\)/)
+  assert.match(page, /initialPatientId=\{initialPatientId\}/)
+  assert.match(preview, /useState<string \| null>\(initialPatientId\)/)
+  assert.match(preview, /clinicUrl\.searchParams\.set\('patient', id\)/)
+  assert.match(preview, /window\.history\.replaceState\(window\.history\.state/)
+})

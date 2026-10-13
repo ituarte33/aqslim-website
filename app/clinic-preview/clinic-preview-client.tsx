@@ -286,9 +286,9 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
   </div>
 }
 
-export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
+export function ClinicPreviewClient({ patients, initialPatientId }: { patients: Patient[]; initialPatientId: string | null }) {
   const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
   const [activeTab, setActiveTab] = useState<Tab>('Consultas')
 
   const [notes, setNotes] = useState<ClinicNote[]>([])
@@ -886,6 +886,9 @@ export function ClinicPreviewClient({ patients }: { patients: Patient[] }) {
 
   function choosePatient(id: string) {
     setSelectedId(id)
+    const clinicUrl = new URL(window.location.href)
+    clinicUrl.searchParams.set('patient', id)
+    window.history.replaceState(window.history.state, '', `${clinicUrl.pathname}${clinicUrl.search}${clinicUrl.hash}`)
     setActiveTab('Consultas')
     setStatusMessage('')
     setConsultationMessage('')

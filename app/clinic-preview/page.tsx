@@ -11,7 +11,11 @@ function clinicEnvironment() {
   }
 }
 
-export default async function ClinicPreviewPage() {
+type ClinicPreviewPageProps = {
+  searchParams: Promise<{ patient?: string | string[] }>
+}
+
+export default async function ClinicPreviewPage({ searchParams }: ClinicPreviewPageProps) {
   const environment = clinicEnvironment()
   if (!isClinicPreviewEnvironment(environment)) redirect('/my-aqslim')
 
@@ -33,5 +37,9 @@ export default async function ClinicPreviewPage() {
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
 
-  return <ClinicPreviewClient patients={items} />
+  const requestedPatient = (await searchParams).patient
+  const requestedPatientId = typeof requestedPatient === 'string' ? requestedPatient : null
+  const initialPatientId = items.some(patient => patient.id === requestedPatientId) ? requestedPatientId : null
+
+  return <ClinicPreviewClient patients={items} initialPatientId={initialPatientId} />
 }
