@@ -15,6 +15,7 @@ import {
   clinicConsultationWeightKg,
   clinicPublishedConsultationId,
   clinicPublishedPreviewKey,
+  isLiveClinicConsultationType,
 } from '@/lib/clinic-consultation-publication'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
@@ -169,7 +170,7 @@ async function publishPreviewConsultation(input: {
   const marker = clinicConsultationPublicationMarker(input.previewRecordId)
   const consultationType = selectName(previewFields[F.TYPE])
   const consultationDate = normalizeClinicIsoDate(previewFields[F.CONSULTATION_DATE])
-  if (!consultationDate || !['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio', 'Seguimiento'].includes(consultationType)) {
+  if (!consultationDate || !isLiveClinicConsultationType(consultationType)) {
     return NextResponse.json({ ok: false, error: 'consultation_not_publishable' }, { status: 409 })
   }
 
@@ -340,7 +341,7 @@ export async function POST(request: NextRequest) {
     }
 
     const weightUpdateMode = body.mode === 'weightUpdate'
-    const allowedTypes = ['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio', 'Seguimiento']
+    const allowedTypes = ['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio']
     const allowedPhases = ['Jing', 'Qi', 'Xue', 'Yang Sheng', 'Sin fase']
     const allowedUnits = ['lb', 'kg']
     const allowedPayments = ['Efectivo', 'Card', 'Venmo', 'Zelle', 'Transferencia', 'Sin especificar']
