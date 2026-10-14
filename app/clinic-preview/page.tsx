@@ -32,8 +32,20 @@ export default async function ClinicPreviewPage({ searchParams }: ClinicPreviewP
       phone: String(patient.fields['Teléfono'] ?? ''),
       status: String(patient.fields['Estado del Cliente'] ?? ''),
       language: String(patient.fields['Idioma Preferido'] ?? ''),
+      clientNumber: patient.fields['ID Cliente'] ?? null,
+      age: patient.fields['Edad'] ?? null,
+      birthDate: String(patient.fields['Fecha Nacimiento'] ?? ''),
+      sex: String(patient.fields['Sexo'] ?? ''),
+      heightCm: patient.fields['Estatura (cm)'] ?? null,
+      goalWeight: patient.fields['Peso Meta'] ?? null,
+      weightUnit: String(patient.fields['Unidad de Peso'] ?? ''),
+      address: String(patient.fields['Dirección'] ?? ''),
+      city: String(patient.fields['Ciudad'] ?? ''),
+      zip: patient.fields['ZIP'] ?? null,
       nextAppointment: String(patient.fields['Próxima Cita'] ?? ''),
+      nextAppointmentService: String(patient.fields['Servicio Próxima Cita'] ?? ''),
       goal: String(patient.fields['Meta del Cliente'] ?? ''),
+      conditions: String(patient.fields['Condiciones Especiales / Alergias'] ?? ''),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
 

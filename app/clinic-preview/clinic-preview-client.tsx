@@ -15,8 +15,20 @@ type Patient = {
   phone: string
   status: string
   language: string
+  clientNumber: number | null
+  age: number | null
+  birthDate: string
+  sex: string
+  heightCm: number | null
+  goalWeight: number | null
+  weightUnit: string
+  address: string
+  city: string
+  zip: number | null
   nextAppointment: string
+  nextAppointmentService: string
   goal: string
+  conditions: string
 }
 
 type ClinicNote = {
@@ -156,7 +168,7 @@ type ClinicAccessReadiness = {
   }
 }
 
-const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
+const tabs = ['Resumen','Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
 type Tab = typeof tabs[number]
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
@@ -171,6 +183,22 @@ function feeForType(type: string) {
   if (type === 'Cliente Re-Inicio') return '35'
   if (type === 'Cliente subsecuente') return '30'
   return '0'
+}
+
+function clinicDateLabel(value: string) {
+  if (!value) return 'Sin registrar'
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('es-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function clinicHeightLabel(heightCm: number | null) {
+  if (heightCm === null) return 'Sin registrar'
+  const totalInches = heightCm / 2.54
+  const roundedInches = Math.round(totalInches)
+  const feet = Math.floor(roundedInches / 12)
+  const inches = roundedInches % 12
+  return `${heightCm} cm · ${feet}' ${inches}\"`
 }
 
 function ClinicWeightHistory({ history, loading }: {
@@ -291,7 +319,7 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
 export function ClinicPreviewClient({ patients, initialPatientId }: { patients: Patient[]; initialPatientId: string | null }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
-  const [activeTab, setActiveTab] = useState<Tab>('Consultas')
+  const [activeTab, setActiveTab] = useState<Tab>('Resumen')
 
   const [notes, setNotes] = useState<ClinicNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
@@ -936,7 +964,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     const clinicUrl = new URL(window.location.href)
     clinicUrl.searchParams.set('patient', id)
     window.history.replaceState(window.history.state, '', `${clinicUrl.pathname}${clinicUrl.search}${clinicUrl.hash}`)
-    setActiveTab('Consultas')
+    setActiveTab('Resumen')
     setStatusMessage('')
     setConsultationMessage('')
     setConsultationPublicationTargetId('')
@@ -1045,11 +1073,71 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                 <div style={{ color: '#6F6A64', fontSize: 10, marginTop: 8 }}>Sólo lectura · calculado desde el historial de pesos.</div>
               </div>
 
-              <nav className="clinic-preview-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>
+              <nav className="clinic-preview-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: 8, marginBottom: 18 }}>
                 {tabs.map(label => <button key={label} onClick={() => setActiveTab(label)} style={{ cursor: 'pointer', border: '1px solid rgba(201,168,76,.18)', borderRadius: 10, padding: '12px 10px', textAlign: 'center', color: activeTab === label ? '#C9A84C' : '#8E8881', background: activeTab === label ? 'rgba(201,168,76,.08)' : 'rgba(255,255,255,.02)', fontSize: 12 }}>{label}</button>)}
               </nav>
 
-              {activeTab === 'Notas' ? (
+              {activeTab === 'Resumen' ? (
+                <div className="clinic-preview-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.15fr) minmax(300px,.85fr)', gap: 16, alignItems: 'start' }}>
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    <section style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Resumen clínico</div>
+                          <h3 style={{ margin: '8px 0 0', fontFamily: 'Georgia, serif', fontSize: 27, fontWeight: 400 }}>Datos del paciente</h3>
+                        </div>
+                        <span style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 999, padding: '8px 11px', color: '#E2C87A', fontSize: 11 }}>Sólo lectura</span>
+                      </div>
+                      <div className="clinic-preview-summary-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 18 }}>
+                        {[
+                          ['ID de cliente', selected.clientNumber === null ? 'Sin registrar' : String(selected.clientNumber)],
+                          ['Estado', selected.status || 'Sin registrar'],
+                          ['Edad', selected.age === null ? 'Sin registrar' : `${selected.age} años`],
+                          ['Fecha de nacimiento', clinicDateLabel(selected.birthDate)],
+                          ['Sexo', selected.sex || 'Sin registrar'],
+                          ['Estatura', clinicHeightLabel(selected.heightCm)],
+                          ['Peso meta', selected.goalWeight === null ? 'Sin registrar' : `${selected.goalWeight} ${selected.weightUnit || ''}`.trim()],
+                          ['Idioma preferido', selected.language || 'Sin registrar'],
+                        ].map(([label, value]) => <div key={label} style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, background: 'rgba(255,255,255,.015)' }}>
+                          <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>{label}</div>
+                          <div style={{ color: '#D9D5CF', fontSize: 13, marginTop: 6, lineHeight: 1.45 }}>{value}</div>
+                        </div>)}
+                      </div>
+                    </section>
+
+                    <section style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
+                      <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Objetivo del paciente</div>
+                      <div style={{ color: selected.goal ? '#D9D5CF' : '#8E8881', lineHeight: 1.65, marginTop: 10, whiteSpace: 'pre-wrap' }}>{selected.goal || 'No hay una meta registrada en el expediente.'}</div>
+                    </section>
+
+                    <section style={{ border: `1px solid ${selected.conditions ? 'rgba(224,160,160,.30)' : 'rgba(255,255,255,.08)'}`, borderRadius: 14, padding: 22, background: selected.conditions ? 'rgba(224,160,160,.045)' : 'rgba(255,255,255,.02)' }}>
+                      <div style={{ color: selected.conditions ? '#E0A0A0' : '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Condiciones especiales / alergias</div>
+                      <div style={{ color: selected.conditions ? '#F0D2D2' : '#8E8881', lineHeight: 1.65, marginTop: 10, whiteSpace: 'pre-wrap' }}>{selected.conditions || 'No hay condiciones especiales ni alergias registradas.'}</div>
+                    </section>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    <section style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                      <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Estado clínico actual</div>
+                      <div style={{ display: 'grid', gap: 11, marginTop: 15 }}>
+                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Peso más reciente</div><div style={{ marginTop: 6 }}>{latestWeight ? `${latestWeight.weight} ${latestWeight.weightUnit}` : 'Sin registro'}</div></div>
+                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Última consulta</div><div style={{ marginTop: 6 }}>{consultationsLoading ? 'Cargando…' : consultations[0] ? clinicDateLabel(consultations[0].consultationDate || consultations[0].consultationAt || '') : 'Sin registro'}</div></div>
+                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Próxima cita</div><div style={{ marginTop: 6 }}>{clinicDateLabel(latestScheduledAppointment || selected.nextAppointment)}</div>{selected.nextAppointmentService && <div style={{ color: '#8E8881', fontSize: 11, marginTop: 5 }}>{selected.nextAppointmentService}</div>}</div>
+                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Consultas Preview</div><div style={{ marginTop: 6 }}>{consultationsLoading ? 'Cargando…' : consultations.length}</div></div>
+                      </div>
+                    </section>
+
+                    <section style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
+                      <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Contacto y ubicación</div>
+                      <div style={{ display: 'grid', gap: 8, marginTop: 13, color: '#D9D5CF', fontSize: 12, lineHeight: 1.55 }}>
+                        <div>{selected.phone || 'Teléfono sin registrar'}</div>
+                        <div>{selected.email || 'Email sin registrar'}</div>
+                        <div>{[selected.address, selected.city, selected.zip === null ? '' : String(selected.zip)].filter(Boolean).join(', ') || 'Dirección sin registrar'}</div>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              ) : activeTab === 'Notas' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(300px,.75fr)', gap: 16 }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de notas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{notes.length} notas</span></div>
