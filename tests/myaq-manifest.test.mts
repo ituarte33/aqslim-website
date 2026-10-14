@@ -61,3 +61,32 @@ test('Home Screen metadata uses publicly fetchable My AQSLIM mascot icons', asyn
   assert.deepEqual([...favicon.subarray(0, 4)], [0, 0, 1, 0])
   assert.deepEqual([...appleTouchIcon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
 })
+
+test('My AQSLIM keeps unlinked or ambiguous accounts inside the safe client flow', async () => {
+  const routePaths = [
+    '../app/my-aqslim/page.tsx',
+    '../app/my-aqslim/welcome/page.tsx',
+    '../app/my-aqslim/plan/page.tsx',
+    '../app/my-aqslim/progress/page.tsx',
+    '../app/my-aqslim/materials/page.tsx',
+    '../app/my-aqslim/buddy/page.tsx',
+    '../app/my-aqslim/nutrition-profile-preview/page.tsx',
+    '../app/my-aqslim/pilot/restaurant/page.tsx',
+    '../app/my-aqslim/pilot/fridge/page.tsx',
+  ]
+  const sources = await Promise.all(routePaths.map(path => readFile(new URL(path, import.meta.url), 'utf8')))
+
+  for (const source of sources) {
+    assert.match(source, /redirect\('\/my-aqslim\/no-record'\)/)
+    assert.doesNotMatch(source, /redirect\('\/onboarding'\)/)
+  }
+
+  const [portalSource, noRecordView] = await Promise.all([
+    readFile(new URL('../lib/patient-portal.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../app/my-aqslim/no-record/no-record-view.tsx', import.meta.url), 'utf8'),
+  ])
+  assert.match(portalSource, /error\.code === 'PATIENT_IDENTITY_AMBIGUOUS'/)
+  assert.match(noRecordView, /Por seguridad, no mostraremos información/)
+  assert.match(noRecordView, /For your safety, no information will be shown/)
+  assert.match(noRecordView, /redirectUrl="\/my-aqslim\/login"/)
+})

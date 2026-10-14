@@ -117,7 +117,10 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
   try {
     cliente = await getOwnPatient()
   } catch (error) {
-    if (error instanceof AuthorizationError && error.code === 'PATIENT_NOT_FOUND') return null
+    if (error instanceof AuthorizationError && (
+      error.code === 'PATIENT_NOT_FOUND'
+      || error.code === 'PATIENT_IDENTITY_AMBIGUOUS'
+    )) return null
     throw error
   }
 

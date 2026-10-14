@@ -18,7 +18,7 @@ export default async function MyAqslimWelcomePage() {
       />
     )
   }
-  if (!data) redirect('/onboarding')
+  if (!data) redirect('/my-aqslim/no-record')
 
   return <WelcomeView firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} destination="/my-aqslim" />
 }

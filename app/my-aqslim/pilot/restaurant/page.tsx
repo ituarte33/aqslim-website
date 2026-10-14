@@ -14,7 +14,7 @@ export default async function RestaurantAdvisorPage() {
   if (!pilot || !pilotHasFeature(pilot, 'restaurant_advisor')) redirect('/my-aqslim/pilot')
 
   const patient = await getPatientPortalData()
-  if (!patient) redirect('/onboarding')
+  if (!patient) redirect('/my-aqslim/no-record')
 
   return <RestaurantAdvisor phase={patient.phase || 'Por confirmar'} language={pilot.language} />
 }

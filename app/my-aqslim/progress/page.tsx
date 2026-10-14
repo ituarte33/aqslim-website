@@ -4,7 +4,7 @@ import { ProgressView } from './progress-view'
 
 export default async function ProgressPage() {
   const data = await getPatientPortalData()
-  if (!data) redirect('/onboarding')
+  if (!data) redirect('/my-aqslim/no-record')
 
   return <ProgressView data={data} />
 }

@@ -16,7 +16,7 @@ export default async function FridgeRecipesPage() {
     getPatientPortalData(),
   ])
   if (!pilot || !pilotHasFeature(pilot, 'fridge_recipes')) redirect('/my-aqslim/pilot')
-  if (!patient) redirect('/onboarding')
+  if (!patient) redirect('/my-aqslim/no-record')
 
   return (
     <FridgeRecipes

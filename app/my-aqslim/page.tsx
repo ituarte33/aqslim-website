@@ -4,7 +4,7 @@ import { MyAqslimHomeView } from './home-view'
 
 export default async function MyAqslimHomePage() {
   const data = await getPatientPortalData()
-  if (!data) redirect('/onboarding')
+  if (!data) redirect('/my-aqslim/no-record')
 
   return <MyAqslimHomeView data={data} />
 }

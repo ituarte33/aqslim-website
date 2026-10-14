@@ -4,7 +4,7 @@ import { NutritionProfilePreviewForm } from './nutrition-profile-form'
 
 export default async function NutritionProfilePreviewPage() {
   const data = await getPatientPortalData()
-  if (!data) redirect('/onboarding')
+  if (!data) redirect('/my-aqslim/no-record')
 
   return (
     <NutritionProfilePreviewForm

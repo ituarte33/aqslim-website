@@ -5,7 +5,7 @@ import { MaterialsView } from './materials-view'
 
 export default async function MaterialsPage() {
   const data = await getPatientPortalData()
-  if (!data) redirect('/onboarding')
+  if (!data) redirect('/my-aqslim/no-record')
   const materialsData = await getPatientPortalMaterials(data.weekInPhase)
 
   return <MaterialsView data={data} materialsData={materialsData} />
