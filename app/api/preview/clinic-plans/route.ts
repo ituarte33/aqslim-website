@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
-import { getClienteById, getClientes, getPlanById } from '@/lib/airtable'
+import {
+  PLAN_AQSLIM_FIELDS,
+  createPlanForPatient,
+  getClienteById,
+  getClientes,
+  getPlanById,
+  updatePlan,
+} from '@/lib/airtable'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
@@ -180,6 +187,34 @@ function mapLivePlan(plan: any) {
   }
 }
 
+const PUBLISHED_PLAN_FIELDS = [
+  'planLabel', 'treatmentStart', 'phase', 'phaseWeek', 'phaseStart', 'calorieTarget',
+  'dietName', 'specialInstructions', 'kenkhoTier', 'startingWeightKg', 'currentWeightKg',
+  'goalWeightKg',
+] as const
+
+function publishedPlanMatches(draft: ReturnType<typeof mapDraft>, livePlan: ReturnType<typeof mapLivePlan>) {
+  return PUBLISHED_PLAN_FIELDS.every(field => (draft[field] ?? '') === (livePlan[field] ?? ''))
+}
+
+function livePlanFields(draft: ReturnType<typeof mapDraft>, patientName: string) {
+  return {
+    [PLAN_AQSLIM_FIELDS.PATIENT_NAME]: patientName,
+    [PLAN_AQSLIM_FIELDS.PLAN_LABEL]: draft.planLabel,
+    [PLAN_AQSLIM_FIELDS.TREATMENT_START]: draft.treatmentStart || null,
+    [PLAN_AQSLIM_FIELDS.PHASE]: draft.phase,
+    [PLAN_AQSLIM_FIELDS.WEEK]: draft.phaseWeek,
+    [PLAN_AQSLIM_FIELDS.PHASE_START]: draft.phaseStart || null,
+    [PLAN_AQSLIM_FIELDS.CALORIE_TARGET]: draft.calorieTarget,
+    [PLAN_AQSLIM_FIELDS.NUTRIMIND_DIET]: draft.dietName,
+    [PLAN_AQSLIM_FIELDS.SPECIAL_INSTRUCTIONS]: draft.specialInstructions,
+    [PLAN_AQSLIM_FIELDS.KENKHO_TIER]: draft.kenkhoTier === 'Clinic' ? null : draft.kenkhoTier,
+    [PLAN_AQSLIM_FIELDS.STARTING_WEIGHT_KG]: draft.startingWeightKg,
+    [PLAN_AQSLIM_FIELDS.CURRENT_WEIGHT_KG]: draft.currentWeightKg,
+    [PLAN_AQSLIM_FIELDS.GOAL_WEIGHT_KG]: draft.goalWeightKg,
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await requireFounder()
@@ -347,5 +382,106 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
     const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const actor = await requireFounder()
+    const body = await request.json() as Record<string, unknown>
+    if (body.confirmation !== 'PUBLICAR PLAN PREVIEW') {
+      return NextResponse.json({ ok: false, error: 'publication_confirmation_required' }, { status: 400 })
+    }
+
+    const patient = await resolvePatient(request, body)
+    if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found_or_ambiguous' }, { status: 404 })
+
+    const key = `${patient.id}:v1`
+    const params = new URLSearchParams({
+      maxRecords: '1',
+      filterByFormula: `{Plan Key} = "${escapeFormula(key)}"`,
+      returnFieldsByFieldId: 'true',
+    })
+    const draftResponse = await fetch(`${baseUrl()}?${params}`, { headers: headers(), cache: 'no-store' })
+    if (!draftResponse.ok) return NextResponse.json({ ok: false, error: 'draft_load_failed' }, { status: 500 })
+    const draftData = await draftResponse.json()
+    const draftRecord = draftData.records?.[0]
+    if (!draftRecord) return NextResponse.json({ ok: false, error: 'draft_not_found' }, { status: 404 })
+
+    const draft = mapDraft(draftRecord)
+    if (draft.status !== 'Ready for Review') {
+      return NextResponse.json({ ok: false, error: 'plan_not_ready_for_publication' }, { status: 409 })
+    }
+    const readiness = getClinicPlanReadiness(draft)
+    if (!readiness.ready) {
+      return NextResponse.json({
+        ok: false,
+        error: 'plan_not_ready',
+        missing: readiness.checks.filter(check => !check.passed).map(check => check.key),
+      }, { status: 400 })
+    }
+
+    const patientName = String(patient.fields['Nombre Completo'] ?? 'Paciente')
+    const linkedPlanIds = patient.fields['Plan AQSLIM']
+    const linkedPlanId = Array.isArray(linkedPlanIds) && linkedPlanIds[0] ? String(linkedPlanIds[0]) : null
+    const fields = livePlanFields(draft, patientName)
+    const published = linkedPlanId
+      ? await updatePlan(linkedPlanId, fields, { typecast: true })
+      : await createPlanForPatient(patient.id, fields, { typecast: true })
+
+    const verifiedPlanRecord = await getPlanById(published.id)
+    const verifiedLivePlan = mapLivePlan(verifiedPlanRecord)
+    if (!publishedPlanMatches(draft, verifiedLivePlan)) {
+      console.error('clinic_plan_publication_verify_failed', { reason: 'field_mismatch', updating: Boolean(linkedPlanId) })
+      return NextResponse.json({ ok: false, error: 'publication_verify_failed' }, { status: 500 })
+    }
+
+    if (!linkedPlanId) {
+      const verifiedPatient = await getClienteById(patient.id)
+      const verifiedLinks = verifiedPatient.fields['Plan AQSLIM']
+      if (!Array.isArray(verifiedLinks) || !verifiedLinks.includes(published.id)) {
+        console.error('clinic_plan_publication_verify_failed', { reason: 'patient_link_missing' })
+        return NextResponse.json({ ok: false, error: 'publication_verify_failed' }, { status: 500 })
+      }
+    }
+
+    const publishedAt = new Date().toISOString()
+    const auditResponse = await fetch(`${baseUrl()}/${draftRecord.id}?returnFieldsByFieldId=true`, {
+      method: 'PATCH',
+      headers: headers(),
+      cache: 'no-store',
+      body: JSON.stringify({
+        fields: {
+          [F.STATUS]: 'Published',
+          [F.AUTHOR_EMAIL]: actor.email,
+          [F.AUTHOR_LABEL]: 'Rom / Founder',
+          [F.UPDATED_AT]: publishedAt,
+        },
+        typecast: true,
+      }),
+    })
+    if (!auditResponse.ok) {
+      console.error('clinic_plan_publication_audit_failed', { status: auditResponse.status })
+      return NextResponse.json({ ok: true, livePlan: verifiedLivePlan, auditVerified: false })
+    }
+    const auditedDraft = await auditResponse.json()
+    if (auditedDraft.fields?.[F.STATUS] !== 'Published') {
+      console.error('clinic_plan_publication_audit_failed', { reason: 'status_mismatch' })
+      return NextResponse.json({ ok: true, livePlan: verifiedLivePlan, auditVerified: false })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      livePlan: verifiedLivePlan,
+      draft: mapDraft(auditedDraft),
+      auditVerified: true,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'FORBIDDEN'
+    if (!['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(message)) {
+      console.error('clinic_plan_publication_failed', { reason: message })
+    }
+    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : message === 'FORBIDDEN' ? 403 : 500
+    return NextResponse.json({ ok: false, error: status === 500 ? 'publication_failed' : undefined }, { status })
   }
 }

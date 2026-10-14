@@ -16,6 +16,22 @@ test('Clinic plan writes verify the exact saved Airtable record', async () => {
   assert.match(source, /identity_mismatch/)
 })
 
+test('Clinic plan publication is founder-only, double-confirmed, and verified against My AQSLIM', async () => {
+  const route = await readFile(new URL('../app/api/preview/clinic-plans/route.ts', import.meta.url), 'utf8')
+  const plan = await readFile(new URL('../app/clinic-plan-compatibility.tsx', import.meta.url), 'utf8')
+  assert.match(route, /export async function PUT/)
+  assert.match(route, /await requireFounder\(\)/)
+  assert.match(route, /confirmation !== 'PUBLICAR PLAN PREVIEW'/)
+  assert.match(route, /draft\.status !== 'Ready for Review'/)
+  assert.match(route, /publishedPlanMatches\(draft, verifiedLivePlan\)/)
+  assert.match(route, /clinic_plan_publication_verify_failed/)
+  assert.match(plan, /Revisar publicación en My AQSLIM/)
+  assert.match(plan, /Confirmar publicación/)
+  assert.match(plan, /publishGuard\.current/)
+  assert.match(plan, /publishedPlansMatch\(intendedPlan, verifiedLivePlan\)/)
+  assert.match(plan, /Plan publicado y verificado en My AQSLIM/)
+})
+
 test('Clinic date inputs expose stable labels and capture input events', async () => {
   const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
   const plan = await readFile(new URL('../app/clinic-plan-compatibility.tsx', import.meta.url), 'utf8')

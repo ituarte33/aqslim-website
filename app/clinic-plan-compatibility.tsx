@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { normalizeClinicWeightKg } from '@/lib/clinic-plan-format'
@@ -80,8 +80,18 @@ const verifiedPlanFields: Array<keyof PlanData> = [
   'startingWeightKg', 'currentWeightKg', 'goalWeightKg',
 ]
 
+const publishedPlanFields: Array<keyof PlanData> = [
+  'planLabel', 'treatmentStart', 'phase', 'phaseWeek', 'phaseStart', 'calorieTarget',
+  'dietName', 'specialInstructions', 'kenkhoTier', 'startingWeightKg', 'currentWeightKg',
+  'goalWeightKg',
+]
+
 function plansMatch(expected: PlanData, actual: PlanData) {
   return verifiedPlanFields.every(key => (expected[key] ?? '') === (actual[key] ?? ''))
+}
+
+function publishedPlansMatch(expected: PlanData, actual: PlanData) {
+  return publishedPlanFields.every(key => (expected[key] ?? '') === (actual[key] ?? ''))
 }
 
 export function ClinicPlanCompatibility() {
@@ -95,7 +105,10 @@ export function ClinicPlanCompatibility() {
   const [latestWeight, setLatestWeight] = useState<LatestWeightSuggestion | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishReviewOpen, setPublishReviewOpen] = useState(false)
   const [message, setMessage] = useState('')
+  const publishGuard = useRef(false)
 
   useEffect(() => {
     if (pathname !== '/clinic-preview') return
@@ -199,6 +212,7 @@ export function ClinicPlanCompatibility() {
         setLivePlan(data.livePlan ? normalizePlan(data.livePlan) : null)
         setLatestWeight(data.latestWeight ?? null)
         setDraft(data.draft ? normalizePlan({ ...emptyPlan, ...data.draft }) : emptyPlan)
+        setPublishReviewOpen(false)
       })
       .catch(() => { if (!cancelled) setMessage('No se pudo cargar el plan Preview de este paciente.') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -257,6 +271,41 @@ export function ClinicPlanCompatibility() {
     void persistDraft('Ready for Review')
   }
 
+  async function publishPlan() {
+    if (!patientId || !identity || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 || publishGuard.current) return
+    publishGuard.current = true
+    const intendedPlan = normalizePlan(draft)
+    setPublishing(true)
+    setMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-plans', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId, confirmation: 'PUBLICAR PLAN PREVIEW' }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error(data.error || 'publication_failed')
+
+      const verifyResponse = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const verifyData = await verifyResponse.json()
+      const verifiedLivePlan = verifyData.livePlan ? normalizePlan(verifyData.livePlan) : null
+      if (!verifyResponse.ok || !verifyData.ok || !verifiedLivePlan || !publishedPlansMatch(intendedPlan, verifiedLivePlan)) throw new Error('publication_verify_failed')
+
+      setLivePlan(verifiedLivePlan)
+      setDraft(verifyData.draft ? normalizePlan({ ...emptyPlan, ...verifyData.draft }) : normalizePlan({ ...intendedPlan, status: 'Published' }))
+      setPublishReviewOpen(false)
+      setMessage(data.auditVerified === false
+        ? '✓ Plan publicado y verificado en My AQSLIM. La bitácora Preview requiere revisión.'
+        : '✓ Plan publicado y verificado en My AQSLIM. El paciente ya puede ver la actualización.')
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'publication_failed'
+      setMessage(`No se pudo publicar y verificar el plan (${reason}). My AQSLIM no debe considerarse actualizado.`)
+    } finally {
+      setPublishing(false)
+      publishGuard.current = false
+    }
+  }
+
   function copyLivePlan() {
     if (!livePlan) return
     setDraft(normalizePlan({ ...emptyPlan, ...livePlan, status: 'Draft', visitCadenceDays: draft.visitCadenceDays ?? 7 }))
@@ -271,7 +320,10 @@ export function ClinicPlanCompatibility() {
 
   if (!active || !host || !identity) return null
 
-  const set = (key: keyof PlanData, value: any) => setDraft(prev => ({ ...prev, [key]: value, status: 'Draft' }))
+  const set = (key: keyof PlanData, value: any) => {
+    setPublishReviewOpen(false)
+    setDraft(prev => ({ ...prev, [key]: value, status: 'Draft' }))
+  }
   const field = inputStyle()
 
   return createPortal(
@@ -301,7 +353,7 @@ export function ClinicPlanCompatibility() {
           <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: '#0E0E0E' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Borrador Clinic</div>
-              <div style={{ padding: '8px 11px', borderRadius: 9, border: `1px solid ${draft.status === 'Ready for Review' ? 'rgba(106,160,116,.55)' : 'rgba(201,168,76,.30)'}`, background: draft.status === 'Ready for Review' ? 'rgba(106,160,116,.10)' : 'rgba(201,168,76,.06)', color: draft.status === 'Ready for Review' ? '#9ED4A8' : '#E2C87A', fontSize: 12 }}>{draft.status === 'Ready for Review' ? 'Listo para publicar' : 'Borrador'}</div>
+              <div style={{ padding: '8px 11px', borderRadius: 9, border: `1px solid ${draft.status === 'Published' || draft.status === 'Ready for Review' ? 'rgba(106,160,116,.55)' : 'rgba(201,168,76,.30)'}`, background: draft.status === 'Published' || draft.status === 'Ready for Review' ? 'rgba(106,160,116,.10)' : 'rgba(201,168,76,.06)', color: draft.status === 'Published' || draft.status === 'Ready for Review' ? '#9ED4A8' : '#E2C87A', fontSize: 12 }}>{draft.status === 'Published' ? 'Publicado' : draft.status === 'Ready for Review' ? 'Listo para publicar' : 'Borrador'}</div>
             </div>
 
             <div style={{ marginTop: 14 }}>{fieldLabel('Nombre / etiqueta del plan')}<input value={draft.planLabel || ''} onChange={e => set('planLabel', e.target.value)} placeholder="Ej. FAST 36 + Plan Hipocalórico" style={field} /></div>
@@ -340,10 +392,18 @@ export function ClinicPlanCompatibility() {
               </div>
             </div>
 
-            <button onClick={saveDraft} disabled={saving || !patientId} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar como borrador Preview'}</button>
-            <button onClick={markReady} disabled={saving || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
-            <button disabled style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.20)', background: 'rgba(226,142,142,.035)', color: '#9A7070', cursor: 'not-allowed', fontWeight: 600 }}>Publicar en My AQSLIM · bloqueado</button>
-            <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>La publicación real requiere una autorización posterior y no está implementada en esta etapa.</div>
+            <button onClick={saveDraft} disabled={saving || publishing || !patientId} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || publishing || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || publishing || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || publishing || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar como borrador Preview'}</button>
+            <button onClick={markReady} disabled={saving || publishing || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || publishing || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || publishing || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || publishing || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
+            <button onClick={() => setPublishReviewOpen(true)} disabled={saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.35)', background: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'rgba(226,142,142,.035)' : 'rgba(226,142,142,.12)', color: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? '#9A7070' : '#F0B1B1', cursor: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{draft.status === 'Published' ? 'Publicado en My AQSLIM' : changedFields.length === 0 ? 'My AQSLIM ya está actualizado' : 'Revisar publicación en My AQSLIM'}</button>
+            <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>Publicar requiere una segunda confirmación explícita y después relee el plan del paciente antes de mostrar éxito.</div>
+            {publishReviewOpen && <div style={{ marginTop: 12, padding: 14, borderRadius: 11, border: '1px solid rgba(226,142,142,.38)', background: 'rgba(226,142,142,.06)' }}>
+              <div style={{ color: '#F0B1B1', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Confirmación final</div>
+              <div style={{ color: '#D9D5CF', fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>Vas a reemplazar el plan visible en My AQSLIM para <strong>{identity.name}</strong> con <strong>{draft.planLabel}</strong>. Se actualizarán {changedFields.length} campos.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+                <button type="button" onClick={() => setPublishReviewOpen(false)} disabled={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: '#A9A49E', cursor: publishing ? 'not-allowed' : 'pointer' }}>Cancelar</button>
+                <button type="button" onClick={() => void publishPlan()} disabled={publishing} aria-busy={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(226,142,142,.55)', background: publishing ? 'rgba(226,142,142,.05)' : '#D88B8B', color: publishing ? '#9A7070' : '#0A0A0A', cursor: publishing ? 'wait' : 'pointer', fontWeight: 700 }}>{publishing ? 'Publicando y verificando…' : 'Confirmar publicación'}</button>
+              </div>
+            </div>}
             {message && <div role="status" aria-live="polite" style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
           </div>
 

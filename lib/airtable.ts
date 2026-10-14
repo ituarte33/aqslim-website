@@ -31,6 +31,7 @@ export const PLAN_AQSLIM_FIELDS = {
   PATIENT_NAME: 'fldsvAWD2ZSSmDDBV',
   PLAN_LABEL: 'fldQb7JzeqeelSkOL',
   TREATMENT_START: 'fldYRudQhtyJUxWf9',
+  PHASE: 'Fase Actual',
   WEEK: 'fld8w3QhNfAzjByAI',
   PHASE_START: 'fldHugDraBhgct0SC',
   CALORIE_TARGET: 'fldd7wEqWMjsnLRn8',
@@ -947,6 +948,7 @@ export async function getPlanById(id: string): Promise<PlanAqslim> {
 export async function createPlanForPatient(
   patientId: string,
   fields: Record<string, unknown>,
+  options?: { typecast?: boolean },
 ): Promise<PlanAqslim> {
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) throw new Error('Invalid patient record')
   return airtableFetch(`/${PLAN_AQSLIM_TABLE}`, {
@@ -956,6 +958,7 @@ export async function createPlanForPatient(
         ...fields,
         [PLAN_AQSLIM_FIELDS.PATIENT]: [patientId],
       },
+      ...(options?.typecast ? { typecast: true } : {}),
     }),
   })
 }
@@ -963,11 +966,12 @@ export async function createPlanForPatient(
 export async function updatePlan(
   id: string,
   fields: Record<string, unknown>,
+  options?: { typecast?: boolean },
 ): Promise<PlanAqslim> {
   if (!/^rec[A-Za-z0-9]{14}$/.test(id)) throw new Error('Invalid plan record')
   return airtableFetch(`/${PLAN_AQSLIM_TABLE}/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields, ...(options?.typecast ? { typecast: true } : {}) }),
   })
 }
 
