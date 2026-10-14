@@ -11,6 +11,7 @@ import {
   ProgressIcon,
 } from './portal-icons'
 import { usePortalLanguage } from './use-portal-language'
+import { demoProfilePath } from '@/lib/demo-profile-route'
 import styles from './portal.module.css'
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
   initialLanguage: 'es' | 'en'
   children: React.ReactNode
   demo?: boolean
+  demoProfileId?: string
 }
 
 const navItems = [
@@ -29,7 +31,7 @@ const navItems = [
   { href: '/my-aqslim/buddy', es: 'AQ Buddy', en: 'AQ Buddy', icon: BuddyIcon },
 ]
 
-export function PortalShell({ firstName, profileId, initialLanguage, children, demo = false }: Props) {
+export function PortalShell({ firstName, profileId, initialLanguage, children, demo = false, demoProfileId }: Props) {
   const pathname = usePathname()
   const [language, setLanguage] = usePortalLanguage(initialLanguage, profileId)
   const basePath = demo ? '/my-aqslim/demo' : '/my-aqslim'
@@ -38,7 +40,7 @@ export function PortalShell({ firstName, profileId, initialLanguage, children, d
   return (
     <div className={`${styles.portal} ${isBuddyPage ? styles.buddyPortal : ''}`} data-language={language}>
       <header className={styles.topbar}>
-        <Link href={basePath} className={styles.brand} aria-label="My AQSLIM">
+        <Link href={demoProfilePath(basePath, demo, demoProfileId)} className={styles.brand} aria-label="My AQSLIM">
           <span className={styles.brandMark} aria-hidden="true">◈</span>
           <span>AQSLIM</span>
         </Link>
@@ -84,7 +86,7 @@ export function PortalShell({ firstName, profileId, initialLanguage, children, d
             : pathname.startsWith(itemPath)
           const Icon = item.icon
           return (
-            <Link key={item.href} href={itemPath} className={`${styles.navItem} ${active ? styles.navActive : ''}`}>
+            <Link key={item.href} href={demoProfilePath(itemPath, demo, demoProfileId)} className={`${styles.navItem} ${active ? styles.navActive : ''}`}>
               <Icon />
               <span>{item[language]}</span>
             </Link>

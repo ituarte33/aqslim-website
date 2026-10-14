@@ -14,11 +14,11 @@ export default async function MyAqslimWelcomePage() {
         firstName={data?.firstName ?? pilot.firstName}
         profileId={data?.clienteId ?? pilot.clerkUserId}
         initialLanguage={data?.language ?? pilot.language}
-        destination="/my-aqslim/pilot"
+        destination="/my-aqslim"
       />
     )
   }
   if (!data) redirect('/onboarding')
 
-  return <WelcomeView firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} />
+  return <WelcomeView firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} destination="/my-aqslim" />
 }

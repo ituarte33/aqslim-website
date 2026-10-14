@@ -1,0 +1,426 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { usePathname } from 'next/navigation'
+import { normalizeClinicWeightKg } from '@/lib/clinic-plan-format'
+import { compareClinicPlans, getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
+import { toCanonicalPhaseName } from '@/lib/phase-names'
+
+type PlanData = {
+  status?: string
+  planLabel?: string
+  treatmentStart?: string
+  phase?: string
+  phaseWeek?: number | null
+  phaseStart?: string
+  calorieTarget?: number | null
+  dietName?: string
+  specialInstructions?: string
+  kenkhoTier?: string
+  visitCadenceDays?: number | null
+  startingWeightKg?: number | null
+  currentWeightKg?: number | null
+  goalWeightKg?: number | null
+  updatedAt?: string | null
+}
+
+type PatientIdentity = { name: string; email: string; phone: string }
+type LatestWeightSuggestion = { weight: number; unit: 'lb' | 'kg'; weightKg: number; date: string | null }
+
+type PlanPrepareDetail = {
+  livePlan?: PlanData | null
+  phase?: string
+  phaseWeek?: number | null
+}
+
+const emptyPlan: PlanData = {
+  status: 'Draft',
+  planLabel: '',
+  treatmentStart: '',
+  phase: 'Sin fase',
+  phaseWeek: null,
+  phaseStart: '',
+  calorieTarget: null,
+  dietName: '',
+  specialInstructions: '',
+  kenkhoTier: 'Clinic',
+  visitCadenceDays: 7,
+  startingWeightKg: null,
+  currentWeightKg: null,
+  goalWeightKg: null,
+}
+
+const CLINIC_PHASES = new Set(['Jing', 'Qi', 'Xue', 'Yang Sheng'])
+
+function inputStyle(): React.CSSProperties {
+  return { width: '100%', boxSizing: 'border-box', padding: '11px 12px', borderRadius: 9, background: '#111', color: '#FAFAF8', border: '1px solid rgba(201,168,76,.25)' }
+}
+
+function fieldLabel(text: string) {
+  return <div style={{ color: '#8E8881', fontSize: 10, letterSpacing: '.09em', textTransform: 'uppercase', marginBottom: 5 }}>{text}</div>
+}
+
+function numeric(value: number | null | undefined) {
+  return value === null || value === undefined || Number.isNaN(value) ? '' : String(value)
+}
+
+function normalizePlan(plan: PlanData): PlanData {
+  const canonicalPhase = toCanonicalPhaseName(plan.phase ?? null)
+  return {
+    ...plan,
+    phase: canonicalPhase && CLINIC_PHASES.has(canonicalPhase) ? canonicalPhase : 'Sin fase',
+    goalWeightKg: normalizeClinicWeightKg(plan.goalWeightKg),
+  }
+}
+
+const verifiedPlanFields: Array<keyof PlanData> = [
+  'status', 'planLabel', 'treatmentStart', 'phase', 'phaseWeek', 'phaseStart',
+  'calorieTarget', 'dietName', 'specialInstructions', 'kenkhoTier', 'visitCadenceDays',
+  'startingWeightKg', 'currentWeightKg', 'goalWeightKg',
+]
+
+const publishedPlanFields: Array<keyof PlanData> = [
+  'planLabel', 'treatmentStart', 'phase', 'phaseWeek', 'phaseStart', 'calorieTarget',
+  'dietName', 'specialInstructions', 'kenkhoTier', 'startingWeightKg', 'currentWeightKg',
+  'goalWeightKg',
+]
+
+function plansMatch(expected: PlanData, actual: PlanData) {
+  return verifiedPlanFields.every(key => (expected[key] ?? '') === (actual[key] ?? ''))
+}
+
+function publishedPlansMatch(expected: PlanData, actual: PlanData) {
+  return publishedPlanFields.every(key => (expected[key] ?? '') === (actual[key] ?? ''))
+}
+
+export function ClinicPlanCompatibility() {
+  const pathname = usePathname()
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  const [active, setActive] = useState(false)
+  const [identity, setIdentity] = useState<PatientIdentity | null>(null)
+  const [patientId, setPatientId] = useState('')
+  const [draft, setDraft] = useState<PlanData>(emptyPlan)
+  const [livePlan, setLivePlan] = useState<PlanData | null>(null)
+  const [latestWeight, setLatestWeight] = useState<LatestWeightSuggestion | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishReviewOpen, setPublishReviewOpen] = useState(false)
+  const [message, setMessage] = useState('')
+  const publishGuard = useRef(false)
+
+  useEffect(() => {
+    if (pathname !== '/clinic-preview') return
+
+    let hiddenContent: HTMLElement | null = null
+
+    const scrapeIdentity = (): PatientIdentity | null => {
+      const heading = [...document.querySelectorAll('h2')].find(el => {
+        const text = el.textContent?.trim() ?? ''
+        return text && text !== 'Selecciona un paciente'
+      })
+      if (!heading) return null
+      const name = heading.textContent?.trim() ?? ''
+      const card = heading.parentElement
+      const text = card?.textContent ?? ''
+      const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? ''
+      const phone = text.match(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/)?.[0] ?? ''
+      return name ? { name, email, phone } : null
+    }
+
+    const activatePlan = () => {
+      const navButtons = [...document.querySelectorAll('nav button')]
+      const planButton = navButtons.find(button => button.textContent?.trim() === 'Plan') as HTMLButtonElement | undefined
+      if (!planButton) return
+      const nav = planButton.parentElement as HTMLElement | null
+      if (!nav) return
+
+      let planHost = document.querySelector('[data-clinic-plan-host]') as HTMLElement | null
+      if (!planHost) {
+        planHost = document.createElement('div')
+        planHost.dataset.clinicPlanHost = 'true'
+        nav.insertAdjacentElement('afterend', planHost)
+      }
+      setHost(planHost)
+
+      const next = planHost.nextElementSibling as HTMLElement | null
+      if (next && !next.dataset.clinicPlanHost) {
+        hiddenContent = next
+        hiddenContent.style.display = 'none'
+      }
+      const nextIdentity = scrapeIdentity()
+      setIdentity(nextIdentity)
+      setActive(true)
+    }
+
+    const deactivate = () => {
+      if (hiddenContent) hiddenContent.style.display = ''
+      setActive(false)
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const button = (event.target as Element | null)?.closest('button')
+      const label = button?.textContent?.trim()
+      if (label === 'Plan') setTimeout(activatePlan, 0)
+      else if (label && ['Consultas', 'Notas', 'My AQSLIM', 'Mensajes', 'Seguimiento'].includes(label)) setTimeout(deactivate, 0)
+      else if (button && button.closest('aside')) setTimeout(deactivate, 0)
+    }
+
+    document.addEventListener('click', handleClick, true)
+    return () => {
+      document.removeEventListener('click', handleClick, true)
+      if (hiddenContent) hiddenContent.style.display = ''
+      document.querySelector('[data-clinic-plan-host]')?.remove()
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    if (pathname !== '/clinic-preview') return
+    const handlePrepare = (event: Event) => {
+      const detail = (event as CustomEvent<PlanPrepareDetail>).detail
+      if (!detail?.livePlan) return
+      setDraft(prev => normalizePlan({
+        ...emptyPlan,
+        ...detail.livePlan,
+        status: 'Draft',
+        phase: detail.phase && detail.phase !== 'Sin fase' ? detail.phase : (detail.livePlan?.phase || 'Sin fase'),
+        phaseWeek: detail.phaseWeek && detail.phaseWeek > 0 ? detail.phaseWeek : (detail.livePlan?.phaseWeek ?? null),
+        visitCadenceDays: prev.visitCadenceDays ?? detail.livePlan?.visitCadenceDays ?? 7,
+      }))
+      setMessage('Actualización preparada desde la última consulta. Revisa y guarda el borrador Preview.')
+    }
+    window.addEventListener('clinic-plan-prepare-update', handlePrepare as EventListener)
+    return () => window.removeEventListener('clinic-plan-prepare-update', handlePrepare as EventListener)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!active || !identity) return
+    let cancelled = false
+    setLoading(true)
+    setMessage('')
+    const params = new URLSearchParams({ patientName: identity.name })
+    if (identity.email) params.set('patientEmail', identity.email)
+    else if (identity.phone) params.set('patientPhone', identity.phone)
+
+    fetch(`/api/preview/clinic-plans?${params}`, { cache: 'no-store' })
+      .then(async response => ({ response, data: await response.json() }))
+      .then(({ response, data }) => {
+        if (cancelled) return
+        if (!response.ok || !data.ok) throw new Error('load_failed')
+        setPatientId(data.patient?.id ?? '')
+        setLivePlan(data.livePlan ? normalizePlan(data.livePlan) : null)
+        setLatestWeight(data.latestWeight ?? null)
+        setDraft(data.draft ? normalizePlan({ ...emptyPlan, ...data.draft }) : emptyPlan)
+        setPublishReviewOpen(false)
+      })
+      .catch(() => { if (!cancelled) setMessage('No se pudo cargar el plan Preview de este paciente.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [active, identity?.name, identity?.email, identity?.phone])
+
+  const cadenceNote = useMemo(() => {
+    const tier = draft.kenkhoTier || 'Clinic'
+    if (tier === 'Clinic') return 'Presencial: 7 días es la sugerencia estándar; puedes cambiarla.'
+    return `${tier}: la frecuencia automática del tier todavía no está fijada. Define los días manualmente por ahora.`
+  }, [draft.kenkhoTier])
+
+  const readiness = useMemo(() => getClinicPlanReadiness(draft), [draft])
+  const comparison = useMemo(() => compareClinicPlans(livePlan, draft), [livePlan, draft])
+  const changedFields = comparison.filter(item => item.changed)
+
+  async function persistDraft(status: 'Draft' | 'Ready for Review') {
+    if (!patientId || !identity) return
+    const intendedDraft = normalizePlan({ ...draft, status })
+    setSaving(true)
+    setMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId, ...intendedDraft }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error(data.error || 'save_failed')
+
+      const verifyResponse = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const verifyData = await verifyResponse.json()
+      if (!verifyResponse.ok || !verifyData.ok || !verifyData.draft || !plansMatch(intendedDraft, normalizePlan(verifyData.draft))) throw new Error('verify_failed')
+
+      setDraft(normalizePlan({ ...emptyPlan, ...verifyData.draft }))
+      setLivePlan(verifyData.livePlan ? normalizePlan(verifyData.livePlan) : livePlan)
+      setMessage(status === 'Ready for Review'
+        ? '✓ Plan marcado Listo para publicar y verificado en Clinic Preview. My AQSLIM todavía no fue modificado.'
+        : '✓ Borrador de plan guardado y verificado en Clinic Preview. Todavía no modifica My AQSLIM.')
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'save_failed'
+      setMessage(status === 'Ready for Review'
+        ? `El plan no pudo marcarse como listo (${reason}). Revisa los requisitos pendientes.`
+        : `No se pudo guardar y verificar el borrador (${reason}). Intenta de nuevo.`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function saveDraft() {
+    void persistDraft('Draft')
+  }
+
+  function markReady() {
+    if (!readiness.ready) return
+    void persistDraft('Ready for Review')
+  }
+
+  async function publishPlan() {
+    if (!patientId || !identity || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 || publishGuard.current) return
+    publishGuard.current = true
+    const intendedPlan = normalizePlan(draft)
+    setPublishing(true)
+    setMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-plans', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId, confirmation: 'PUBLICAR PLAN PREVIEW' }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) throw new Error(data.error || 'publication_failed')
+
+      const verifyResponse = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const verifyData = await verifyResponse.json()
+      const verifiedLivePlan = verifyData.livePlan ? normalizePlan(verifyData.livePlan) : null
+      if (!verifyResponse.ok || !verifyData.ok || !verifiedLivePlan || !publishedPlansMatch(intendedPlan, verifiedLivePlan)) throw new Error('publication_verify_failed')
+
+      setLivePlan(verifiedLivePlan)
+      setDraft(verifyData.draft ? normalizePlan({ ...emptyPlan, ...verifyData.draft }) : normalizePlan({ ...intendedPlan, status: 'Published' }))
+      setPublishReviewOpen(false)
+      setMessage(data.auditVerified === false
+        ? '✓ Plan publicado y verificado en My AQSLIM. La bitácora Preview requiere revisión.'
+        : '✓ Plan publicado y verificado en My AQSLIM. El paciente ya puede ver la actualización.')
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'publication_failed'
+      setMessage(`No se pudo publicar y verificar el plan (${reason}). My AQSLIM no debe considerarse actualizado.`)
+    } finally {
+      setPublishing(false)
+      publishGuard.current = false
+    }
+  }
+
+  function copyLivePlan() {
+    if (!livePlan) return
+    setDraft(normalizePlan({ ...emptyPlan, ...livePlan, status: 'Draft', visitCadenceDays: draft.visitCadenceDays ?? 7 }))
+    setMessage('Plan actual copiado al borrador. Revisa y guarda antes de continuar.')
+  }
+
+  function applyLatestWeightToDraft() {
+    if (!latestWeight) return
+    setDraft(prev => ({ ...prev, currentWeightKg: latestWeight.weightKg, status: 'Draft' }))
+    setMessage(`Sugerencia aplicada: ${latestWeight.weight} ${latestWeight.unit} = ${latestWeight.weightKg} kg. Revisa y guarda el borrador Preview si deseas conservarla.`)
+  }
+
+  if (!active || !host || !identity) return null
+
+  const set = (key: keyof PlanData, value: any) => {
+    setPublishReviewOpen(false)
+    setDraft(prev => ({ ...prev, [key]: value, status: 'Draft' }))
+  }
+  const field = inputStyle()
+
+  return createPortal(
+    <div style={{ maxWidth: 1040, margin: '0 auto 24px', display: 'grid', gap: 16 }}>
+      <div style={{ border: '1px solid rgba(201,168,76,.25)', borderRadius: 16, padding: 22, background: 'rgba(201,168,76,.035)' }}>
+        <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>Plan del paciente · Preview</div>
+        <h3 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 30, margin: '8px 0 6px' }}>{identity.name}</h3>
+        <div style={{ color: '#8E8881', fontSize: 12 }}>Trabaja aquí el borrador. El plan real de My AQSLIM permanece sin cambios hasta una publicación explícita.</div>
+      </div>
+
+      {loading ? <div style={{ color: '#9A9590', padding: 20 }}>Cargando plan…</div> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,.8fr) minmax(420px,1.2fr)', gap: 16, alignItems: 'start' }}>
+          <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 20, background: 'rgba(255,255,255,.02)' }}>
+            <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Plan actual · sólo lectura</div>
+            {!livePlan ? <div style={{ marginTop: 16, color: '#8E8881', lineHeight: 1.6 }}>No encontré un Plan AQSLIM actual vinculado a este paciente.</div> : <>
+              <div style={{ marginTop: 16, display: 'grid', gap: 12, color: '#D9D5CF', fontSize: 13 }}>
+                <div><strong>Fase:</strong>&nbsp;{livePlan.phase || 'Sin fase'}{livePlan.phaseWeek ? ` · semana ${livePlan.phaseWeek}` : ''}</div>
+                <div><strong>Dieta/plan:</strong> {livePlan.dietName || '—'}</div>
+                <div><strong>Calorías:</strong> {livePlan.calorieTarget ?? '—'}</div>
+                <div><strong>Kenkho:</strong> {livePlan.kenkhoTier || 'Clinic'}</div>
+                <div><strong>Instrucciones:</strong><div style={{ marginTop: 5, whiteSpace: 'pre-wrap', color: '#A9A49E' }}>{livePlan.specialInstructions || '—'}</div></div>
+              </div>
+              <button onClick={copyLivePlan} style={{ marginTop: 16, width: '100%', padding: '10px 12px', borderRadius: 9, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', cursor: 'pointer' }}>Copiar al borrador →</button>
+            </>}
+          </div>
+
+          <div style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: '#0E0E0E' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Borrador Clinic</div>
+              <div style={{ padding: '8px 11px', borderRadius: 9, border: `1px solid ${draft.status === 'Published' || draft.status === 'Ready for Review' ? 'rgba(106,160,116,.55)' : 'rgba(201,168,76,.30)'}`, background: draft.status === 'Published' || draft.status === 'Ready for Review' ? 'rgba(106,160,116,.10)' : 'rgba(201,168,76,.06)', color: draft.status === 'Published' || draft.status === 'Ready for Review' ? '#9ED4A8' : '#E2C87A', fontSize: 12 }}>{draft.status === 'Published' ? 'Publicado' : draft.status === 'Ready for Review' ? 'Listo para publicar' : 'Borrador'}</div>
+            </div>
+
+            <div style={{ marginTop: 14 }}>{fieldLabel('Nombre / etiqueta del plan')}<input value={draft.planLabel || ''} onChange={e => set('planLabel', e.target.value)} placeholder="Ej. FAST 36 + Plan Hipocalórico" style={field} /></div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+              <div>{fieldLabel('Inicio tratamiento')}<input aria-label="Inicio tratamiento" type="date" value={draft.treatmentStart || ''} onInput={event => set('treatmentStart', event.currentTarget.value)} onChange={event => set('treatmentStart', event.currentTarget.value)} style={field} /></div>
+              <div>{fieldLabel('Inicio fase')}<input aria-label="Inicio fase" type="date" value={draft.phaseStart || ''} onInput={event => set('phaseStart', event.currentTarget.value)} onChange={event => set('phaseStart', event.currentTarget.value)} style={field} /></div>
+              <div>{fieldLabel('Fase')}<select value={draft.phase || 'Sin fase'} onChange={e => set('phase', e.target.value)} style={field}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select></div>
+              <div>{fieldLabel('Semana en fase')}<input type="number" min="0" value={numeric(draft.phaseWeek)} onChange={e => set('phaseWeek', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>{fieldLabel('Dieta / nombre del plan')}<textarea rows={3} value={draft.dietName || ''} onChange={e => set('dietName', e.target.value)} placeholder="Nombre o descripción del plan alimentario" style={{ ...field, resize: 'vertical' }} /></div>
+            <div style={{ marginTop: 12 }}>{fieldLabel('Calorías objetivo')}<input type="number" min="0" value={numeric(draft.calorieTarget)} onChange={e => set('calorieTarget', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+            <div style={{ marginTop: 12 }}>{fieldLabel('Instrucciones especiales')}<textarea rows={5} value={draft.specialInstructions || ''} onChange={e => set('specialInstructions', e.target.value)} placeholder="Indicaciones importantes que debe ver el paciente y AQSLIM" style={{ ...field, resize: 'vertical' }} /></div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+              <div>{fieldLabel('Modalidad / Kenkho Tier')}<select value={draft.kenkhoTier || 'Clinic'} onChange={e => set('kenkhoTier', e.target.value)} style={field}><option>Clinic</option><option>Start</option><option>Plus</option><option>Elite</option></select></div>
+              <div>{fieldLabel('Cadencia de citas (días)')}<input type="number" min="1" value={numeric(draft.visitCadenceDays)} onChange={e => set('visitCadenceDays', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+            </div>
+            <div style={{ color: '#6F6A64', fontSize: 11, marginTop: 7, lineHeight: 1.5 }}>{cadenceNote}</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginTop: 12 }}>
+              <div>{fieldLabel('Peso inicio kg')}<input type="number" step="0.1" value={numeric(draft.startingWeightKg)} onChange={e => set('startingWeightKg', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+              <div>{fieldLabel('Peso actual kg')}<input type="number" step="0.1" value={numeric(draft.currentWeightKg)} onChange={e => set('currentWeightKg', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+              <div>{fieldLabel('Peso meta kg')}<input type="number" step="0.1" value={numeric(draft.goalWeightKg)} onChange={e => set('goalWeightKg', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+            </div>
+            {latestWeight && <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(201,168,76,.24)', borderRadius: 9, background: 'rgba(201,168,76,.045)', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div><div style={{ color: '#E2C87A', fontSize: 11 }}>Último peso registrado: {latestWeight.weight} {latestWeight.unit} · {latestWeight.weightKg} kg</div><div style={{ color: '#77716A', fontSize: 10, marginTop: 4 }}>Sugerencia únicamente; no cambia el borrador hasta que la uses.</div></div>
+              <button type="button" onClick={applyLatestWeightToDraft} style={{ padding: '9px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.38)', background: 'rgba(201,168,76,.10)', color: '#E2C87A', cursor: 'pointer' }}>Usar como peso actual →</button>
+            </div>}
+
+            <div style={{ marginTop: 18, border: '1px solid rgba(255,255,255,.08)', borderRadius: 11, padding: 14, background: 'rgba(255,255,255,.018)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><strong style={{ fontSize: 12, color: '#D9D5CF' }}>Validación previa</strong><span style={{ fontSize: 11, color: readiness.ready ? '#9ED4A8' : '#E2C87A' }}>{readiness.checks.filter(item => item.passed).length}/{readiness.checks.length}</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 12px', marginTop: 11 }}>
+                {readiness.checks.map(item => <div key={item.key} style={{ color: item.passed ? '#9ED4A8' : '#9A9590', fontSize: 11, lineHeight: 1.4 }}>{item.passed ? '✓' : '○'} {item.label}</div>)}
+              </div>
+            </div>
+
+            <button onClick={saveDraft} disabled={saving || publishing || !patientId} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || publishing || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || publishing || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || publishing || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar como borrador Preview'}</button>
+            <button onClick={markReady} disabled={saving || publishing || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || publishing || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || publishing || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || publishing || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
+            <button onClick={() => setPublishReviewOpen(true)} disabled={saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.35)', background: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'rgba(226,142,142,.035)' : 'rgba(226,142,142,.12)', color: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? '#9A7070' : '#F0B1B1', cursor: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{draft.status === 'Published' ? 'Publicado en My AQSLIM' : changedFields.length === 0 ? 'My AQSLIM ya está actualizado' : 'Revisar publicación en My AQSLIM'}</button>
+            <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>Publicar requiere una segunda confirmación explícita y después relee el plan del paciente antes de mostrar éxito.</div>
+            {publishReviewOpen && <div style={{ marginTop: 12, padding: 14, borderRadius: 11, border: '1px solid rgba(226,142,142,.38)', background: 'rgba(226,142,142,.06)' }}>
+              <div style={{ color: '#F0B1B1', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Confirmación final</div>
+              <div style={{ color: '#D9D5CF', fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>Vas a reemplazar el plan visible en My AQSLIM para <strong>{identity.name}</strong> con <strong>{draft.planLabel}</strong>. Se actualizarán {changedFields.length} campos.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+                <button type="button" onClick={() => setPublishReviewOpen(false)} disabled={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: '#A9A49E', cursor: publishing ? 'not-allowed' : 'pointer' }}>Cancelar</button>
+                <button type="button" onClick={() => void publishPlan()} disabled={publishing} aria-busy={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(226,142,142,.55)', background: publishing ? 'rgba(226,142,142,.05)' : '#D88B8B', color: publishing ? '#9A7070' : '#0A0A0A', cursor: publishing ? 'wait' : 'pointer', fontWeight: 700 }}>{publishing ? 'Publicando y verificando…' : 'Confirmar publicación'}</button>
+              </div>
+            </div>}
+            {message && <div role="status" aria-live="polite" style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
+          </div>
+
+          <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 20, background: 'rgba(255,255,255,.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div><div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Resumen de cambios</div><div style={{ color: '#8E8881', fontSize: 12, marginTop: 6 }}>{livePlan ? 'Plan actual de My AQSLIM comparado con el borrador Clinic.' : 'Este paciente no tiene un plan actual vinculado; el borrador sería un plan nuevo.'}</div></div>
+              <span style={{ color: '#E2C87A', fontSize: 12 }}>{changedFields.length} campos cambiarían</span>
+            </div>
+            {changedFields.length === 0 ? <div style={{ color: '#9ED4A8', fontSize: 12, marginTop: 16 }}>✓ El borrador coincide con el plan actual.</div> : <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+              {changedFields.map(item => <div key={String(item.key)} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 24px 1fr', gap: 10, alignItems: 'start', padding: '10px 12px', borderRadius: 9, background: 'rgba(201,168,76,.035)', fontSize: 12 }}>
+                <strong style={{ color: '#CDBE8B' }}>{item.label}</strong><span style={{ color: '#8E8881', whiteSpace: 'pre-wrap' }}>{item.current}</span><span style={{ color: '#C9A84C', textAlign: 'center' }}>→</span><span style={{ color: '#D9D5CF', whiteSpace: 'pre-wrap' }}>{item.draft}</span>
+              </div>)}
+            </div>}
+          </div>
+        </div>
+      )}
+    </div>,
+    host,
+  )
+}

@@ -13,7 +13,7 @@ export default function SignInPage() {
         path="/sign-in"
         routing="path"
         signUpUrl="/sign-up"
-        forceRedirectUrl="/food-scanner"
+        forceRedirectUrl="/my-aqslim"
       />
     </div>
   )

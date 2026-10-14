@@ -7,15 +7,18 @@ const LANG_KEY = 'aqslim-lang'
 
 export function LanguageModal() {
   const pathname = usePathname()
+  const hasDedicatedEntry = pathname.startsWith('/my-aqslim')
+    || pathname.startsWith('/clinic-preview')
   const [visible, setVisible] = useState(false)
   const [animateIn, setAnimateIn] = useState(false)
 
   useEffect(() => {
+    if (hasDedicatedEntry) return
     if (!localStorage.getItem(LANG_KEY)) {
       setVisible(true)
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimateIn(true)))
     }
-  }, [])
+  }, [hasDedicatedEntry])
 
   function pick(lang: 'es' | 'en') {
     localStorage.setItem(LANG_KEY, lang)
@@ -27,7 +30,7 @@ export function LanguageModal() {
     setTimeout(() => setVisible(false), 300)
   }
 
-  if (!visible || pathname.startsWith('/my-aqslim')) return null
+  if (!visible || hasDedicatedEntry) return null
 
   return (
     <div

@@ -1,0 +1,1166 @@
+'use client'
+
+import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
+import { buildGuidedPlan } from '@/lib/nutrition/assembler'
+import {
+  canPublishSyntheticDraft,
+  compareSyntheticPlans,
+  createSyntheticPublicationState,
+  hasSameSyntheticPlan,
+  SYNTHETIC_CLIENT,
+} from '@/lib/nutrition/synthetic-publication'
+import type {
+  SyntheticPlanComparison,
+  SyntheticPlanSnapshot,
+  SyntheticPublicationState,
+  SyntheticProfileChange,
+} from '@/lib/nutrition/synthetic-publication'
+import { parseSyntheticPublicationState } from '@/lib/nutrition/synthetic-publication-storage'
+import {
+  INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+  parseInternalPilotConsent,
+  type InternalPilotConsent,
+} from '@/lib/nutrition/synthetic-publication-ledger'
+import type {
+  CompletionComponent,
+  GuidedPlan,
+  MealSlot,
+  NutritionProfile,
+  PlateOption,
+  RecipeVariant,
+} from '@/lib/nutrition/types'
+import { GuidedPlanExperience } from '@/app/my-aqslim/plan/guided-plan-view'
+import { hasPilotRecipeDetail, RecipeDetailDialog } from '@/app/my-aqslim/plan/recipe-detail-dialog'
+import { DashboardShell } from '../dashboard-shell'
+import styles from './plan-preview.module.css'
+import { SyntheticQuestionnaire } from './synthetic-questionnaire'
+
+const SLOT_LABEL: Record<MealSlot, { es: string; en: string }> = {
+  first_meal: { es: 'Primera comida', en: 'First meal' },
+  lunch: { es: 'Comida', en: 'Lunch' },
+  dinner: { es: 'Cena', en: 'Dinner' },
+}
+
+const FOOD_LABEL: Record<string, { es: string; en: string }> = {
+  chicken: { es: 'pollo', en: 'chicken' },
+  dairy: { es: 'lácteos', en: 'dairy' },
+  egg: { es: 'huevo', en: 'egg' },
+  fish: { es: 'pescado', en: 'fish' },
+  'ground beef': { es: 'carne molida', en: 'ground beef' },
+  nopales: { es: 'nopales', en: 'nopales' },
+  pork: { es: 'cerdo', en: 'pork' },
+  sirloin: { es: 'bistec', en: 'steak' },
+  spinach: { es: 'espinaca', en: 'spinach' },
+  tilapia: { es: 'tilapia', en: 'tilapia' },
+}
+
+type Props = {
+  user: { firstName: string | null; lastName: string | null } | null
+  plans: readonly GuidedPlan[]
+  recipes: readonly RecipeVariant[]
+  components: readonly CompletionComponent[]
+  recipeVariantCount: number
+  componentCount: number
+}
+
+function foodList(values: readonly string[], lang: 'es' | 'en') {
+  return values.map(value => FOOD_LABEL[value]?.[lang] ?? value).join(', ')
+}
+
+function blockedMessage(status: GuidedPlan['status'], es: boolean) {
+  if (status === 'blocked_safety_review') {
+    return es
+      ? 'Los datos energéticos o una señal de seguridad requieren revisión humana antes de generar opciones.'
+      : 'The energy inputs or a safety signal require human review before generating choices.'
+  }
+  if (status === 'blocked_profile') {
+    return es
+      ? 'Este perfil está fuera de la cobertura autorizada para la prueba y requiere revisión humana.'
+      : 'This profile is outside the authorized test coverage and requires human review.'
+  }
+  return es
+    ? 'La biblioteca actual no tiene suficientes opciones compatibles para completar este perfil.'
+    : 'The current library does not have enough compatible choices to complete this profile.'
+}
+
+function pounds(kilograms: number) {
+  return Math.round(kilograms * 2.20462)
+}
+
+function activityLabel(activity: GuidedPlan['profile']['energyInputs']['activityLevel'], es: boolean) {
+  const labels = {
+    sedentary: es ? 'Actividad baja' : 'Low activity',
+    light: es ? 'Actividad ligera' : 'Light activity',
+    moderate: es ? 'Actividad moderada' : 'Moderate activity',
+  }
+  return labels[activity]
+}
+
+function resetPreviewScroll() {
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+}
+
+function workflowDate(value: string, lang: 'es' | 'en') {
+  return new Intl.DateTimeFormat(lang === 'es' ? 'es-US' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+type PlanStopExplanation = {
+  statusLabel: string
+  heading: string
+  details: readonly string[]
+  action: string
+}
+
+function planStopExplanation(plan: GuidedPlan, lang: 'es' | 'en'): PlanStopExplanation | null {
+  if (plan.status === 'ready_for_review') return null
+
+  const es = lang === 'es'
+  if (plan.status === 'blocked_safety_review') {
+    const medicationReview = plan.profile.safetyReviewRequired
+    return {
+      statusLabel: es ? 'Detenida por señal de seguridad' : 'Stopped by a safety signal',
+      heading: es
+        ? 'El perfil sí se calculó; el plan requiere revisión antes de guardarse.'
+        : 'The profile was calculated; the plan requires review before it can be saved.',
+      details: [medicationReview
+        ? (es
+          ? 'Se indicó que los medicamentos deben revisarse antes de generar y guardar opciones.'
+          : 'Medication review was requested before choices can be generated and saved.')
+        : (es
+          ? 'El cálculo energético quedó fuera de los límites autorizados de esta prueba.'
+          : 'The energy calculation is outside this test’s authorized limits.')],
+      action: medicationReview
+        ? (es
+          ? 'Vuelve al cuestionario. Usa “No en esta prueba” únicamente si el perfil ficticio no necesita esa revisión.'
+          : 'Return to the questionnaire. Use “Not in this test” only if the fictional profile does not need that review.')
+        : (es
+          ? 'Revisa edad, estatura, pesos y actividad; después genera las opciones otra vez.'
+          : 'Review age, height, weights, and activity, then generate the choices again.'),
+    }
+  }
+
+  if (plan.status === 'blocked_profile') {
+    return {
+      statusLabel: es ? 'Detenida por perfil fuera de cobertura' : 'Stopped because the profile is out of coverage',
+      heading: es
+        ? 'El perfil sí se creó; esta prueba todavía no puede convertirlo en un plan.'
+        : 'The profile was created; this test cannot convert it into a plan yet.',
+      details: [es
+        ? 'El Preview sólo cubre Jing con dos o tres comidas.'
+        : 'The Preview only covers Jing with two or three meals.'],
+      action: es
+        ? 'Corrige la configuración y vuelve a generar las opciones.'
+        : 'Correct the configuration and generate the choices again.',
+    }
+  }
+
+  const details: string[] = []
+  const incompleteGroups = plan.groups.filter(group => group.options.length < 3)
+  for (const group of incompleteGroups) {
+    details.push(es
+      ? `${SLOT_LABEL[group.slot].es}: ${group.options.length} de 3 opciones compatibles.`
+      : `${SLOT_LABEL[group.slot].en}: ${group.options.length} of 3 compatible choices.`)
+  }
+
+  if (plan.groups.length > 0 && (
+    plan.envelope.minCalories < plan.envelope.calorieFloor
+    || plan.envelope.maxCalories > plan.envelope.calorieCeiling
+  )) {
+    details.push(es
+      ? `Energía diaria posible: ${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal; rango permitido: ${plan.envelope.calorieFloor}–${plan.envelope.calorieCeiling} kcal.`
+      : `Possible daily energy: ${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal; allowed range: ${plan.envelope.calorieFloor}–${plan.envelope.calorieCeiling} kcal.`)
+  }
+  if (plan.groups.length > 0 && plan.envelope.maxNetCarbsG > plan.envelope.carbCeilingG) {
+    details.push(es
+      ? `Carbohidratos netos posibles: ${plan.envelope.maxNetCarbsG} g; máximo Jing: ${plan.envelope.carbCeilingG} g.`
+      : `Possible net carbs: ${plan.envelope.maxNetCarbsG} g; Jing maximum: ${plan.envelope.carbCeilingG} g.`)
+  }
+  if (
+    plan.groups.length > 0
+    && (
+      plan.envelope.minProteinG < plan.energyEstimate.proteinFloorG
+      || plan.envelope.maxProteinG > plan.energyEstimate.proteinCeilingG
+    )
+  ) {
+    details.push(es
+      ? `Proteína diaria para revisar: ${plan.envelope.minProteinG}–${plan.envelope.maxProteinG} g; rango de referencia: ${plan.energyEstimate.proteinFloorG}–${plan.energyEstimate.proteinCeilingG} g.`
+      : `Daily protein to review: ${plan.envelope.minProteinG}–${plan.envelope.maxProteinG} g; reference range: ${plan.energyEstimate.proteinFloorG}–${plan.energyEstimate.proteinCeilingG} g.`)
+  }
+
+  return {
+    statusLabel: incompleteGroups.length > 0
+      ? (es ? 'Detenida por cobertura incompleta' : 'Stopped by incomplete coverage')
+      : (es ? 'Detenida por compatibilidad diaria' : 'Stopped by daily compatibility'),
+    heading: es
+      ? 'El perfil sí se creó; el borrador del plan todavía no se puede guardar.'
+      : 'The profile was created; the plan draft cannot be saved yet.',
+    details: details.length > 0
+      ? details
+      : [es
+        ? 'Ninguna combinación diaria completa cumple todas las reglas de esta prueba.'
+        : 'No complete daily combination satisfies every rule in this test.'],
+    action: es
+      ? 'Ajusta el número de comidas, gustos o exclusiones y pulsa “Generar opciones con AQ Buddy” otra vez.'
+      : 'Adjust the meal count, preferences, or exclusions and select “Generate choices with AQ Buddy” again.',
+  }
+}
+
+const PROFILE_CHANGE_LABEL: Record<SyntheticProfileChange['field'], { es: string; en: string }> = {
+  phase: { es: 'Fase', en: 'Phase' },
+  calorieTarget: { es: 'Meta calórica', en: 'Calorie target' },
+  mealSlots: { es: 'Horarios', en: 'Meal slots' },
+  preferredFoods: { es: 'Prioriza', en: 'Prioritizes' },
+  dislikedFoods: { es: 'No le gusta', en: 'Dislikes' },
+  excludedFoods: { es: 'Exclusión estricta', en: 'Strict exclusion' },
+  ageYears: { es: 'Edad', en: 'Age' },
+  heightCm: { es: 'Estatura', en: 'Height' },
+  currentWeightKg: { es: 'Peso actual', en: 'Current weight' },
+  goalWeightKg: { es: 'Peso meta', en: 'Goal weight' },
+  activityLevel: { es: 'Actividad', en: 'Activity' },
+}
+
+function profileChangeValue(change: SyntheticProfileChange, value: string, lang: 'es' | 'en') {
+  const es = lang === 'es'
+  if (change.field === 'calorieTarget') return `${Number(value).toLocaleString(es ? 'es-MX' : 'en-US')} kcal`
+  if (change.field === 'heightCm') return `${value} cm`
+  if (change.field === 'currentWeightKg' || change.field === 'goalWeightKg') return `${value} kg`
+  if (change.field === 'ageYears') return es ? `${value} años` : `${value} years`
+  if (change.field === 'activityLevel') {
+    const labels: Record<string, { es: string; en: string }> = {
+      sedentary: { es: 'Actividad baja', en: 'Low activity' },
+      light: { es: 'Actividad ligera', en: 'Light activity' },
+      moderate: { es: 'Actividad moderada', en: 'Moderate activity' },
+    }
+    return labels[value]?.[lang] ?? value
+  }
+  const values = value ? value.split(', ').filter(Boolean) : []
+  if (change.field === 'mealSlots') {
+    return values.map(slot => SLOT_LABEL[slot as MealSlot]?.[lang] ?? slot).join(', ') || (es ? 'Ninguno' : 'None')
+  }
+  if (change.field === 'preferredFoods' || change.field === 'dislikedFoods' || change.field === 'excludedFoods') {
+    return values.map(food => FOOD_LABEL[food]?.[lang] ?? food).join(', ') || (es ? 'Ninguno' : 'None')
+  }
+  return value || (es ? 'Ninguno' : 'None')
+}
+
+function VersionComparison({
+  beforeVersion,
+  afterVersion,
+  comparison,
+  lang,
+}: {
+  beforeVersion: number
+  afterVersion: number
+  comparison: SyntheticPlanComparison
+  lang: 'es' | 'en'
+}) {
+  const es = lang === 'es'
+  const profileChanged = comparison.profileChanges.length > 0
+
+  return (
+    <section className={styles.versionComparison} aria-live="polite" data-testid="synthetic-version-comparison">
+      <header>
+        <div>
+          <span>{es ? 'Comparación de versiones' : 'Version comparison'}</span>
+          <strong>v{beforeVersion} → v{afterVersion}</strong>
+        </div>
+        <b className={comparison.clientDeliveryChanged ? styles.comparisonChanged : styles.comparisonUnchanged}>
+          {comparison.clientDeliveryChanged
+            ? (es ? 'Cambios visibles' : 'Visible changes')
+            : (es ? 'Sin cambios visibles' : 'No visible changes')}
+        </b>
+      </header>
+      {!comparison.clientDeliveryChanged ? (
+        <p className={styles.comparisonWarning}>{es
+          ? (profileChanged
+            ? 'El perfil cambió, pero el cliente recibiría las mismas recetas, porciones, complementos y macros. Esta versión no puede publicarse.'
+            : 'El perfil y el plan no presentan cambios visibles para el cliente. Esta versión no puede publicarse.')
+          : (profileChanged
+            ? 'The profile changed, but the client would receive the same recipes, portions, complements, and macros. This version cannot be published.'
+            : 'The profile and plan have no client-visible changes. This version cannot be published.')}</p>
+      ) : null}
+      <div className={styles.comparisonColumns}>
+        <div>
+          <h4>{es ? 'Perfil y reglas' : 'Profile and rules'}</h4>
+          {comparison.profileChanges.length > 0 ? (
+            <ul>{comparison.profileChanges.map(change => (
+              <li key={change.field}>
+                <strong>{PROFILE_CHANGE_LABEL[change.field][lang]}</strong>
+                <span>{profileChangeValue(change, change.before, lang)} → {profileChangeValue(change, change.after, lang)}</span>
+              </li>
+            ))}</ul>
+          ) : <p>{es ? 'Sin cambios de perfil.' : 'No profile changes.'}</p>}
+        </div>
+        <div>
+          <h4>{es ? 'Recetas y orden' : 'Recipes and order'}</h4>
+          {comparison.recipeChanges.length > 0 ? (
+            <ul>{comparison.recipeChanges.map(change => (
+              <li key={`${change.type}-${change.slot}-${change.familyId}`}>
+                <strong>{change.name[lang]}</strong>
+                <span>{SLOT_LABEL[change.slot][lang]} · {change.type === 'added'
+                  ? (es ? `añadida en posición ${change.afterPosition}` : `added at position ${change.afterPosition}`)
+                  : change.type === 'removed'
+                    ? (es ? `retirada de posición ${change.beforePosition}` : `removed from position ${change.beforePosition}`)
+                    : (es
+                      ? `posición ${change.beforePosition} → ${change.afterPosition}`
+                      : `position ${change.beforePosition} → ${change.afterPosition}`)}</span>
+              </li>
+            ))}</ul>
+          ) : <p>{es ? 'Mismas recetas y mismo orden.' : 'Same recipes in the same order.'}</p>}
+        </div>
+        <div>
+          <h4>{es ? 'Porciones, complementos y calorías' : 'Portions, complements, and calories'}</h4>
+          {comparison.detailChanges.length > 0 ? (
+            <ul>{comparison.detailChanges.map(change => (
+              <li key={`${change.slot}-${change.familyId}`}>
+                <strong>{change.name[lang]} · {SLOT_LABEL[change.slot][lang]}</strong>
+                {change.portion ? <span>{es ? 'Porción' : 'Portion'}: {change.portion.before[lang]} → {change.portion.after[lang]}</span> : null}
+                {change.components ? <span>{es ? 'Complementos' : 'Complements'}: {change.components.before.map(item => item[lang]).join(', ') || '—'} → {change.components.after.map(item => item[lang]).join(', ') || '—'}</span> : null}
+                {change.calories ? <span>{es ? 'Calorías' : 'Calories'}: {change.calories.before} → {change.calories.after} kcal</span> : null}
+                {change.macros ? <span>{es ? 'Macros' : 'Macros'}: {change.macros.before.proteinG} g P / {change.macros.before.netCarbsG} g CN / {change.macros.before.fatG} g G → {change.macros.after.proteinG} g P / {change.macros.after.netCarbsG} g CN / {change.macros.after.fatG} g G</span> : null}
+              </li>
+            ))}</ul>
+          ) : <p>{es ? 'Sin cambios en porciones, complementos o calorías.' : 'No changes to portions, complements, or calories.'}</p>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function PlanPreviewClient({ user, plans, recipes, components, recipeVariantCount, componentCount }: Props) {
+  const [lang, setLang] = useState<'es' | 'en'>('es')
+  const [selectedProfileId, setSelectedProfileId] = useState(plans[0]?.profile.id ?? '')
+  const [questionnairePlan, setQuestionnairePlan] = useState<GuidedPlan | null>(null)
+  const [openRecipe, setOpenRecipe] = useState<PlateOption | null>(null)
+  const [showTemporaryExperience, setShowTemporaryExperience] = useState(false)
+  const [experienceMode, setExperienceMode] = useState<'draft' | 'published'>('draft')
+  const [experienceSnapshot, setExperienceSnapshot] = useState<SyntheticPlanSnapshot | null>(null)
+  const [publication, setPublication] = useState(createSyntheticPublicationState)
+  const [publicationRevision, setPublicationRevision] = useState(0)
+  const [publicationStorageReady, setPublicationStorageReady] = useState(false)
+  const [publicationAvailable, setPublicationAvailable] = useState(false)
+  const [publicationBusy, setPublicationBusy] = useState(false)
+  const [publicationError, setPublicationError] = useState<string | null>(null)
+  const [showVersionComparison, setShowVersionComparison] = useState(false)
+  const [pilotConsent, setPilotConsent] = useState<InternalPilotConsent | null>(null)
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
+  const [deleteChecked, setDeleteChecked] = useState(false)
+  const es = lang === 'es'
+  const availablePlans = useMemo(
+    () => questionnairePlan ? [questionnairePlan, ...plans] : plans,
+    [plans, questionnairePlan],
+  )
+  const plan = useMemo(
+    () => availablePlans.find(item => item.profile.id === selectedProfileId) ?? availablePlans[0],
+    [availablePlans, selectedProfileId],
+  )
+  const combinationCount = useMemo(
+    () => plan.groups.length > 0
+      ? plan.groups.reduce((total, group) => total * group.options.length, 1)
+      : 0,
+    [plan.groups],
+  )
+  const generationPassed = plan.status === 'ready_for_review'
+  const isQuestionnairePlan = plan.profile.id === 'SYN-JING-QUESTIONNAIRE-DRAFT'
+  const draftMatchesCurrentPlan = Boolean(
+    publication.draft && hasSameSyntheticPlan(publication.draft.plan, plan),
+  )
+  const hasUnpublishedDraft = Boolean(
+    publication.draft && publication.published?.version !== publication.draft.version,
+  )
+  const comparisonPair = useMemo(() => {
+    if (hasUnpublishedDraft && publication.published && publication.draft) {
+      return { before: publication.published, after: publication.draft }
+    }
+    const history = publication.publishedVersions
+    if (history.length < 2) return null
+    return { before: history[history.length - 2], after: history[history.length - 1] }
+  }, [hasUnpublishedDraft, publication.draft, publication.published, publication.publishedVersions])
+  const versionComparison = useMemo(
+    () => comparisonPair ? compareSyntheticPlans(comparisonPair.before.plan, comparisonPair.after.plan) : null,
+    [comparisonPair],
+  )
+  const draftHasNoVisibleChanges = Boolean(
+    hasUnpublishedDraft
+    && comparisonPair?.after === publication.draft
+    && versionComparison
+    && !versionComparison.clientDeliveryChanged,
+  )
+  const reviewConfirmed = Boolean(
+    draftMatchesCurrentPlan
+    && hasUnpublishedDraft
+    && publication.review?.draftVersion === publication.draft?.version,
+  )
+  const coverageGap = plan.groups.find(group => group.options.length < 3)
+  const stopExplanation = planStopExplanation(plan, lang)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadPublication() {
+      try {
+        const response = await fetch(`/api/dashboard/plan-preview/publication?clientId=${encodeURIComponent(SYNTHETIC_CLIENT.id)}`, {
+          cache: 'no-store',
+        })
+        const payload: unknown = await response.json()
+        if (!response.ok || !payload || typeof payload !== 'object') throw new Error('load_failed')
+        const result = payload as { state?: unknown; revision?: unknown; consent?: unknown }
+        const restored = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
+        const restoredConsent = result.consent === null ? null : parseInternalPilotConsent(result.consent)
+        if (
+          !restored
+          || !Number.isInteger(result.revision)
+          || Number(result.revision) < 0
+          || (result.consent !== null && !restoredConsent)
+        ) throw new Error('invalid_state')
+        if (cancelled) return
+        applyPublication(restored, Number(result.revision), restoredConsent)
+        setPublicationAvailable(true)
+      } catch {
+        if (!cancelled) setPublicationError(es
+          ? 'No se pudo cargar el registro seguro de Preview. Los controles permanecen bloqueados.'
+          : 'The secure Preview record could not be loaded. Controls remain locked.')
+      } finally {
+        if (!cancelled) setPublicationStorageReady(true)
+      }
+    }
+    void loadPublication()
+    return () => { cancelled = true }
+    // The server record is loaded once; language changes must not repeat the request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    resetPreviewScroll()
+
+    let secondFrame = 0
+    const firstFrame = window.requestAnimationFrame(() => {
+      resetPreviewScroll()
+      secondFrame = window.requestAnimationFrame(resetPreviewScroll)
+    })
+    const delayedReset = window.setTimeout(resetPreviewScroll, 120)
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      window.cancelAnimationFrame(secondFrame)
+      window.clearTimeout(delayedReset)
+      window.history.scrollRestoration = previousScrollRestoration
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!showTemporaryExperience) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowTemporaryExperience(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [showTemporaryExperience])
+
+  function selectProfile(profileId: string) {
+    setShowTemporaryExperience(false)
+    setSelectedProfileId(profileId)
+    window.requestAnimationFrame(resetPreviewScroll)
+  }
+
+  function generateQuestionnairePlan(profile: NutritionProfile) {
+    const generatedPlan = buildGuidedPlan({ profile, recipes, components })
+    setShowTemporaryExperience(false)
+    setExperienceSnapshot(null)
+    setExperienceMode('draft')
+    setShowVersionComparison(false)
+    setQuestionnairePlan(generatedPlan)
+    setSelectedProfileId(profile.id)
+    window.requestAnimationFrame(resetPreviewScroll)
+  }
+
+  function openSyntheticExperience(
+    mode: 'draft' | 'published',
+    snapshot: SyntheticPlanSnapshot | null = mode === 'published' ? publication.published : publication.draft,
+  ) {
+    if (!snapshot) return
+    setExperienceMode(mode)
+    setExperienceSnapshot(snapshot)
+    setShowTemporaryExperience(true)
+  }
+
+  function applyPublication(
+    restored: SyntheticPublicationState,
+    revision: number,
+    consent: InternalPilotConsent | null = pilotConsent,
+  ) {
+    const restoredPlan = restored.draft?.plan ?? restored.published?.plan ?? null
+    setPublication(restored)
+    setPublicationRevision(revision)
+    setPilotConsent(consent)
+    if (restoredPlan) {
+      setQuestionnairePlan(restoredPlan)
+      setSelectedProfileId(restoredPlan.profile.id)
+      setShowVersionComparison(
+        Boolean(restored.published && restored.draft?.version !== restored.published.version)
+        || restored.publishedVersions.length >= 2,
+      )
+    }
+  }
+
+  async function updatePublication(action: Record<string, unknown>) {
+    setPublicationBusy(true)
+    setPublicationError(null)
+    try {
+      const response = await fetch('/api/dashboard/plan-preview/publication', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...action,
+          clientId: SYNTHETIC_CLIENT.id,
+          expectedRevision: publicationRevision,
+        }),
+      })
+      const payload: unknown = await response.json()
+      if (!payload || typeof payload !== 'object') throw new Error('invalid_response')
+      const result = payload as { state?: unknown; revision?: unknown; consent?: unknown; error?: unknown }
+      const nextState = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
+      const nextRevision = Number(result.revision)
+      const nextConsent = parseInternalPilotConsent(result.consent)
+      if (response.status === 409 && nextState && Number.isInteger(nextRevision)) {
+        applyPublication(nextState, nextRevision, result.consent === null ? null : nextConsent)
+        throw new Error('revision_conflict')
+      }
+      if (!response.ok || !nextState || !Number.isInteger(nextRevision) || !nextConsent) {
+        throw new Error(String(result.error ?? 'write_failed'))
+      }
+      applyPublication(nextState, nextRevision, nextConsent)
+      setExperienceSnapshot(null)
+      setShowVersionComparison(true)
+      return true
+    } catch (error) {
+      setPublicationError(error instanceof Error && error.message === 'revision_conflict'
+        ? (es
+          ? 'El registro cambió en otra sesión. Ya cargamos la versión más reciente; revisa antes de continuar.'
+          : 'The record changed in another session. The latest version is now loaded; review it before continuing.')
+        : (es
+          ? 'No se pudo guardar en Preview. No se aplicó ningún cambio local.'
+          : 'Preview could not be saved. No local change was applied.'))
+      return false
+    } finally {
+      setPublicationBusy(false)
+    }
+  }
+
+  async function saveCurrentSyntheticDraft() {
+    if (await updatePublication({ action: 'save_draft', plan })) setExperienceMode('draft')
+  }
+
+  async function publishCurrentSyntheticDraft() {
+    if (await updatePublication({ action: 'publish' })) setExperienceMode('published')
+  }
+
+  async function grantPilotConsent() {
+    if (!consentChecked) return
+    const saved = await updatePublication({
+      action: 'grant_personal_data_consent',
+      accepted: true,
+      noticeVersion: INTERNAL_PILOT_CONSENT_NOTICE_VERSION,
+    })
+    if (saved) setConsentChecked(false)
+  }
+
+  async function deleteMyPilotData() {
+    if (!deleteChecked) return
+    setPublicationBusy(true)
+    setPublicationError(null)
+    try {
+      const response = await fetch(`/api/dashboard/plan-preview/publication?clientId=${encodeURIComponent(SYNTHETIC_CLIENT.id)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmation: 'DELETE_MY_INTERNAL_PILOT_DATA',
+          expectedRevision: publicationRevision,
+        }),
+      })
+      const payload: unknown = await response.json()
+      if (!payload || typeof payload !== 'object') throw new Error('invalid_response')
+      const result = payload as { state?: unknown; revision?: unknown; consent?: unknown; error?: unknown }
+      const nextState = parseSyntheticPublicationState(result.state, SYNTHETIC_CLIENT)
+      const nextRevision = Number(result.revision)
+      if (response.status === 409 && nextState && Number.isInteger(nextRevision)) {
+        applyPublication(nextState, nextRevision, result.consent === null ? null : parseInternalPilotConsent(result.consent))
+        throw new Error('revision_conflict')
+      }
+      if (!response.ok || !nextState || nextRevision !== 0 || result.consent !== null) {
+        throw new Error(String(result.error ?? 'delete_failed'))
+      }
+      applyPublication(nextState, 0, null)
+      setQuestionnairePlan(null)
+      setSelectedProfileId(plans[0]?.profile.id ?? '')
+      setExperienceSnapshot(null)
+      setShowTemporaryExperience(false)
+      setShowVersionComparison(false)
+      setShowDeleteConfirmation(false)
+      setDeleteChecked(false)
+    } catch (error) {
+      setPublicationError(error instanceof Error && error.message === 'revision_conflict'
+        ? (es
+          ? 'El registro cambió en otra sesión. Ya cargamos la versión más reciente; confirma nuevamente el borrado.'
+          : 'The record changed in another session. The latest version is loaded; confirm deletion again.')
+        : (es
+          ? 'No se pudieron eliminar tus datos de Preview. No se ocultó ni simuló el resultado.'
+          : 'Your Preview data could not be deleted. The result was not hidden or simulated.'))
+    } finally {
+      setPublicationBusy(false)
+    }
+  }
+
+  if (!pilotConsent) {
+    return (
+      <DashboardShell user={user} lang={lang} setLang={setLang} isolatedPreview>
+        <div className={styles.page}>
+          <header className={styles.intro}>
+            <div>
+              <div className={styles.kicker}>{es ? 'Piloto interno · Preview aislado' : 'Internal pilot · Isolated Preview'}</div>
+              <h1>{es ? 'Activa tu piloto personal' : 'Activate your personal pilot'}</h1>
+              <p>{es
+                ? 'Antes de usar peso, estatura, meta y preferencias reales, necesitamos tu consentimiento individual.'
+                : 'Before using real weight, height, goal, and preferences, we need your individual consent.'}</p>
+            </div>
+            <span className={styles.syntheticBadge}>{es ? 'No es Producción' : 'Not Production'}</span>
+          </header>
+
+          <section className={styles.consentGate} aria-labelledby="pilot-consent-title">
+            <span>{es ? 'Consentimiento del piloto interno' : 'Internal pilot consent'}</span>
+            <h2 id="pilot-consent-title">{es ? 'Tus datos quedan vinculados sólo a tu cuenta' : 'Your data stays linked only to your account'}</h2>
+            <ul>
+              <li>{es ? 'Participación voluntaria para probar las herramientas de AQSLIM en Preview.' : 'Voluntary participation to test AQSLIM tools in Preview.'}</li>
+              <li>{es ? 'Al guardar, se conservarán tus medidas, preferencias, planes, revisiones y bitácora en el registro aislado de Preview.' : 'When saved, your measurements, preferences, plans, reviews, and audit history are kept in the isolated Preview record.'}</li>
+              <li>{es ? 'Cada cuenta sólo puede leer, modificar y eliminar sus propios datos del piloto.' : 'Each account can only read, modify, and delete its own pilot data.'}</li>
+              <li>{es ? 'No se incorporan clientes reales ni se modifica Producción. Este piloto no sustituye atención médica.' : 'No real clients are enrolled and Production is not modified. This pilot does not replace medical care.'}</li>
+              <li>{es ? 'No escribas diagnósticos ni nombres de medicamentos; usa únicamente la señal de revisión.' : 'Do not enter diagnoses or medication names; use only the review flag.'}</li>
+            </ul>
+            <label className={styles.consentCheck}>
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                disabled={!publicationStorageReady || !publicationAvailable || publicationBusy}
+                onChange={event => setConsentChecked(event.target.checked)}
+              />
+              <span>{es
+                ? 'Entiendo lo anterior y doy mi consentimiento para usar mis datos personales en este piloto interno.'
+                : 'I understand the above and consent to use my personal data in this internal pilot.'}</span>
+            </label>
+            <button
+              type="button"
+              disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !consentChecked}
+              onClick={() => void grantPilotConsent()}
+            >
+              {!publicationStorageReady
+                ? (es ? 'Verificando registro seguro…' : 'Checking secure record…')
+                : (es ? 'Aceptar y comenzar mi piloto' : 'Accept and start my pilot')}
+            </button>
+            {publicationError ? <p role="alert">{publicationError}</p> : null}
+          </section>
+        </div>
+      </DashboardShell>
+    )
+  }
+
+  return (
+    <DashboardShell user={user} lang={lang} setLang={setLang} isolatedPreview>
+      <div className={styles.page}>
+        <header className={styles.intro}>
+          <div>
+            <div className={styles.kicker}>{es ? 'Piloto personal interno · Preview aislado' : 'Internal personal pilot · Isolated Preview'}</div>
+            <h1>{es ? 'Mi plan personalizado' : 'My personalized plan'}</h1>
+            <p>{es
+              ? 'AQ Buddy calcula opciones con tus datos y mantiene el flujo dentro del piloto interno.'
+              : 'AQ Buddy calculates choices with your data and keeps the workflow inside the internal pilot.'}</p>
+          </div>
+          <div className={styles.headerActions}>
+            <span className={styles.syntheticBadge}>{es ? 'Datos personales · Preview' : 'Personal data · Preview'}</span>
+            {generationPassed && !isQuestionnairePlan ? (
+              <Link
+                href={{ pathname: '/my-aqslim/demo/plan', query: { profile: plan.profile.id } }}
+                className={styles.previewLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {es ? `Abrir vista de ${plan.profile.firstName} ↗` : `Open ${plan.profile.firstName}’s view ↗`}
+              </Link>
+            ) : isQuestionnairePlan && hasUnpublishedDraft ? (
+              <button
+                type="button"
+                className={`${styles.previewLink} ${styles.previewLinkButton}`}
+                onClick={() => openSyntheticExperience('draft')}
+              >
+                {es
+                  ? `Revisar borrador v${publication.draft?.version} ↗`
+                  : `Review draft v${publication.draft?.version} ↗`}
+              </button>
+            ) : isQuestionnairePlan && publication.published ? (
+              <button
+                type="button"
+                className={`${styles.previewLink} ${styles.previewLinkButton}`}
+                onClick={() => openSyntheticExperience('published')}
+              >
+                {es
+                  ? `Abrir versión publicada v${publication.published.version} ↗`
+                  : `Open published version v${publication.published.version} ↗`}
+              </button>
+            ) : isQuestionnairePlan ? (
+              <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
+                {generationPassed
+                  ? (es ? 'Guarda el borrador para abrirlo' : 'Save the draft to open it')
+                  : (es ? 'Experiencia temporal no disponible' : 'Temporary experience unavailable')}
+              </span>
+            ) : (
+              <span className={`${styles.previewLink} ${styles.previewLinkDisabled}`} aria-disabled="true">
+                {es ? `Vista de ${plan.profile.firstName} no disponible` : `${plan.profile.firstName}’s view unavailable`}
+              </span>
+            )}
+          </div>
+        </header>
+
+        <section className={styles.privacyBar}>
+          <div>
+            <strong>{es ? 'Consentimiento activo' : 'Consent active'}</strong>
+            <span>{es
+              ? `Registrado ${workflowDate(pilotConsent.grantedAt, lang)} · datos separados por cuenta`
+              : `Recorded ${workflowDate(pilotConsent.grantedAt, lang)} · data separated by account`}</span>
+          </div>
+          <button type="button" onClick={() => setShowDeleteConfirmation(value => !value)}>
+            {showDeleteConfirmation ? (es ? 'Cancelar' : 'Cancel') : (es ? 'Eliminar mis datos del piloto' : 'Delete my pilot data')}
+          </button>
+          {showDeleteConfirmation ? (
+            <div className={styles.deleteConfirmation}>
+              <strong>{es ? 'Esta acción elimina permanentemente tu consentimiento, perfil, borradores, versiones y bitácora de Preview.' : 'This permanently deletes your consent, profile, drafts, versions, and Preview audit history.'}</strong>
+              <label>
+                <input type="checkbox" checked={deleteChecked} onChange={event => setDeleteChecked(event.target.checked)} />
+                <span>{es ? 'Confirmo que deseo eliminar todos mis datos de este piloto.' : 'I confirm that I want to delete all my data from this pilot.'}</span>
+              </label>
+              <button type="button" disabled={!deleteChecked || publicationBusy} onClick={() => void deleteMyPilotData()}>
+                {es ? 'Eliminar definitivamente' : 'Delete permanently'}
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        <SyntheticQuestionnaire lang={lang} onGenerate={generateQuestionnairePlan} />
+
+        <section className={styles.profilePicker} aria-labelledby="synthetic-profile-title">
+          <div className={styles.profilePickerIntro}>
+            <div>
+              <span>{es ? 'Prueba de personalización y publicación v0.9' : 'Personalization and publishing test v0.9'}</span>
+              <h2 id="synthetic-profile-title">{es ? 'Cambia el perfil; AQ Buddy recalcula' : 'Change the profile; AQ Buddy recalculates'}</h2>
+            </div>
+            <p>{es
+              ? 'Estos perfiles ficticios comprueban que fase, número de comidas, gustos y exclusiones cambian el resultado sin armar cada plan a mano.'
+              : 'These fictional profiles verify that phase, meal count, preferences, and exclusions change the result without building every plan by hand.'}</p>
+          </div>
+          <div className={styles.profileOptions}>
+            {availablePlans.map(item => {
+              const active = item.profile.id === plan.profile.id
+              const ready = item.status === 'ready_for_review'
+              return (
+                <button
+                  key={item.profile.id}
+                  type="button"
+                  className={active ? styles.profileOptionActive : undefined}
+                  aria-pressed={active}
+                  onClick={() => selectProfile(item.profile.id)}
+                >
+                  <span className={ready ? styles.profileReady : styles.profileBlocked} />
+                  <strong>{item.profile.firstName}</strong>
+                  <small>{item.profile.calorieTarget.toLocaleString()} kcal {es ? 'calculadas' : 'calculated'} · {item.profile.mealSlots.length} {es ? 'comidas' : 'meals'}</small>
+                  <b>{ready ? (es ? 'Generado' : 'Generated') : (es ? 'Detenido' : 'Stopped')}</b>
+                </button>
+              )
+            })}
+          </div>
+          <dl className={styles.profileSignals}>
+            <div><dt>{es ? 'Prioriza' : 'Prioritizes'}</dt><dd>{foodList(plan.profile.preferredFoods, lang)}</dd></div>
+            <div><dt>{es ? 'No le gusta' : 'Dislikes'}</dt><dd>{plan.profile.dislikedFoods.length > 0 ? foodList(plan.profile.dislikedFoods, lang) : (es ? 'Sin dislikes' : 'No dislikes')}</dd></div>
+            <div><dt>{es ? 'Exclusión estricta' : 'Hard exclusion'}</dt><dd>{plan.profile.excludedFoods.length > 0 ? foodList(plan.profile.excludedFoods, lang) : (es ? 'Ninguna' : 'None')}</dd></div>
+          </dl>
+        </section>
+
+        <section className={styles.summaryGrid}>
+          <article className={styles.profileCard}>
+            <span>{es ? 'Perfil de prueba' : 'Test profile'}</span>
+            <strong>{plan.profile.firstName}</strong>
+            <small>{plan.profile.phase} · {plan.profile.mealSlots.length} {es ? 'comidas' : 'meals'} · {plan.profile.calorieTarget.toLocaleString()} kcal</small>
+          </article>
+          <article>
+            <span>{es ? 'Biblioteca piloto' : 'Pilot library'}</span>
+            <strong>{recipeVariantCount}</strong>
+            <small>{es ? 'variantes piloto calculadas' : 'calculated pilot variants'}</small>
+          </article>
+          <article>
+            <span>{es ? 'Componentes' : 'Components'}</span>
+            <strong>{componentCount}</strong>
+            <small>{es ? 'complementos sintéticos' : 'synthetic complements'}</small>
+          </article>
+          <article>
+            <span>{es ? 'Combinaciones diarias' : 'Daily combinations'}</span>
+            <strong>{combinationCount}</strong>
+            <small>{generationPassed ? (es ? 'compatibles automáticamente' : 'automatically compatible') : (es ? 'generación detenida' : 'generation stopped')}</small>
+          </article>
+        </section>
+
+        <div className={styles.workspace}>
+          <main className={styles.groups}>
+            {plan.groups.length > 0 ? plan.groups.map(group => (
+              <section key={group.slot} className={styles.groupCard}>
+                <header>
+                  <div>
+                    <span>{SLOT_LABEL[group.slot][lang]}</span>
+                    <h2>{Math.round(group.targetCalories)} kcal objetivo</h2>
+                  </div>
+                  <b>{group.options.length} {es ? 'de 3 opciones disponibles' : 'of 3 choices available'}</b>
+                </header>
+
+                <div className={styles.optionList}>
+                  {group.options.map((option, index) => (
+                    <article key={option.id} className={styles.optionCard}>
+                      <div className={styles.optionIndex}>{index + 1}</div>
+                      <div className={styles.optionCopy}>
+                        <div>
+                          <h3>{option.name[lang]}</h3>
+                          <span>{option.recipeId} · Banda {option.band}{option.conditional ? ` · ${es ? 'Condicional' : 'Conditional'}` : ''}</span>
+                        </div>
+                        <p>{option.portion[lang]}</p>
+                        {option.componentNames.length > 0 ? (
+                          <ul>{option.componentNames.map(component => <li key={component.es}>+ {component[lang]}</li>)}</ul>
+                        ) : null}
+                        {hasPilotRecipeDetail(option) ? (
+                          <button type="button" className={styles.recipeReviewButton} onClick={() => setOpenRecipe(option)}>
+                            {es ? 'Ver receta con foto ↗' : 'View photo recipe ↗'}
+                          </button>
+                        ) : null}
+                      </div>
+                      <dl className={styles.macros}>
+                        <div><dt>kcal</dt><dd>{option.totals.calories}</dd></div>
+                        <div><dt>{es ? 'Carbos netos' : 'Net carbs'}</dt><dd>{option.totals.netCarbsG} g</dd></div>
+                        <div><dt>{es ? 'Proteína' : 'Protein'}</dt><dd>{option.totals.proteinG} g</dd></div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )) : (
+              <section className={styles.blockedPanel}>
+                <span>{es ? 'Revisión requerida' : 'Review required'}</span>
+                <h2>{es ? 'AQ Buddy no improvisó un plan' : 'AQ Buddy did not improvise a plan'}</h2>
+                <p>{blockedMessage(plan.status, es)}</p>
+                <ul>
+                  <li>{es ? 'No se mostraron recetas incompatibles.' : 'No incompatible recipes were shown.'}</li>
+                  <li>{es ? 'No se aumentaron porciones fuera de las reglas.' : 'Portions were not increased beyond the rules.'}</li>
+                  <li>{es ? 'La publicación permanece desactivada.' : 'Publishing remains disabled.'}</li>
+                </ul>
+              </section>
+            )}
+          </main>
+
+          <aside className={styles.inspector}>
+            <div className={`${styles.statusCard} ${generationPassed ? '' : styles.blockedStatusCard}`}>
+              <div className={styles.statusItem}>
+                <span className={`${styles.statusDot} ${generationPassed ? '' : styles.stopDot}`} />
+                <div>
+                  <small>{es ? 'Validación automática' : 'Automated validation'}</small>
+                  <strong>{generationPassed
+                    ? (es ? `Aprobada · ${combinationCount}/${combinationCount} combinaciones` : `Passed · ${combinationCount}/${combinationCount} combinations`)
+                    : stopExplanation?.statusLabel}</strong>
+                </div>
+              </div>
+              <div className={styles.statusDivider} />
+              <div className={styles.statusItem}>
+                <span className={`${styles.statusDot} ${styles.reviewDot}`} />
+                <div>
+                  <small>{es ? 'Publicación' : 'Publishing'}</small>
+                  <strong className={publication.published && isQuestionnairePlan ? styles.publishedStatus : styles.reviewStatus}>
+                    {hasUnpublishedDraft && isQuestionnairePlan
+                      ? publication.published
+                        ? (es
+                          ? `Borrador v${publication.draft?.version} · publicada v${publication.published.version} sigue activa`
+                          : `Draft v${publication.draft?.version} · published v${publication.published.version} remains active`)
+                        : (es
+                          ? `Borrador v${publication.draft?.version} · sin versión publicada`
+                          : `Draft v${publication.draft?.version} · no published version`)
+                      : publication.published && isQuestionnairePlan
+                        ? (es ? `Publicada en simulación · v${publication.published.version}` : `Published in simulation · v${publication.published.version}`)
+                        : publication.draft && isQuestionnairePlan
+                        ? (es ? `Borrador v${publication.draft.version} · revisión pendiente` : `Draft v${publication.draft.version} · review pending`)
+                        : generationPassed
+                          ? (es ? 'Pendiente de revisión humana' : 'Pending human review')
+                          : (es ? 'No disponible' : 'Unavailable')}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <section>
+              <span>{es ? 'Cálculo energético sintético' : 'Synthetic energy calculation'}</span>
+              <h2>{plan.profile.calorieTarget.toLocaleString()} kcal</h2>
+              <dl>
+                <div><dt>{es ? 'Datos utilizados' : 'Inputs used'}</dt><dd>{plan.profile.energyInputs.ageYears} {es ? 'años' : 'years'} · {pounds(plan.profile.energyInputs.currentWeightKg)} lb · {plan.profile.energyInputs.heightCm} cm</dd></div>
+                <div><dt>{es ? 'Actividad' : 'Activity'}</dt><dd>{activityLabel(plan.profile.energyInputs.activityLevel, es)}</dd></div>
+                <div><dt>{es ? 'Mantenimiento estimado' : 'Estimated maintenance'}</dt><dd>{plan.energyEstimate.maintenanceCalories.toLocaleString()} kcal</dd></div>
+                <div><dt>{es ? 'Déficit aplicado' : 'Applied deficit'}</dt><dd>{plan.energyEstimate.appliedDeficitCalories} kcal · {plan.energyEstimate.deficitPercent}%</dd></div>
+                <div><dt>{es ? 'Proteína para revisión' : 'Protein review range'}</dt><dd>{plan.energyEstimate.proteinFloorG}–{plan.energyEstimate.proteinCeilingG} g/día</dd></div>
+              </dl>
+            </section>
+
+            {coverageGap ? (
+              <div className={styles.coverageNote}>
+                <span>{es ? 'Cobertura piloto' : 'Pilot coverage'}</span>
+                <strong>{SLOT_LABEL[coverageGap.slot][lang]}: {coverageGap.options.length} {es ? 'de 3 opciones disponibles' : 'of 3 choices available'}</strong>
+                <p>{es ? 'La prueba muestra la limitación; no inventa una tercera opción.' : 'The test shows the limitation; it does not invent a third choice.'}</p>
+              </div>
+            ) : null}
+
+            <section>
+              <span>{es ? 'Cápsula semanal' : 'Weekly capsule'}</span>
+              <h2>{plan.groups.reduce((total, group) => total + group.options.length, 0)} {es ? 'recetas activas' : 'active recipes'}</h2>
+              <dl>
+                <div><dt>{es ? 'Horizonte' : 'Horizon'}</dt><dd>{es ? '7 días' : '7 days'}</dd></div>
+                <div><dt>{es ? 'Por horario' : 'Per meal slot'}</dt><dd>{es ? 'Máximo 3' : 'Maximum 3'}</dd></div>
+                <div><dt>{es ? 'Lista de compra' : 'Grocery list'}</dt><dd>{es ? 'Sólo usos repetidos' : 'Repeated uses only'}</dd></div>
+              </dl>
+            </section>
+
+            <section>
+              <span>{es ? 'Sobre de compatibilidad' : 'Compatibility envelope'}</span>
+              <h2>{plan.envelope.passes
+                ? (es ? `${combinationCount} de ${combinationCount} combinaciones compatibles` : `${combinationCount} of ${combinationCount} compatible combinations`)
+                : (es ? 'Generación detenida' : 'Generation stopped')}</h2>
+              <dl>
+                <div><dt>{es ? 'Energía posible' : 'Possible energy'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.minCalories}–${plan.envelope.maxCalories} kcal` : '—'}</dd></div>
+                <div><dt>{es ? 'Rango permitido' : 'Allowed range'}</dt><dd>{plan.envelope.calorieFloor}–{plan.envelope.calorieCeiling} kcal</dd></div>
+                <div><dt>{es ? 'Máximo de carbos' : 'Maximum carbs'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.maxNetCarbsG}/${plan.envelope.carbCeilingG} g` : `—/${plan.envelope.carbCeilingG} g`}</dd></div>
+                <div><dt>{es ? 'Proteína posible' : 'Possible protein'}</dt><dd>{plan.groups.length > 0 ? `${plan.envelope.minProteinG}–${plan.envelope.maxProteinG} g` : '—'}</dd></div>
+              </dl>
+            </section>
+
+            <section>
+              <span>{es ? 'Reglas aplicadas' : 'Applied rules'}</span>
+              <ul className={styles.ruleList}>
+                <li>{es ? 'Seguridad antes que preferencias' : 'Safety before preferences'}</li>
+                <li>{es ? 'Máximo 3 opciones por comida' : 'Maximum 3 choices per meal'}</li>
+                <li>{es ? 'Favoritas priorizadas; “No repetir” no equivale a alergia' : 'Favorites prioritized; “Do not repeat” is not an allergy'}</li>
+                <li>{es ? 'Ingredientes de compra utilizados en 2 o más comidas' : 'Grocery ingredients used in 2 or more meals'}</li>
+                <li>{es ? 'Máximo 2 complementos' : 'Maximum 2 complements'}</li>
+                <li>{es ? 'Sin repetición forzada de familias' : 'No forced family repetition'}</li>
+                <li>{es ? 'Sin techo artificial de 2,000 kcal' : 'No artificial 2,000 kcal ceiling'}</li>
+                <li>{es ? 'Déficit controlado de 500–750 kcal' : 'Controlled 500–750 kcal deficit'}</li>
+              </ul>
+            </section>
+
+            {isQuestionnairePlan ? (
+              <div className={styles.publicationActions} data-testid="synthetic-publication-controls">
+                <div className={styles.publicationHeading}>
+                  <span>{es ? 'Flujo de publicación sintético' : 'Synthetic publishing workflow'}</span>
+                  <strong>{hasUnpublishedDraft
+                    ? publication.published
+                      ? (es
+                        ? `Borrador v${publication.draft?.version} · publicada v${publication.published.version} activa`
+                        : `Draft v${publication.draft?.version} · published v${publication.published.version} active`)
+                      : (es
+                        ? `Borrador v${publication.draft?.version} · sin versión publicada`
+                        : `Draft v${publication.draft?.version} · no published version`)
+                    : publication.published
+                      ? (es ? `Publicado v${publication.published.version}` : `Published v${publication.published.version}`)
+                      : publication.draft
+                      ? (es ? `Borrador v${publication.draft.version}` : `Draft v${publication.draft.version}`)
+                      : (es ? 'Sin guardar' : 'Not saved')}</strong>
+                </div>
+                <dl className={styles.workflowIdentity}>
+                  <div><dt>{es ? 'Cliente vinculado' : 'Linked client'}</dt><dd>{publication.client.displayName}</dd></div>
+                  <div><dt>ID sintético</dt><dd>{publication.client.id}</dd></div>
+                </dl>
+                {comparisonPair && versionComparison ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.comparisonToggle}
+                      aria-expanded={showVersionComparison}
+                      onClick={() => setShowVersionComparison(value => !value)}
+                    >
+                      {showVersionComparison
+                        ? (es ? 'Ocultar comparación' : 'Hide comparison')
+                        : (es
+                          ? `Comparar v${comparisonPair.before.version} con v${comparisonPair.after.version}`
+                          : `Compare v${comparisonPair.before.version} with v${comparisonPair.after.version}`)}
+                    </button>
+                    {showVersionComparison ? (
+                      <VersionComparison
+                        beforeVersion={comparisonPair.before.version}
+                        afterVersion={comparisonPair.after.version}
+                        comparison={versionComparison}
+                        lang={lang}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+                {stopExplanation ? (
+                  <div className={styles.publicationBlocker} role="status" aria-live="polite" id="synthetic-publication-blocker">
+                    <strong>{stopExplanation.heading}</strong>
+                    <ul>{stopExplanation.details.map(detail => <li key={detail}>{detail}</li>)}</ul>
+                    <p>{stopExplanation.action}</p>
+                  </div>
+                ) : null}
+                {publicationError ? (
+                  <div className={styles.publicationBlocker} role="alert" aria-live="assertive">
+                    <strong>{publicationError}</strong>
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className={styles.draftAction}
+                  disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !generationPassed || draftMatchesCurrentPlan}
+                  onClick={saveCurrentSyntheticDraft}
+                  aria-describedby={stopExplanation ? 'synthetic-publication-blocker' : undefined}
+                >
+                  {!generationPassed
+                    ? (es ? 'Plan detenido · revisa la causa' : 'Plan stopped · review the reason')
+                    : draftMatchesCurrentPlan
+                      ? (es ? `Plan guardado como borrador v${publication.draft?.version}` : `Plan saved as draft v${publication.draft?.version}`)
+                      : publication.draft
+                        ? (es
+                          ? `Guardar plan como borrador v${(publication.published?.version ?? 0) + 1}`
+                          : `Save plan as draft v${(publication.published?.version ?? 0) + 1}`)
+                        : (es ? 'Guardar plan como borrador v1' : 'Save plan as draft v1')}
+                </button>
+                <label className={styles.reviewConfirmation}>
+                  <input
+                    type="checkbox"
+                    checked={reviewConfirmed}
+                    disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !hasUnpublishedDraft || !draftMatchesCurrentPlan || draftHasNoVisibleChanges}
+                    onChange={event => void updatePublication({ action: 'review', confirmed: event.target.checked })}
+                  />
+                  <span>{es
+                    ? 'Confirmo que revisé calorías, exclusiones y la señal de medicamentos.'
+                    : 'I confirm that I reviewed calories, exclusions, and the medication flag.'}</span>
+                </label>
+                <button
+                  type="button"
+                  className={styles.publishAction}
+                  disabled={!publicationStorageReady || !publicationAvailable || publicationBusy || !canPublishSyntheticDraft(publication) || !draftMatchesCurrentPlan}
+                  onClick={publishCurrentSyntheticDraft}
+                >
+                  {canPublishSyntheticDraft(publication)
+                    ? (publication.published
+                      ? (es ? `Publicar v${publication.draft?.version} y reemplazar v${publication.published.version}` : `Publish v${publication.draft?.version} and replace v${publication.published.version}`)
+                      : (es ? 'Simular aprobación y publicación' : 'Simulate approval and publishing'))
+                    : draftHasNoVisibleChanges
+                      ? (es ? 'Sin cambios visibles para publicar' : 'No visible changes to publish')
+                    : publication.published && !hasUnpublishedDraft
+                      ? (es ? `Versión v${publication.published.version} publicada` : `Version v${publication.published.version} published`)
+                      : (es ? 'Revisión humana requerida' : 'Human review required')}
+                </button>
+                {publication.review ? (
+                  <div className={styles.reviewRecord}>
+                    <span>{es ? 'Revisión registrada' : 'Review recorded'}</span>
+                    <strong>{publication.review.reviewer.displayName}</strong>
+                    <small>{workflowDate(publication.review.reviewedAt, lang)} · v{publication.review.draftVersion}</small>
+                  </div>
+                ) : null}
+                {publication.publishedVersions.length > 0 ? (
+                  <div className={styles.versionHistory}>
+                    <span>{es ? 'Historial conservado' : 'Preserved history'}</span>
+                    {[...publication.publishedVersions].reverse().map(version => (
+                      <article key={version.version}>
+                        <div>
+                          <strong>v{version.version} {version.version === publication.published?.version
+                            ? (es ? '· Activa' : '· Active')
+                            : (es ? '· Reemplazada' : '· Replaced')}</strong>
+                          <small>{workflowDate(version.publishedAt, lang)} · {version.publishedBy.displayName}</small>
+                        </div>
+                        <button type="button" onClick={() => openSyntheticExperience('published', version)}>
+                          {es ? 'Abrir' : 'Open'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+                {publication.auditTrail.length > 0 ? (
+                  <details className={styles.auditTrail}>
+                    <summary>{es ? `Ver bitácora (${publication.auditTrail.length})` : `View audit trail (${publication.auditTrail.length})`}</summary>
+                    <ol>
+                      {publication.auditTrail.map(event => (
+                        <li key={event.id}>
+                          <strong>{event.type === 'draft_saved'
+                            ? (es ? 'Borrador guardado' : 'Draft saved')
+                            : event.type === 'review_confirmed'
+                              ? (es ? 'Revisión confirmada' : 'Review confirmed')
+                              : event.type === 'review_cleared'
+                                ? (es ? 'Revisión retirada' : 'Review cleared')
+                              : (es ? 'Versión publicada' : 'Version published')}</strong>
+                          <span>v{event.version} · {event.actor.displayName} · {workflowDate(event.at, lang)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ) : null}
+                <p>{es
+                  ? 'Registro seguro de Preview: persiste en Airtable por cuenta y cliente sintético. No modifica tablas operativas ni llega a clientes reales.'
+                  : 'Secure Preview record: persisted in Airtable per account and synthetic client. It does not modify operational tables or reach real clients.'}</p>
+              </div>
+            ) : (
+              <div className={styles.disabledActions}>
+                <button type="button" disabled>{es ? 'Guardar borrador' : 'Save draft'}</button>
+                <button type="button" disabled>{es ? 'Aprobar y publicar' : 'Approve and publish'}</button>
+                <p>{es
+                  ? 'Controles desconectados: esta etapa no escribe en Airtable ni publica a usuarios.'
+                  : 'Disconnected controls: this stage neither writes to Airtable nor publishes to users.'}</p>
+              </div>
+            )}
+          </aside>
+        </div>
+
+        <RecipeDetailDialog option={openRecipe} language={lang} context="review" onClose={() => setOpenRecipe(null)} />
+      </div>
+
+      {showTemporaryExperience && isQuestionnairePlan && experienceSnapshot ? (
+        <div className={styles.temporaryExperienceOverlay} role="dialog" aria-modal="true" aria-labelledby="temporary-experience-title">
+          <header className={styles.temporaryExperienceHeader}>
+            <div>
+              <span>{experienceMode === 'published'
+                ? (es
+                  ? `Versión publicada simulada · v${experienceSnapshot.version}`
+                  : `Simulated published version · v${experienceSnapshot.version}`)
+                : (es
+                  ? `Vista previa del borrador · v${experienceSnapshot.version}`
+                  : `Draft preview · v${experienceSnapshot.version}`)}</span>
+              <strong id="temporary-experience-title">{experienceMode === 'published'
+                ? (es ? 'Así recibiría el cliente esta versión' : 'How the client would receive this version')
+                : (es ? 'Revisión del borrador antes de publicar' : 'Draft review before publishing')}</strong>
+            </div>
+            <button type="button" onClick={() => setShowTemporaryExperience(false)} aria-label={es ? 'Cerrar experiencia temporal' : 'Close temporary experience'}>
+              ×
+            </button>
+          </header>
+          <main className={styles.temporaryExperienceBody}>
+            <GuidedPlanExperience
+              plan={experienceSnapshot.plan}
+              language={lang}
+              guidePath="/my-aqslim/demo/materials"
+              persistPreferences={false}
+              showGuideActions={false}
+            />
+          </main>
+        </div>
+      ) : null}
+    </DashboardShell>
+  )
+}

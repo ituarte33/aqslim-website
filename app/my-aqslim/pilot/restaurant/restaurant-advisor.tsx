@@ -33,6 +33,42 @@ async function optimizeImage(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', .84).split(',')[1]
 }
 
+function advisorErrorMessage(errorCode: string, es: boolean) {
+  if (errorCode === 'invalid_image') {
+    return es
+      ? 'No pudimos usar esa imagen. Prueba con una foto JPG, PNG o WEBP más clara y completa.'
+      : 'We could not use that image. Try a clearer, more complete JPG, PNG, or WEBP image.'
+  }
+  if (errorCode === 'provider_unavailable') {
+    return es
+      ? 'El analizador de menú no está disponible temporalmente. Puedes reintentar con la misma foto.'
+      : 'The menu analyzer is temporarily unavailable. You can retry with the same photo.'
+  }
+  if (errorCode === 'analysis_incomplete') {
+    return es
+      ? 'La foto llegó al analizador, pero la respuesta no pudo completarse. Puedes reintentar con la misma foto; no significa que el menú sea ilegible.'
+      : 'The photo reached the analyzer, but the response could not be completed. You can retry with the same photo; this does not mean the menu is unreadable.'
+  }
+  if (errorCode === 'phase_required') {
+    return es
+      ? 'No pudimos confirmar tu fase AQSLIM para analizar este menú.'
+      : 'We could not confirm your AQSLIM phase for this menu analysis.'
+  }
+  if (errorCode === 'Forbidden') {
+    return es
+      ? 'Esta función no está disponible con tu acceso actual.'
+      : 'This feature is not available with your current access.'
+  }
+  if (errorCode === 'network_error') {
+    return es
+      ? 'Hubo un problema de conexión. Intenta nuevamente con la misma foto.'
+      : 'There was a connection problem. Try again with the same photo.'
+  }
+  return es
+    ? 'No pudimos completar el análisis del menú. Intenta nuevamente.'
+    : 'We could not complete the menu analysis. Please try again.'
+}
+
 export function RestaurantAdvisor({ phase, language }: { phase: string; language: 'es' | 'en' }) {
   const es = language === 'es'
   const fileRef = useRef<HTMLInputElement>(null)
@@ -74,7 +110,7 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
       const data = await response.json()
       if (!response.ok) {
         const errorCode = data.error || 'analysis_failed'
-        setError(es ? 'No pudimos analizar el menú. Inténtalo con una foto más clara.' : 'We could not analyze the menu. Try a clearer photo.')
+        setError(advisorErrorMessage(errorCode, es))
         setFeedbackTarget({
           id: crypto.randomUUID(),
           context: { restaurant, phase, errorCode, correlationId: data.correlationId ?? null },
@@ -85,7 +121,7 @@ export function RestaurantAdvisor({ phase, language }: { phase: string; language
       setFeedbackTarget({ id: crypto.randomUUID(), context: { restaurant, phase, result: data } })
     } catch {
       const errorCode = 'network_error'
-      setError(es ? 'No pudimos analizar el menú. Inténtalo con una foto más clara.' : 'We could not analyze the menu. Try a clearer photo.')
+      setError(advisorErrorMessage(errorCode, es))
       setFeedbackTarget({ id: crypto.randomUUID(), context: { restaurant, phase, errorCode } })
     } finally {
       setLoading(false)

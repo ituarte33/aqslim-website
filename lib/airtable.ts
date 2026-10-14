@@ -2,6 +2,7 @@ import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
 import { filterConsultationsForPatient } from './patient-portal-policy'
 import type { PilotFeedbackInput, PilotFeedbackStatus } from './pilot-feedback'
+import type { SyntheticLedgerEntry, SyntheticLedgerEventType } from './nutrition/synthetic-publication-ledger'
 
 const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
 
@@ -9,12 +10,28 @@ export const CLIENTES_TABLE = 'tblek9goIGKMRJKXJ'
 export const PILOT_FEEDBACK_TABLE = 'tbl0yg7fqfaXS5Dva'
 export const PLAN_AQSLIM_TABLE = 'tblO1xi8kyIcpw5cY'
 export const FAST_36_MEASUREMENTS_TABLE = 'tblgOIGTREU63FdW0'
+export const SYNTHETIC_PREVIEW_LEDGER_TABLE = 'tblVqKHjbyTNJayHn'
+
+export const SYNTHETIC_PREVIEW_LEDGER_FIELDS = {
+  ENTRY_KEY: 'fldv1rMkX5g5yMq3f',
+  SCOPE_KEY: 'fldP85h7FE2KCfsHj',
+  ACCOUNT_ID: 'fldOpTiQtm0y636Wc',
+  CLIENT_ID: 'fldSoPh0L4DrLQnCO',
+  REVISION: 'fld52Ycve3LtDsTI6',
+  EVENT_TYPE: 'fldgQd8qliV4vBUDk',
+  PLAN_VERSION: 'fldWBaHS8SckaRPXy',
+  PLAN_JSON: 'fldwG83GxA7R1kGSk',
+  ACTOR_ID: 'fldngaUWNQzjfSnE5',
+  ACTOR_LABEL: 'fldUvyWCgs6GZyOhz',
+  EVENT_AT: 'fld2Sa5YrSCOoaX18',
+} as const
 
 export const PLAN_AQSLIM_FIELDS = {
   PATIENT: 'fld5egFOgztSG8qgU',
   PATIENT_NAME: 'fldsvAWD2ZSSmDDBV',
   PLAN_LABEL: 'fldQb7JzeqeelSkOL',
   TREATMENT_START: 'fldYRudQhtyJUxWf9',
+  PHASE: 'Fase Actual',
   WEEK: 'fld8w3QhNfAzjByAI',
   PHASE_START: 'fldHugDraBhgct0SC',
   CALORIE_TARGET: 'fldd7wEqWMjsnLRn8',
@@ -258,6 +275,107 @@ export async function getClientesPage({
 
 function escapeAirtableString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+type SyntheticLedgerAirtableRecord = {
+  id: string
+  fields: Record<string, unknown>
+}
+
+function syntheticLedgerEntryFromRecord(record: SyntheticLedgerAirtableRecord): SyntheticLedgerEntry {
+  const fields = record.fields
+  const text = (fieldId: string) => typeof fields[fieldId] === 'string' ? fields[fieldId] as string : ''
+  const number = (fieldId: string) => typeof fields[fieldId] === 'number' ? fields[fieldId] as number : Number.NaN
+  return {
+    entryKey: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.ENTRY_KEY),
+    scopeKey: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.SCOPE_KEY),
+    accountId: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACCOUNT_ID),
+    clientId: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.CLIENT_ID),
+    revision: number(SYNTHETIC_PREVIEW_LEDGER_FIELDS.REVISION),
+    eventType: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.EVENT_TYPE) as SyntheticLedgerEventType,
+    planVersion: number(SYNTHETIC_PREVIEW_LEDGER_FIELDS.PLAN_VERSION),
+    planJson: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.PLAN_JSON) || null,
+    actor: {
+      id: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACTOR_ID),
+      displayName: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACTOR_LABEL),
+    },
+    at: text(SYNTHETIC_PREVIEW_LEDGER_FIELDS.EVENT_AT),
+  }
+}
+
+async function getSyntheticLedgerAirtableRecords(scopeKey: string): Promise<SyntheticLedgerAirtableRecord[]> {
+  const records: SyntheticLedgerAirtableRecord[] = []
+  let offset: string | undefined
+
+  do {
+    const escapedScope = escapeAirtableString(scopeKey)
+    const params = new URLSearchParams({
+      pageSize: '100',
+      filterByFormula: `{Scope Key} = "${escapedScope}"`,
+      'sort[0][field]': SYNTHETIC_PREVIEW_LEDGER_FIELDS.REVISION,
+      'sort[0][direction]': 'asc',
+      returnFieldsByFieldId: 'true',
+    })
+    if (offset) params.set('offset', offset)
+    const data = await airtableFetch(`/${SYNTHETIC_PREVIEW_LEDGER_TABLE}?${params}`)
+    records.push(...(data.records ?? []))
+    offset = typeof data.offset === 'string' ? data.offset : undefined
+  } while (offset)
+
+  return records
+}
+
+export async function getSyntheticPublicationLedgerEntries(scopeKey: string): Promise<SyntheticLedgerEntry[]> {
+  return (await getSyntheticLedgerAirtableRecords(scopeKey)).map(syntheticLedgerEntryFromRecord)
+}
+
+export async function appendSyntheticPublicationLedgerEntry(entry: SyntheticLedgerEntry): Promise<void> {
+  const escapedKey = escapeAirtableString(entry.entryKey)
+  const check = new URLSearchParams({
+    maxRecords: '1',
+    filterByFormula: `{Entry Key} = "${escapedKey}"`,
+    returnFieldsByFieldId: 'true',
+  })
+  const existing = await airtableFetch(`/${SYNTHETIC_PREVIEW_LEDGER_TABLE}?${check}`)
+  if ((existing.records ?? []).length > 0) throw new Error('SYNTHETIC_LEDGER_CONFLICT')
+
+  await airtableFetch(`/${SYNTHETIC_PREVIEW_LEDGER_TABLE}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      fields: {
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.ENTRY_KEY]: entry.entryKey,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.SCOPE_KEY]: entry.scopeKey,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACCOUNT_ID]: entry.accountId,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.CLIENT_ID]: entry.clientId,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.REVISION]: entry.revision,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.EVENT_TYPE]: entry.eventType,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.PLAN_VERSION]: entry.planVersion,
+        ...(entry.planJson ? { [SYNTHETIC_PREVIEW_LEDGER_FIELDS.PLAN_JSON]: entry.planJson } : {}),
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACTOR_ID]: entry.actor.id,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.ACTOR_LABEL]: entry.actor.displayName,
+        [SYNTHETIC_PREVIEW_LEDGER_FIELDS.EVENT_AT]: entry.at,
+      },
+      typecast: true,
+    }),
+  })
+}
+
+export async function deleteSyntheticPublicationLedgerEntries(scopeKey: string): Promise<number> {
+  let deleted = 0
+  for (let pass = 0; pass < 5; pass += 1) {
+    const records = await getSyntheticLedgerAirtableRecords(scopeKey)
+    if (records.length === 0) return deleted
+    for (let index = 0; index < records.length; index += 10) {
+      const params = new URLSearchParams()
+      records.slice(index, index + 10).forEach(record => params.append('records[]', record.id))
+      await airtableFetch(`/${SYNTHETIC_PREVIEW_LEDGER_TABLE}?${params}`, { method: 'DELETE' })
+      deleted += Math.min(10, records.length - index)
+    }
+  }
+  if ((await getSyntheticLedgerAirtableRecords(scopeKey)).length > 0) {
+    throw new Error('SYNTHETIC_LEDGER_DELETE_INCOMPLETE')
+  }
+  return deleted
 }
 
 export async function getClientesByEmail(email: string): Promise<Cliente[]> {
@@ -830,6 +948,7 @@ export async function getPlanById(id: string): Promise<PlanAqslim> {
 export async function createPlanForPatient(
   patientId: string,
   fields: Record<string, unknown>,
+  options?: { typecast?: boolean },
 ): Promise<PlanAqslim> {
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) throw new Error('Invalid patient record')
   return airtableFetch(`/${PLAN_AQSLIM_TABLE}`, {
@@ -839,6 +958,7 @@ export async function createPlanForPatient(
         ...fields,
         [PLAN_AQSLIM_FIELDS.PATIENT]: [patientId],
       },
+      ...(options?.typecast ? { typecast: true } : {}),
     }),
   })
 }
@@ -846,11 +966,12 @@ export async function createPlanForPatient(
 export async function updatePlan(
   id: string,
   fields: Record<string, unknown>,
+  options?: { typecast?: boolean },
 ): Promise<PlanAqslim> {
   if (!/^rec[A-Za-z0-9]{14}$/.test(id)) throw new Error('Invalid plan record')
   return airtableFetch(`/${PLAN_AQSLIM_TABLE}/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields, ...(options?.typecast ? { typecast: true } : {}) }),
   })
 }
 

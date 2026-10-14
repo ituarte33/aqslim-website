@@ -21,6 +21,23 @@ test('meal log always provides a route back to My AQSLIM', async () => {
   assert.match(styles, /\.fs-nav-link--home\s*\{[\s\S]*?display: inline-flex/)
 })
 
+test('My AQSLIM home links directly to each meal logging path and history', async () => {
+  const home = await readFile(new URL('../app/my-aqslim/home-view.tsx', import.meta.url), 'utf8')
+  const scanner = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+  const loading = await readFile(new URL('../app/my-aqslim/loading.tsx', import.meta.url), 'utf8')
+
+  assert.match(home, /href="\/food-scanner\?mode=photo"/)
+  assert.match(home, /href="\/food-scanner\?mode=description"/)
+  assert.match(home, /href="\/food-scanner#food-history"/)
+  assert.match(home, /href="\/my-aqslim\/pilot\/restaurant"/)
+  assert.match(home, /¿Qué puedo comer aquí\?/)
+  assert.match(home, /href="\/my-aqslim\/pilot\/fridge"/)
+  assert.match(home, /Recetas de mi refrigerador/)
+  assert.match(scanner, /new URLSearchParams\(window\.location\.search\)\.get\('mode'\)/)
+  assert.match(scanner, /id="food-history"/)
+  assert.match(loading, /aria-busy="true"/)
+})
+
 test('meal analysis requests localized and internally checked estimates', async () => {
   const route = await readFile(new URL('../app/api/food-scan/route.ts', import.meta.url), 'utf8')
   assert.match(route, /Write the food name and notes in \$\{responseLanguage\}/)
@@ -41,13 +58,13 @@ test('photo estimates can be corrected without creating another scan', async () 
   assert.match(component, /action: 'reanalyze'/)
   assert.match(route, /payload\.action === 'reanalyze'/)
   assert.match(route, /Do not reintroduce an ingredient the member explicitly says is absent/)
-  assert.match(route, /do not apply the photo's previously selected plate percentage again/)
-  assert.match(route, /portionBasis: 'described_serving'/)
-  assert.match(component, /personalServingResult/)
+  assert.match(route, /Do not apply the member's selected percentage/)
+  assert.match(route, /portionBasis: 'selected_percentage'/)
+  assert.match(component, /portionPercent/)
   assert.match(airtable, /updateUnconfirmedMealLogEstimate/)
   const correctionBranch = route.match(/if \(payload\.action === 'reanalyze'\)[\s\S]*?\n  }\n\n  if \(/)?.[0] ?? ''
   assert.doesNotMatch(correctionBranch, /createMealLog/)
-  assert.doesNotMatch(correctionBranch, /applyMealPortion/)
+  assert.match(correctionBranch, /applyMealPortion/)
 })
 
 test('meal type can be corrected on the existing scan without another analysis', async () => {

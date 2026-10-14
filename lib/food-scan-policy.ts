@@ -1,3 +1,5 @@
+import { evaluateUsageGate, type UsageGateDecision } from './usage-gate'
+
 export type FoodScanPlan = 'free' | 'start' | 'plus' | 'elite' | 'pilot'
 
 export type FoodScanPolicy = {
@@ -62,27 +64,17 @@ export function foodScanPolicyFor(value: unknown): FoodScanPolicy {
   return POLICIES[normalizeFoodScanPlan(value)]
 }
 
-export type FoodScanUsageDecision = {
-  allowed: boolean
-  reason: 'allowed' | 'daily_limit' | 'monthly_limit'
-  dailyRemaining: number
-  monthlyRemaining: number
-}
+export type FoodScanUsageDecision = UsageGateDecision
 
 export function evaluateFoodScanUsage(
   policy: FoodScanPolicy,
   dailyUsed: number,
   monthlyUsed: number,
 ): FoodScanUsageDecision {
-  const dailyRemaining = Math.max(0, policy.dailyLimit - dailyUsed)
-  const monthlyRemaining = Math.max(0, policy.monthlyLimit - monthlyUsed)
-  if (dailyUsed >= policy.dailyLimit) {
-    return { allowed: false, reason: 'daily_limit', dailyRemaining, monthlyRemaining }
-  }
-  if (monthlyUsed >= policy.monthlyLimit) {
-    return { allowed: false, reason: 'monthly_limit', dailyRemaining, monthlyRemaining }
-  }
-  return { allowed: true, reason: 'allowed', dailyRemaining, monthlyRemaining }
+  return evaluateUsageGate(
+    { dailyLimit: policy.dailyLimit, monthlyLimit: policy.monthlyLimit },
+    { dailyUsed, monthlyUsed },
+  )
 }
 
 function partsFromDate(value: string) {

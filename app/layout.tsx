@@ -2,9 +2,19 @@ import { ClientSignedIn } from './client-signed-in'
 import { ClerkLanguageProvider } from './clerk-language-provider'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import './chat-layout-fix.css'
 import { LanguageModal } from './language-modal'
 import { ChatWidget } from './chat-widget'
 import { NavAuthLinks } from './nav-auth-links'
+import { MobileImagePickerCompatibility } from './mobile-image-picker-compatibility'
+import { NutritionProfileOtherCompatibility } from './nutrition-profile-other-compatibility'
+import { NutritionProfilePersistenceCompatibility } from './nutrition-profile-persistence-compatibility'
+import { OnboardingNutritionProfileEntryCompatibility } from './onboarding-nutrition-profile-entry-compatibility'
+import { ClinicAriosLauncher } from './clinic-arios-launcher'
+import { ClinicSchedulingCompatibility } from './clinic-scheduling-compatibility'
+import { ClinicPlanCompatibility } from './clinic-plan-compatibility'
+import { ClinicPlanConsultationSyncCompatibility } from './clinic-plan-consultation-sync-compatibility'
+import { ClinicPlanPreparePersistence } from './clinic-plan-prepare-persistence'
 
 export const metadata: Metadata = {
   title: 'AQSLIM Wellness Center — El Cajon, CA',
@@ -43,9 +53,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="lang-es">
         <ClerkLanguageProvider>
+          <MobileImagePickerCompatibility />
+          <NutritionProfileOtherCompatibility />
+          <NutritionProfilePersistenceCompatibility />
+          <OnboardingNutritionProfileEntryCompatibility />
+          <ClinicSchedulingCompatibility />
+          <ClinicPlanCompatibility />
+          <ClinicPlanConsultationSyncCompatibility />
+          <ClinicPlanPreparePersistence />
           <LanguageModal />
           {children}
           <ClientSignedIn><ChatWidget /></ClientSignedIn>
+          <ClinicAriosLauncher />
           <NavAuthLinks />
         </ClerkLanguageProvider>
       </body>

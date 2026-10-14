@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import type { PatientMaterialsData } from '@/lib/materials-policy'
+import { demoProfilePath } from '@/lib/demo-profile-route'
 import { ChevronIcon, InfoIcon, MaterialsIcon } from '../portal-icons'
 import { PortalShell } from '../portal-shell'
 import { usePortalLanguage } from '../use-portal-language'
@@ -14,9 +15,10 @@ type MaterialsViewProps = {
   data: PatientPortalData
   materialsData: PatientMaterialsData
   demo?: boolean
+  demoProfileId?: string
 }
 
-export function MaterialsView({ data, materialsData, demo = false }: MaterialsViewProps) {
+export function MaterialsView({ data, materialsData, demo = false, demoProfileId }: MaterialsViewProps) {
   const router = useRouter()
   const [openingBuddy, setOpeningBuddy] = useState(false)
   const [language] = usePortalLanguage(data.language, data.clienteId)
@@ -24,7 +26,7 @@ export function MaterialsView({ data, materialsData, demo = false }: MaterialsVi
   const plan = data.planName || data.phase || (es ? 'Tu plan' : 'Your plan')
   const week = data.weekInPhase
   const { kenkhoTier, materials } = materialsData
-  const buddyPath = demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'
+  const buddyPath = demoProfilePath(demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy', demo, demoProfileId)
   useEffect(() => {
     router.prefetch(buddyPath)
   }, [buddyPath, router])
@@ -33,7 +35,7 @@ export function MaterialsView({ data, materialsData, demo = false }: MaterialsVi
     : (es ? 'Atención en clínica' : 'In-clinic care')
 
   return (
-    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo}>
+    <PortalShell firstName={data.firstName} profileId={data.clienteId} initialLanguage={data.language} demo={demo} demoProfileId={demoProfileId}>
       <section className={styles.pageIntro}>
         <div>
           <h1>{es ? 'Materiales' : 'Materials'}</h1>

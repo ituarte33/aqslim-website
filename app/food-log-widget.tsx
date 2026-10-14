@@ -213,17 +213,14 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
                   ? new Date(log.fields['Timestamp']).toLocaleTimeString(lang === 'es' ? 'es-MX' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
                   : log.fields['Date'] ?? ''}
               </div>
-              {period === 'today' && index === 0 && onMealTypeChange && (
-                <button
-                  type="button"
+              {period === 'today' && index === 0 && (log.fields['Consumption Status'] ?? 'Unconfirmed') === 'Unconfirmed' && (
+                <a
                   className="flw-row-edit-latest"
                   aria-label={`${t.editLatest}: ${log.fields['Food Description'] ?? ''}`}
-                  aria-expanded={editingMealTypeId === log.id}
-                  onClick={() => setEditingMealTypeId(current => current === log.id ? null : log.id)}
-                  disabled={savingMealTypeId === log.id}
+                  href={`/food-scanner/edit/${log.id}`}
                 >
                   {t.editLatest}
-                </button>
+                </a>
               )}
               {editingMealTypeId === log.id && (
                 <div className="flw-meal-type-menu" role="group" aria-label={t.editMealType}>

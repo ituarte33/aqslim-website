@@ -10,6 +10,7 @@ export type PilotFeature =
   | 'fast_36'
   | 'fridge_recipes'
   | 'weekly_summary'
+  | 'guided_meal_plan'
 
 export const ACTIVE_PILOT_FEATURES: readonly PilotFeature[] = [
   'aq_buddy',
@@ -19,7 +20,7 @@ export const ACTIVE_PILOT_FEATURES: readonly PilotFeature[] = [
   'weekly_summary',
 ]
 
-export const PLANNED_PILOT_FEATURES: readonly PilotFeature[] = []
+export const PLANNED_PILOT_FEATURES: readonly PilotFeature[] = ['guided_meal_plan']
 
 export type PilotAccess = {
   cohort: typeof PILOT_COHORT_ID
@@ -40,6 +41,7 @@ function isPilotFeature(value: unknown): value is PilotFeature {
     || value === 'fast_36'
     || value === 'fridge_recipes'
     || value === 'weekly_summary'
+    || value === 'guided_meal_plan'
 }
 
 export function pilotAccessFromMetadata(metadata: unknown): PilotAccess | null {

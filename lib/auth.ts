@@ -3,6 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
 import { getClienteById, getClientesByEmail, type Cliente } from '@/lib/airtable'
+import { evaluateAiEntitlementAccess } from '@/lib/ai-entitlement-access'
 import {
   AuthorizationError,
   assertPatientOwnership,
@@ -12,6 +13,13 @@ import {
   type AppRole,
   type Capability,
 } from '@/lib/authorization-policy'
+import {
+  ACTIVE_PILOT_FEATURES,
+  pilotAccessFromMetadata,
+  type PilotFeature,
+} from '@/lib/pilot-policy'
+import { canReviewSyntheticPreview } from '@/lib/nutrition/synthetic-preview-policy'
+import { isP5FounderCanaryIdentity } from '@/lib/p5-founder-canary-policy'
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .split(',')
@@ -24,6 +32,8 @@ export type AuthenticatedActor = {
   role: AppRole
   capabilities: ReadonlySet<Capability>
   boundPatientId: string | null
+  rawPlan: unknown
+  shadowPilotFeatures: ReadonlySet<PilotFeature> | null
 }
 
 function primaryEmail(user: NonNullable<Awaited<ReturnType<typeof currentUser>>>): string | null {
@@ -33,6 +43,27 @@ function primaryEmail(user: NonNullable<Awaited<ReturnType<typeof currentUser>>>
   return selected?.emailAddress?.trim().toLowerCase() || null
 }
 
+function shadowPilotFeaturesFor(
+  user: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
+  email: string,
+  role: AppRole,
+): ReadonlySet<PilotFeature> | null {
+  const metadataAccess = pilotAccessFromMetadata(user.privateMetadata)
+  if (metadataAccess) return metadataAccess.enabledFeatures
+
+  const previewReviewer = canReviewSyntheticPreview({
+    role,
+    email,
+    environment: {
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+      MYAQ_PREVIEW_REVIEWER_EMAILS: process.env.MYAQ_PREVIEW_REVIEWER_EMAILS,
+    },
+  })
+
+  return previewReviewer ? new Set(ACTIVE_PILOT_FEATURES) : null
+}
+
 export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
   const user = await currentUser()
   if (!user) return null
@@ -40,9 +71,36 @@ export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
   if (!email) return null
   const role: AppRole = ADMIN_EMAILS.includes(email) ? 'admin' : 'patient'
   const metadataPatientId = user.privateMetadata?.aqslimPatientId
-  const boundPatientId = typeof metadataPatientId === 'string' && metadataPatientId.trim()
+  let boundPatientId = typeof metadataPatientId === 'string' && metadataPatientId.trim()
     ? metadataPatientId.trim()
     : null
+
+  const founderCanaryIdentity = isP5FounderCanaryIdentity({
+    email,
+    environment: {
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+      MYAQ_P5_FOUNDER_CANARY: process.env.MYAQ_P5_FOUNDER_CANARY,
+    },
+  })
+
+  // A patient may complete a qualifying clinic visit before ever creating a Clerk account.
+  // If no explicit metadata binding exists, reuse the portal's governed unique-email identity
+  // resolution so entitlement can bind to the stable Airtable patient record. Zero or duplicate
+  // matches fail closed. Admin identities never use this fallback except the exact Founder identity
+  // inside the isolated P5 Preview canary.
+  if ((role === 'patient' || founderCanaryIdentity) && !boundPatientId) {
+    try {
+      const matches = await getClientesByEmail(email)
+      boundPatientId = resolveAuthenticatedPatientScope({
+        role,
+        boundPatientId: null,
+        matchingPatientIds: matches.map(patient => patient.id),
+      })
+    } catch {
+      boundPatientId = null
+    }
+  }
 
   return {
     clerkUserId: user.id,
@@ -50,6 +108,8 @@ export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
     role,
     capabilities: capabilitiesForRole(role),
     boundPatientId,
+    rawPlan: user.privateMetadata?.plan,
+    shadowPilotFeatures: shadowPilotFeaturesFor(user, email, role),
   }
 })
 
@@ -62,6 +122,20 @@ export async function requireActor(): Promise<AuthenticatedActor> {
 export async function requireCapability(capability: Capability): Promise<AuthenticatedActor> {
   const actor = await requireActor()
   assertRoleCapability(actor.role, capability)
+
+  if (capability === 'buddy:chat') {
+    const access = await evaluateAiEntitlementAccess({
+      clerkUserId: actor.clerkUserId,
+      capability: 'buddy:chat',
+      currentAccessAllowed: true,
+      rawPlan: actor.rawPlan,
+      hasPilotAccess: actor.shadowPilotFeatures !== null,
+      pilotFeatures: actor.shadowPilotFeatures ?? undefined,
+      authenticatedPatientRecordId: actor.boundPatientId,
+    })
+    if (!access.allowed) throw new AuthorizationError('FORBIDDEN')
+  }
+
   return actor
 }
 
