@@ -106,6 +106,23 @@ test('consultation submission has a synchronous duplicate-save guard', async () 
   assert.match(preview, /Protección contra doble guardado activa/)
 })
 
+test('consultation publication is explicit, idempotent, verified, and keeps Square separate', async () => {
+  const route = await readFile(new URL('../app/api/preview/clinic-consultations/route.ts', import.meta.url), 'utf8')
+  const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
+  assert.match(route, /clinicConsultationPublicationIsConfirmed/)
+  assert.match(route, /clinicConsultationPublicationMarker/)
+  assert.match(route, /getConsultasByPatientId/)
+  assert.match(route, /getConsultaById/)
+  assert.match(route, /liveConsultationMatches/)
+  assert.match(route, /markPreviewConsultationPublished/)
+  assert.match(route, /clinic_consultation_publication_verify_failed/)
+  assert.match(preview, /Revisar publicación clínica/)
+  assert.match(preview, /Confirmar publicación/)
+  assert.match(preview, /confirmation: 'PUBLICAR CONSULTA'/)
+  assert.match(preview, /consultationPublicationSubmitGuard/)
+  assert.match(preview, /La próxima cita seguirá requiriendo confirmación por separado en Square/)
+})
+
 test('consultation readiness blocks invalid dates and payment amounts before persistence', async () => {
   const preview = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
   const route = await readFile(new URL('../app/api/preview/clinic-consultations/route.ts', import.meta.url), 'utf8')

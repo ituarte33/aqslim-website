@@ -6,7 +6,7 @@ import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation
 import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
-import { buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
+import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 
 type Patient = {
   id: string
@@ -63,6 +63,8 @@ type ClinicConsultation = {
   amountCollected: number | null
   paymentMethod: string
   authorLabel: string
+  publishedToClinic: boolean
+  liveConsultationId: string | null
 }
 
 type ClinicAccessReadiness = {
@@ -334,6 +336,10 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [paymentMethod, setPaymentMethod] = useState('Sin especificar')
   const [consultationSaving, setConsultationSaving] = useState(false)
   const [consultationMessage, setConsultationMessage] = useState('')
+  const [consultationPublicationTargetId, setConsultationPublicationTargetId] = useState('')
+  const [consultationPublicationConfirmed, setConsultationPublicationConfirmed] = useState(false)
+  const [consultationPublicationSaving, setConsultationPublicationSaving] = useState(false)
+  const [consultationPublicationMessage, setConsultationPublicationMessage] = useState('')
   const [reportedWeight, setReportedWeight] = useState('')
   const [reportedWeightUnit, setReportedWeightUnit] = useState<ClinicWeightUnit>('lb')
   const [reportedWeightDate, setReportedWeightDate] = useState(todayLocal())
@@ -357,6 +363,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [activationComplete, setActivationComplete] = useState(false)
   const authorizationRequestId = useRef(0)
   const consultationSubmitGuard = useRef<ClinicSubmitGuard>({ active: false })
+  const consultationPublicationSubmitGuard = useRef<ClinicSubmitGuard>({ active: false })
 
   const filtered = useMemo(() => {
     const q = normalizeClinicSearch(query)
@@ -884,6 +891,46 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     }
   }
 
+  async function publishConsultation(item: ClinicConsultation) {
+    if (!selected || item.publishedToClinic || item.consultationType === CLINIC_WEIGHT_UPDATE_TYPE) return
+    if (!consultationPublicationConfirmed) {
+      setConsultationPublicationMessage('Confirma que revisaste la consulta antes de publicarla.')
+      return
+    }
+    if (!beginClinicSubmit(consultationPublicationSubmitGuard.current)) return
+    setConsultationPublicationSaving(true)
+    setConsultationPublicationMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-consultations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'publish',
+          patientId: selected.id,
+          previewRecordId: item.id,
+          confirmation: 'PUBLICAR CONSULTA',
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok || !data.published || !data.liveConsultationId) throw new Error('publication_failed')
+      await loadConsultations(selected.id)
+      setConsultationPublicationTargetId('')
+      setConsultationPublicationConfirmed(false)
+      if (data.auditVerified === false || data.warning || (Array.isArray(data.warnings) && data.warnings.length > 0)) {
+        setConsultationPublicationMessage('✓ La consulta fue publicada en el expediente clínico real. Una parte de la auditoría requiere revisión; no vuelvas a publicarla.')
+      } else if (data.alreadyPublished) {
+        setConsultationPublicationMessage('✓ Esta consulta ya estaba publicada y fue verificada; no se creó un duplicado.')
+      } else {
+        setConsultationPublicationMessage('✓ Consulta publicada y verificada en el expediente clínico real.')
+      }
+    } catch {
+      setConsultationPublicationMessage('No se pudo completar la publicación. No vuelvas a pulsar hasta revisar el estado del expediente.')
+    } finally {
+      finishClinicSubmit(consultationPublicationSubmitGuard.current)
+      setConsultationPublicationSaving(false)
+    }
+  }
+
   function choosePatient(id: string) {
     setSelectedId(id)
     const clinicUrl = new URL(window.location.href)
@@ -892,6 +939,9 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     setActiveTab('Consultas')
     setStatusMessage('')
     setConsultationMessage('')
+    setConsultationPublicationTargetId('')
+    setConsultationPublicationConfirmed(false)
+    setConsultationPublicationMessage('')
     setReportedWeight('')
     setReportedWeightUnit('lb')
     setReportedWeightDate(todayLocal())
@@ -1026,6 +1076,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                   <div className="clinic-preview-card" style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span></div>
                     <ClinicWeightHistory history={weightHistory} loading={consultationsLoading} />
+                    {consultationPublicationMessage && <div style={{ marginTop: 14, padding: 12, border: `1px solid ${consultationPublicationMessage.startsWith('✓') ? 'rgba(158,212,168,.28)' : 'rgba(224,160,160,.32)'}`, borderRadius: 10, color: consultationPublicationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>{consultationPublicationMessage}</div>}
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
                       {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Próxima consulta preliminar</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
                       {consultationsLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : consultations.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay consultas registradas en Clinic Preview.</div> : consultations.map(item => <div key={item.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>
@@ -1039,6 +1090,18 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8, color: '#6F6A64', fontSize: 11 }}>
                           {item.amountCollected !== null && <span>Cobrado: ${Number(item.amountCollected).toFixed(2)}</span>}{item.paymentMethod && <span>{item.paymentMethod}</span>}{item.authorLabel && <span>{item.authorLabel}</span>}
                         </div>
+                        {item.consultationType !== CLINIC_WEIGHT_UPDATE_TYPE && <div style={{ marginTop: 12 }}>
+                          {item.publishedToClinic ? <div style={{ color: '#9ED4A8', fontSize: 11 }}>✓ Publicada y vinculada al expediente clínico real.</div> : <button type="button" onClick={() => { setConsultationPublicationTargetId(item.id); setConsultationPublicationConfirmed(false); setConsultationPublicationMessage('') }} style={{ padding: '9px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', cursor: 'pointer', fontSize: 11 }}>Revisar publicación clínica →</button>}
+                        </div>}
+                        {consultationPublicationTargetId === item.id && !item.publishedToClinic && <div style={{ marginTop: 12, padding: 13, border: '1px solid rgba(226,200,122,.34)', borderRadius: 10, background: 'rgba(201,168,76,.055)' }}>
+                          <div style={{ color: '#E2C87A', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Confirmar publicación clínica</div>
+                          <div style={{ color: '#B8B3AD', fontSize: 11, lineHeight: 1.55, marginTop: 8 }}>Se copiarán esta fecha, tipo de consulta, mediciones, recomendaciones y pago al expediente clínico real. La próxima cita seguirá requiriendo confirmación por separado en Square.</div>
+                          <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', color: '#D9D5CF', fontSize: 11, lineHeight: 1.45, marginTop: 11 }}><input type="checkbox" checked={consultationPublicationConfirmed} onChange={event => setConsultationPublicationConfirmed(event.target.checked)} /> Confirmo que revisé esta consulta y deseo publicarla una sola vez.</label>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                            <button type="button" onClick={() => void publishConsultation(item)} disabled={!consultationPublicationConfirmed || consultationPublicationSaving} aria-busy={consultationPublicationSaving} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(201,168,76,.48)', background: !consultationPublicationConfirmed || consultationPublicationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: !consultationPublicationConfirmed || consultationPublicationSaving ? '#8E8881' : '#0A0A0A', cursor: !consultationPublicationConfirmed || consultationPublicationSaving ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600 }}>{consultationPublicationSaving ? 'Publicando una sola vez…' : 'Confirmar publicación'}</button>
+                            <button type="button" onClick={() => { setConsultationPublicationTargetId(''); setConsultationPublicationConfirmed(false) }} disabled={consultationPublicationSaving} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#9A9590', cursor: consultationPublicationSaving ? 'not-allowed' : 'pointer', fontSize: 11 }}>Cancelar</button>
+                          </div>
+                        </div>}
                       </div>)}
                     </div>
                   </div>

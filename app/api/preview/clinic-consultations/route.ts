@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
-import { getClienteById } from '@/lib/airtable'
+import {
+  CLIENTES_FIELDS,
+  createConsulta,
+  getClienteById,
+  getConsultaById,
+  getConsultasByPatientId,
+  updateCliente,
+} from '@/lib/airtable'
+import {
+  buildClinicLiveConsultationFields,
+  clinicConsultationPublicationIsConfirmed,
+  clinicConsultationPublicationMarker,
+  clinicConsultationWeightKg,
+  clinicPublishedConsultationId,
+  clinicPublishedPreviewKey,
+} from '@/lib/clinic-consultation-publication'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 import { CLINIC_WEIGHT_UPDATE_TYPE, normalizeClinicWeightEntry } from '@/lib/clinic-weight-entry'
+import { provisionClinicEntitlementForCompletedVisit } from '@/lib/p4-preview-entitlement-provisioning'
 
 const TABLE_ID = 'tbl0cTWsYqv4R5n3u'
 
@@ -87,6 +103,174 @@ function escapeFormula(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
+async function getPreviewConsultation(recordId: string) {
+  const response = await fetch(`${baseUrl()}/${recordId}?returnFieldsByFieldId=true`, {
+    headers: headers(), cache: 'no-store',
+  })
+  if (!response.ok) return null
+  return response.json()
+}
+
+async function markPreviewConsultationPublished(recordId: string, currentKey: unknown, liveConsultationId: string) {
+  const key = clinicPublishedPreviewKey(currentKey, liveConsultationId)
+  const response = await fetch(`${baseUrl()}/${recordId}?returnFieldsByFieldId=true`, {
+    method: 'PATCH',
+    headers: headers(),
+    cache: 'no-store',
+    body: JSON.stringify({ fields: { [F.KEY]: key } }),
+  })
+  if (!response.ok) return false
+  const readback = await getPreviewConsultation(recordId)
+  return clinicPublishedConsultationId(readback?.fields?.[F.KEY]) === liveConsultationId
+}
+
+function liveConsultationMatches(input: {
+  record: Awaited<ReturnType<typeof getConsultaById>>
+  patientId: string
+  consultationDate: string
+  consultationType: string
+  weightKg: number | null
+  marker: string
+}) {
+  const fields = input.record.fields ?? {}
+  const linkedPatients = Array.isArray(fields['ID Cliente']) ? fields['ID Cliente'] : []
+  const storedWeight = fields['Peso (kg)']
+  const weightMatches = input.weightKg === null
+    ? storedWeight == null
+    : typeof storedWeight === 'number' && Math.abs(storedWeight - input.weightKg) < 0.011
+  return linkedPatients.includes(input.patientId)
+    && fields['Fecha Consulta'] === input.consultationDate
+    && fields['Tipo de Consulta'] === input.consultationType
+    && weightMatches
+    && String(fields['Notas del Terapeuta'] ?? '').includes(input.marker)
+}
+
+async function publishPreviewConsultation(input: {
+  patientId: string
+  patientName: string
+  previewRecordId: string
+  confirmation: unknown
+}) {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(input.previewRecordId)) {
+    return NextResponse.json({ ok: false, error: 'invalid_consultation' }, { status: 400 })
+  }
+  if (!clinicConsultationPublicationIsConfirmed(input.confirmation)) {
+    return NextResponse.json({ ok: false, error: 'confirmation_required' }, { status: 409 })
+  }
+
+  const preview = await getPreviewConsultation(input.previewRecordId)
+  const previewFields = preview?.fields ?? {}
+  if (!preview?.id
+    || previewFields[F.PATIENT_ID] !== input.patientId
+    || previewFields[F.PREVIEW_ONLY] !== true) {
+    return NextResponse.json({ ok: false, error: 'consultation_not_found' }, { status: 404 })
+  }
+
+  const marker = clinicConsultationPublicationMarker(input.previewRecordId)
+  const consultationType = selectName(previewFields[F.TYPE])
+  const consultationDate = normalizeClinicIsoDate(previewFields[F.CONSULTATION_DATE])
+  if (!consultationDate || !['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio', 'Seguimiento'].includes(consultationType)) {
+    return NextResponse.json({ ok: false, error: 'consultation_not_publishable' }, { status: 409 })
+  }
+
+  const weightKg = clinicConsultationWeightKg(previewFields[F.WEIGHT], selectName(previewFields[F.WEIGHT_UNIT]))
+  const existingPublishedId = clinicPublishedConsultationId(previewFields[F.KEY])
+  if (existingPublishedId) {
+    try {
+      const publishedReadback = await getConsultaById(existingPublishedId)
+      const auditVerified = liveConsultationMatches({
+        record: publishedReadback,
+        patientId: input.patientId,
+        consultationDate,
+        consultationType,
+        weightKg,
+        marker,
+      })
+      return NextResponse.json({
+        ok: true,
+        published: true,
+        alreadyPublished: true,
+        liveConsultationId: existingPublishedId,
+        auditVerified,
+        warning: auditVerified ? null : 'publication_requires_review',
+      })
+    } catch {
+      return NextResponse.json({ ok: true, published: true, alreadyPublished: true, liveConsultationId: existingPublishedId, auditVerified: false, warning: 'publication_requires_review' })
+    }
+  }
+
+  const existingLiveConsultations = await getConsultasByPatientId(input.patientId, input.patientName)
+  const recovered = existingLiveConsultations.find(item => String(item.fields['Notas del Terapeuta'] ?? '').includes(marker))
+  if (recovered) {
+    const auditVerified = await markPreviewConsultationPublished(input.previewRecordId, previewFields[F.KEY], recovered.id)
+    return NextResponse.json({ ok: true, published: true, alreadyPublished: true, recovered: true, liveConsultationId: recovered.id, auditVerified })
+  }
+
+  const { fields: liveFields } = buildClinicLiveConsultationFields({
+    patientId: input.patientId,
+    previewRecordId: input.previewRecordId,
+    consultationDate,
+    consultationType,
+    weight: previewFields[F.WEIGHT],
+    weightUnit: selectName(previewFields[F.WEIGHT_UNIT]),
+    bodyFat: previewFields[F.BODY_FAT],
+    waistCm: previewFields[F.WAIST],
+    hipsCm: previewFields[F.HIPS],
+    armsCm: previewFields[F.ARMS],
+    thighsCm: previewFields[F.THIGHS],
+    chestCm: previewFields[F.CHEST],
+    phase: selectName(previewFields[F.PHASE]),
+    phaseWeek: previewFields[F.PHASE_WEEK],
+    recommendations: previewFields[F.RECOMMENDATIONS],
+    consultationFee: previewFields[F.CONSULTATION_FEE],
+    amountCollected: previewFields[F.AMOUNT_COLLECTED],
+    paymentMethod: selectName(previewFields[F.PAYMENT_METHOD]),
+  })
+
+  const live = await createConsulta(liveFields)
+  const readback = await getConsultaById(live.id)
+  if (!liveConsultationMatches({ record: readback, patientId: input.patientId, consultationDate, consultationType, weightKg, marker })) {
+    console.error('clinic_consultation_publication_verify_failed', { previewRecordId: input.previewRecordId, liveConsultationId: live.id })
+    return NextResponse.json({ ok: true, published: true, liveConsultationId: live.id, auditVerified: false, warning: 'publication_requires_review' })
+  }
+
+  const warnings: string[] = []
+  const nextAppointment = safeText(previewFields[F.NEXT_APPOINTMENT], 40)
+  if (nextAppointment) {
+    try {
+      await updateCliente(input.patientId, { [CLIENTES_FIELDS.PROXIMA_CITA]: nextAppointment })
+    } catch {
+      warnings.push('next_appointment_not_updated')
+    }
+  }
+
+  try {
+    await provisionClinicEntitlementForCompletedVisit({
+      patientRecordId: input.patientId,
+      visitType: consultationType,
+      visitDate: consultationDate,
+    })
+  } catch (error) {
+    console.error('clinic_consultation_publication_entitlement_failed_after_commit', {
+      previewRecordId: input.previewRecordId,
+      liveConsultationId: live.id,
+      error: error instanceof Error ? error.message : 'unknown',
+    })
+    warnings.push('preview_entitlement_requires_review')
+  }
+
+  const auditVerified = await markPreviewConsultationPublished(input.previewRecordId, previewFields[F.KEY], live.id)
+  if (!auditVerified) warnings.push('preview_audit_requires_review')
+
+  return NextResponse.json({
+    ok: true,
+    published: true,
+    liveConsultationId: live.id,
+    auditVerified,
+    warnings,
+  })
+}
+
 export async function GET(request: NextRequest) {
   try {
     await requireFounder()
@@ -125,6 +309,8 @@ export async function GET(request: NextRequest) {
       amountCollected: record.fields?.[F.AMOUNT_COLLECTED] ?? null,
       paymentMethod: record.fields?.[F.PAYMENT_METHOD] ?? '',
       authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
+      publishedToClinic: Boolean(clinicPublishedConsultationId(record.fields?.[F.KEY])),
+      liveConsultationId: clinicPublishedConsultationId(record.fields?.[F.KEY]),
     }))
     return NextResponse.json({ ok: true, consultations })
   } catch (error) {
@@ -143,6 +329,15 @@ export async function POST(request: NextRequest) {
 
     const patient = await getClienteById(patientId)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
+
+    if (body.action === 'publish') {
+      return publishPreviewConsultation({
+        patientId,
+        patientName: String(patient.fields['Nombre Completo'] ?? 'Paciente'),
+        previewRecordId: safeText(body.previewRecordId, 100),
+        confirmation: body.confirmation,
+      })
+    }
 
     const weightUpdateMode = body.mode === 'weightUpdate'
     const allowedTypes = ['Cliente Nuevo', 'Cliente subsecuente', 'Cliente Re-Inicio', 'Seguimiento']
