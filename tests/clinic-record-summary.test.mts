@@ -25,6 +25,9 @@ test('Clinic Preview opens a read-only clinical summary with the complete patien
 
 test('Clinic clinical summary is responsive on tablet and mobile', async () => {
   const styles = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8')
+  assert.match(styles, /\.clinic-preview-shell,[\s\S]*?\.clinic-preview-summary-fields > \* \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;[\s\S]*?\}/)
+  assert.match(styles, /\.clinic-preview-shell \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: clip;[\s\S]*?\}/)
   assert.match(styles, /@media \(max-width: 860px\)[\s\S]*?\.clinic-preview-summary-grid \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
   assert.match(styles, /@media \(max-width: 560px\)[\s\S]*?\.clinic-preview-summary-fields \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/)
+  assert.match(styles, /@media \(max-width: 560px\)[\s\S]*?\.clinic-preview-tabs \{ width: 100%; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important; \}/)
 })

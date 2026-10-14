@@ -29,6 +29,26 @@ body.marketing { cursor:none; }
   padding: 0;
 }
 
+.clinic-preview-shell,
+.clinic-preview-content,
+.clinic-preview-content > div,
+.clinic-preview-summary-grid,
+.clinic-preview-summary-grid > *,
+.clinic-preview-summary-fields,
+.clinic-preview-summary-fields > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.clinic-preview-shell {
+  width: 100%;
+  overflow-x: clip;
+}
+
+.clinic-preview-summary-grid {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 860px) {
   .clinic-preview-header {
     position: static !important;
@@ -58,6 +78,7 @@ body.marketing { cursor:none; }
   .clinic-preview-readiness-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .clinic-preview-summary-fields { grid-template-columns: minmax(0, 1fr) !important; }
   .clinic-preview-card { min-width: 0; padding: 16px !important; }
+  .clinic-preview-tabs { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .clinic-preview-tabs button { min-width: 0; padding: 10px 6px !important; font-size: 11px !important; }
 }
 
