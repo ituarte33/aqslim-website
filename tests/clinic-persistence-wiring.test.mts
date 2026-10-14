@@ -25,6 +25,8 @@ test('Clinic plan publication is founder-only, double-confirmed, and verified ag
   assert.match(route, /draft\.status !== 'Ready for Review'/)
   assert.match(route, /publishedPlanMatches\(draft, verifiedLivePlan\)/)
   assert.match(route, /clinic_plan_publication_verify_failed/)
+  assert.match(route, /auditReadbackResponse/)
+  assert.match(route, /reason: 'readback_failed'/)
   assert.match(plan, /Revisar publicación en My AQSLIM/)
   assert.match(plan, /Confirmar publicación/)
   assert.match(plan, /publishGuard\.current/)

@@ -464,7 +464,15 @@ export async function PUT(request: NextRequest) {
       console.error('clinic_plan_publication_audit_failed', { status: auditResponse.status })
       return NextResponse.json({ ok: true, livePlan: verifiedLivePlan, auditVerified: false })
     }
-    const auditedDraft = await auditResponse.json()
+    const auditReadbackResponse = await fetch(`${baseUrl()}/${draftRecord.id}?returnFieldsByFieldId=true`, {
+      headers: headers(),
+      cache: 'no-store',
+    })
+    if (!auditReadbackResponse.ok) {
+      console.error('clinic_plan_publication_audit_failed', { reason: 'readback_failed' })
+      return NextResponse.json({ ok: true, livePlan: verifiedLivePlan, auditVerified: false })
+    }
+    const auditedDraft = await auditReadbackResponse.json()
     if (auditedDraft.fields?.[F.STATUS] !== 'Published') {
       console.error('clinic_plan_publication_audit_failed', { reason: 'status_mismatch' })
       return NextResponse.json({ ok: true, livePlan: verifiedLivePlan, auditVerified: false })
