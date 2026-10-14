@@ -1,4 +1,14 @@
 export const CLINIC_CONSULTATION_PUBLICATION_CONFIRMATION = 'PUBLICAR CONSULTA'
+export const LIVE_CLINIC_CONSULTATION_TYPES = [
+  'Cliente Nuevo',
+  'Cliente subsecuente',
+  'Cliente Re-Inicio',
+] as const
+
+export function isLiveClinicConsultationType(value: unknown): value is typeof LIVE_CLINIC_CONSULTATION_TYPES[number] {
+  return typeof value === 'string'
+    && (LIVE_CLINIC_CONSULTATION_TYPES as readonly string[]).includes(value)
+}
 
 const POUNDS_PER_KILOGRAM = 2.2046226218
 const PUBLICATION_MARKER_PREFIX = 'CLINIC-PREVIEW:'
