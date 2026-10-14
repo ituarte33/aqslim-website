@@ -7,6 +7,8 @@ import { assessClinicConsultationReadiness, type ClinicConsultationReadinessChec
 import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
+import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
+import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
 
 type Patient = {
   id: string
@@ -15,20 +17,8 @@ type Patient = {
   phone: string
   status: string
   language: string
-  clientNumber: number | null
-  age: number | null
-  birthDate: string
-  sex: string
-  heightCm: number | null
-  goalWeight: number | null
-  weightUnit: string
-  address: string
-  city: string
-  zip: number | null
   nextAppointment: string
-  nextAppointmentService: string
   goal: string
-  conditions: string
 }
 
 type ClinicNote = {
@@ -168,7 +158,7 @@ type ClinicAccessReadiness = {
   }
 }
 
-const tabs = ['Resumen','Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
+const tabs = ['Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
 type Tab = typeof tabs[number]
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
 
@@ -183,22 +173,6 @@ function feeForType(type: string) {
   if (type === 'Cliente Re-Inicio') return '35'
   if (type === 'Cliente subsecuente') return '30'
   return '0'
-}
-
-function clinicDateLabel(value: string) {
-  if (!value) return 'Sin registrar'
-  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('es-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function clinicHeightLabel(heightCm: number | null) {
-  if (heightCm === null) return 'Sin registrar'
-  const totalInches = heightCm / 2.54
-  const roundedInches = Math.round(totalInches)
-  const feet = Math.floor(roundedInches / 12)
-  const inches = roundedInches % 12
-  return `${heightCm} cm · ${feet}' ${inches}\"`
 }
 
 function ClinicWeightHistory({ history, loading }: {
@@ -319,7 +293,7 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
 export function ClinicPreviewClient({ patients, initialPatientId }: { patients: Patient[]; initialPatientId: string | null }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
-  const [activeTab, setActiveTab] = useState<Tab>('Resumen')
+  const [activeTab, setActiveTab] = useState<Tab>('Consultas')
 
   const [notes, setNotes] = useState<ClinicNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
@@ -345,6 +319,9 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
 
   const [consultations, setConsultations] = useState<ClinicConsultation[]>([])
   const [consultationsLoading, setConsultationsLoading] = useState(false)
+  const [clinicRecord, setClinicRecord] = useState<ClinicRecord | null>(null)
+  const [clinicRecordLoading, setClinicRecordLoading] = useState(false)
+  const [clinicRecordError, setClinicRecordError] = useState('')
   const [consultationType, setConsultationType] = useState('Cliente subsecuente')
   const [consultationDate, setConsultationDate] = useState(todayLocal())
   const [weight, setWeight] = useState('')
@@ -410,9 +387,29 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const cadence = useMemo(() => resolveClinicCadence(visitCadenceDays), [visitCadenceDays])
   const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
   const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
-  const latestWeight = consultations.find(item => item.weight !== null) ?? null
-  const weightSummary = useMemo(() => summarizeClinicWeights(consultations), [consultations])
-  const weightHistory = useMemo(() => buildClinicWeightHistory(consultations), [consultations])
+  const completeWeightEntries = useMemo(() => {
+    const liveIds = new Set(clinicRecord?.consultations.map(item => item.id) ?? [])
+    const previewEntries = consultations
+      .filter(item => !item.liveConsultationId || !liveIds.has(item.liveConsultationId))
+      .map(item => ({
+        weight: item.weight,
+        weightUnit: item.weightUnit,
+        consultationDate: item.consultationDate,
+        consultationAt: item.consultationAt,
+      }))
+    const liveEntries = (clinicRecord?.consultations ?? []).map(item => ({
+      weight: item.weightKg,
+      weightUnit: 'kg',
+      consultationDate: item.consultationDate,
+      consultationAt: item.consultationDate,
+    }))
+    return [...previewEntries, ...liveEntries].sort((a, b) =>
+      String(b.consultationDate ?? b.consultationAt ?? '').localeCompare(String(a.consultationDate ?? a.consultationAt ?? ''))
+    )
+  }, [clinicRecord, consultations])
+  const latestWeight = completeWeightEntries.find(item => item.weight !== null) ?? null
+  const weightSummary = useMemo(() => summarizeClinicWeights(completeWeightEntries), [completeWeightEntries])
+  const weightHistory = useMemo(() => buildClinicWeightHistory(completeWeightEntries), [completeWeightEntries])
   const consultationReadiness = useMemo(() => assessClinicConsultationReadiness({
     patientId: selectedId,
     consultationDate,
@@ -463,6 +460,24 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     }
   }
 
+  async function loadClinicRecord(patientId: string, signal?: AbortSignal) {
+    setClinicRecordLoading(true)
+    setClinicRecordError('')
+    try {
+      const response = await fetch(`/api/preview/clinic-record?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store', signal })
+      const data = await response.json()
+      if (!response.ok || !data.ok || data.readOnly !== true || !data.record) throw new Error('load_failed')
+      if (signal?.aborted) return
+      setClinicRecord(data.record as ClinicRecord)
+    } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) return
+      setClinicRecord(null)
+      setClinicRecordError('No se pudo cargar el expediente clínico real. Los borradores Preview permanecen separados y disponibles.')
+    } finally {
+      if (!signal?.aborted) setClinicRecordLoading(false)
+    }
+  }
+
   async function getSchedulingCadence(patientId: string) {
     try {
       const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
@@ -496,8 +511,10 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     let cancelled = false
     const accessController = new AbortController()
     const notesController = new AbortController()
+    const clinicRecordController = new AbortController()
     if (selectedId) {
       void loadNotes(selectedId, notesController.signal)
+      void loadClinicRecord(selectedId, clinicRecordController.signal)
       void loadConsultations(selectedId).then(loaded => {
         if (cancelled || !loaded) return
         const persistedAppointment = loaded.find(item => item.nextAppointment)?.nextAppointment
@@ -514,6 +531,8 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     } else {
       setNotes([])
       setConsultations([])
+      setClinicRecord(null)
+      setClinicRecordError('')
       setVisitCadenceDays(null)
       setAccessReadiness(null)
       setAccessReadinessError('')
@@ -522,6 +541,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       cancelled = true
       accessController.abort()
       notesController.abort()
+      clinicRecordController.abort()
     }
   }, [selectedId])
 
@@ -964,7 +984,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     const clinicUrl = new URL(window.location.href)
     clinicUrl.searchParams.set('patient', id)
     window.history.replaceState(window.history.state, '', `${clinicUrl.pathname}${clinicUrl.search}${clinicUrl.hash}`)
-    setActiveTab('Resumen')
+    setActiveTab('Consultas')
     setStatusMessage('')
     setConsultationMessage('')
     setConsultationPublicationTargetId('')
@@ -1073,71 +1093,11 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                 <div style={{ color: '#6F6A64', fontSize: 10, marginTop: 8 }}>Sólo lectura · calculado desde el historial de pesos.</div>
               </div>
 
-              <nav className="clinic-preview-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: 8, marginBottom: 18 }}>
+              <nav className="clinic-preview-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 8, marginBottom: 18 }}>
                 {tabs.map(label => <button key={label} onClick={() => setActiveTab(label)} style={{ cursor: 'pointer', border: '1px solid rgba(201,168,76,.18)', borderRadius: 10, padding: '12px 10px', textAlign: 'center', color: activeTab === label ? '#C9A84C' : '#8E8881', background: activeTab === label ? 'rgba(201,168,76,.08)' : 'rgba(255,255,255,.02)', fontSize: 12 }}>{label}</button>)}
               </nav>
 
-              {activeTab === 'Resumen' ? (
-                <div className="clinic-preview-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.15fr) minmax(300px,.85fr)', gap: 16, alignItems: 'start' }}>
-                  <div style={{ display: 'grid', gap: 16 }}>
-                    <section style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <div>
-                          <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Resumen clínico</div>
-                          <h3 style={{ margin: '8px 0 0', fontFamily: 'Georgia, serif', fontSize: 27, fontWeight: 400 }}>Datos del paciente</h3>
-                        </div>
-                        <span style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 999, padding: '8px 11px', color: '#E2C87A', fontSize: 11 }}>Sólo lectura</span>
-                      </div>
-                      <div className="clinic-preview-summary-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 18 }}>
-                        {[
-                          ['ID de cliente', selected.clientNumber === null ? 'Sin registrar' : String(selected.clientNumber)],
-                          ['Estado', selected.status || 'Sin registrar'],
-                          ['Edad', selected.age === null ? 'Sin registrar' : `${selected.age} años`],
-                          ['Fecha de nacimiento', clinicDateLabel(selected.birthDate)],
-                          ['Sexo', selected.sex || 'Sin registrar'],
-                          ['Estatura', clinicHeightLabel(selected.heightCm)],
-                          ['Peso meta', selected.goalWeight === null ? 'Sin registrar' : `${selected.goalWeight} ${selected.weightUnit || ''}`.trim()],
-                          ['Idioma preferido', selected.language || 'Sin registrar'],
-                        ].map(([label, value]) => <div key={label} style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, background: 'rgba(255,255,255,.015)' }}>
-                          <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>{label}</div>
-                          <div style={{ color: '#D9D5CF', fontSize: 13, marginTop: 6, lineHeight: 1.45 }}>{value}</div>
-                        </div>)}
-                      </div>
-                    </section>
-
-                    <section style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
-                      <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Objetivo del paciente</div>
-                      <div style={{ color: selected.goal ? '#D9D5CF' : '#8E8881', lineHeight: 1.65, marginTop: 10, whiteSpace: 'pre-wrap' }}>{selected.goal || 'No hay una meta registrada en el expediente.'}</div>
-                    </section>
-
-                    <section style={{ border: `1px solid ${selected.conditions ? 'rgba(224,160,160,.30)' : 'rgba(255,255,255,.08)'}`, borderRadius: 14, padding: 22, background: selected.conditions ? 'rgba(224,160,160,.045)' : 'rgba(255,255,255,.02)' }}>
-                      <div style={{ color: selected.conditions ? '#E0A0A0' : '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Condiciones especiales / alergias</div>
-                      <div style={{ color: selected.conditions ? '#F0D2D2' : '#8E8881', lineHeight: 1.65, marginTop: 10, whiteSpace: 'pre-wrap' }}>{selected.conditions || 'No hay condiciones especiales ni alergias registradas.'}</div>
-                    </section>
-                  </div>
-
-                  <div style={{ display: 'grid', gap: 16 }}>
-                    <section style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                      <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Estado clínico actual</div>
-                      <div style={{ display: 'grid', gap: 11, marginTop: 15 }}>
-                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Peso más reciente</div><div style={{ marginTop: 6 }}>{latestWeight ? `${latestWeight.weight} ${latestWeight.weightUnit}` : 'Sin registro'}</div></div>
-                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Última consulta</div><div style={{ marginTop: 6 }}>{consultationsLoading ? 'Cargando…' : consultations[0] ? clinicDateLabel(consultations[0].consultationDate || consultations[0].consultationAt || '') : 'Sin registro'}</div></div>
-                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Próxima cita</div><div style={{ marginTop: 6 }}>{clinicDateLabel(latestScheduledAppointment || selected.nextAppointment)}</div>{selected.nextAppointmentService && <div style={{ color: '#8E8881', fontSize: 11, marginTop: 5 }}>{selected.nextAppointmentService}</div>}</div>
-                        <div style={{ padding: 13, border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}><div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase' }}>Consultas Preview</div><div style={{ marginTop: 6 }}>{consultationsLoading ? 'Cargando…' : consultations.length}</div></div>
-                      </div>
-                    </section>
-
-                    <section style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                      <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Contacto y ubicación</div>
-                      <div style={{ display: 'grid', gap: 8, marginTop: 13, color: '#D9D5CF', fontSize: 12, lineHeight: 1.55 }}>
-                        <div>{selected.phone || 'Teléfono sin registrar'}</div>
-                        <div>{selected.email || 'Email sin registrar'}</div>
-                        <div>{[selected.address, selected.city, selected.zip === null ? '' : String(selected.zip)].filter(Boolean).join(', ') || 'Dirección sin registrar'}</div>
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              ) : activeTab === 'Notas' ? (
+              {activeTab === 'Notas' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(300px,.75fr)', gap: 16 }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de notas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{notes.length} notas</span></div>
@@ -1162,8 +1122,10 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
               ) : activeTab === 'Consultas' ? (
                 <div className="clinic-preview-consultations-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(390px,.9fr)', gap: 16, alignItems: 'start' }}>
                   <div className="clinic-preview-card" style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Historial de consultas</h3><span style={{ color: '#6F6A64', fontSize: 12 }}>{consultations.length} consultas</span></div>
-                    <ClinicWeightHistory history={weightHistory} loading={consultationsLoading} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}><h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Expediente clínico completo</h3><span style={{ color: '#9ED4A8', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase' }}>Lectura segura</span></div>
+                    <ClinicWeightHistory history={weightHistory} loading={consultationsLoading || clinicRecordLoading} />
+                    <div style={{ marginTop: 18 }}><ClinicRecordView record={clinicRecord} loading={clinicRecordLoading} error={clinicRecordError} /></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap', borderTop: '1px solid rgba(201,168,76,.18)', marginTop: 20, paddingTop: 18 }}><div><h4 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400 }}>Borradores y registros Preview</h4><div style={{ color: '#77716A', fontSize: 10, marginTop: 4 }}>Separados del expediente real hasta su publicación controlada.</div></div><span style={{ color: '#6F6A64', fontSize: 11 }}>{consultations.length} registros</span></div>
                     {consultationPublicationMessage && <div style={{ marginTop: 14, padding: 12, border: `1px solid ${consultationPublicationMessage.startsWith('✓') ? 'rgba(158,212,168,.28)' : 'rgba(224,160,160,.32)'}`, borderRadius: 10, color: consultationPublicationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>{consultationPublicationMessage}</div>}
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
                       {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Próxima consulta preliminar</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
@@ -1179,8 +1141,9 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                           {item.amountCollected !== null && <span>Cobrado: ${Number(item.amountCollected).toFixed(2)}</span>}{item.paymentMethod && <span>{item.paymentMethod}</span>}{item.authorLabel && <span>{item.authorLabel}</span>}
                         </div>
                         {item.consultationType !== CLINIC_WEIGHT_UPDATE_TYPE && <div style={{ marginTop: 12 }}>
-                          {item.publishedToClinic ? <div style={{ color: '#9ED4A8', fontSize: 11 }}>✓ Publicada y vinculada al expediente clínico real.</div> : <button type="button" onClick={() => { setConsultationPublicationTargetId(item.id); setConsultationPublicationConfirmed(false); setConsultationPublicationMessage('') }} style={{ padding: '9px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', cursor: 'pointer', fontSize: 11 }}>Revisar publicación clínica →</button>}
+                          {item.publishedToClinic ? <div style={{ color: '#9ED4A8', fontSize: 11 }}>✓ Publicada y vinculada al expediente clínico real.</div> : isLiveClinicConsultationType(item.consultationType) ? <button type="button" onClick={() => { setConsultationPublicationTargetId(item.id); setConsultationPublicationConfirmed(false); setConsultationPublicationMessage('') }} style={{ padding: '9px 11px', borderRadius: 8, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', cursor: 'pointer', fontSize: 11 }}>Revisar publicación clínica →</button> : null}
                         </div>}
+                        {!item.publishedToClinic && item.consultationType !== CLINIC_WEIGHT_UPDATE_TYPE && !isLiveClinicConsultationType(item.consultationType) && <div style={{ marginTop: 10, color: '#E0A0A0', fontSize: 11, lineHeight: 1.5 }}>Este registro anterior no puede publicarse como consulta clínica. Conserva su información en Preview y registra el seguimiento desde la pestaña Seguimiento.</div>}
                         {consultationPublicationTargetId === item.id && !item.publishedToClinic && <div style={{ marginTop: 12, padding: 13, border: '1px solid rgba(226,200,122,.34)', borderRadius: 10, background: 'rgba(201,168,76,.055)' }}>
                           <div style={{ color: '#E2C87A', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Confirmar publicación clínica</div>
                           <div style={{ color: '#B8B3AD', fontSize: 11, lineHeight: 1.55, marginTop: 8 }}>Se copiarán esta fecha, tipo de consulta, mediciones, recomendaciones y pago al expediente clínico real. La próxima cita seguirá requiriendo confirmación por separado en Square.</div>
@@ -1198,7 +1161,8 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                     <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Registrar consulta</div>
 
                     <div style={sectionTitle}>Tipo y fecha</div>
-                    <select value={consultationType} onChange={e => changeConsultationType(e.target.value)} style={inputStyle}><option>Cliente Nuevo</option><option>Cliente subsecuente</option><option>Cliente Re-Inicio</option><option>Seguimiento</option></select>
+                    <select value={consultationType} onChange={e => changeConsultationType(e.target.value)} style={inputStyle}><option>Cliente Nuevo</option><option>Cliente subsecuente</option><option>Cliente Re-Inicio</option></select>
+                    <div style={{ color: '#77716A', fontSize: 10, lineHeight: 1.45, marginTop: 7 }}>Los seguimientos sin consulta se registran en Notas o Seguimiento; no se publican como una consulta facturable.</div>
                     <label style={{ ...labelStyle, marginTop: 10 }}>Fecha de consulta</label><input aria-label="Fecha de consulta" type="date" value={consultationDate} onInput={e => setConsultationDate(e.currentTarget.value)} onChange={e => setConsultationDate(e.target.value)} style={inputStyle} />
 
                     <div style={sectionTitle}>Mediciones</div>
