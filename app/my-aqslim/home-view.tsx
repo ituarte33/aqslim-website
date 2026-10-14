@@ -50,8 +50,7 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
     : `${data.totalChange > 0 ? '+' : '−'}${Math.abs(Math.round(data.totalChange * 10) / 10)} ${data.unit}`
   const percent = data.percentChange === null ? '—' : `${data.percentChange.toFixed(1)}%`
   const plan = data.planName || data.phase || (es ? 'Por confirmar' : 'To be confirmed')
-  const isFast36Hypocaloric = plan.toLowerCase().includes('fast 36') && plan.toLowerCase().includes('hipocal')
-  const planTitle = isFast36Hypocaloric ? 'FAST 36' : plan
+  const planTitle = plan
   const guidance = buildDailyAQBuddyGuidance({
     phase: data.phase,
     weekInPhase: data.weekInPhase,
@@ -75,7 +74,6 @@ export function MyAqslimHomeView({ data, demo = false, demoProfileId }: HomeView
           <p className={styles.eyebrow}>{es ? 'Tu plan actual' : 'Your current plan'}</p>
           <h1>{planTitle}</h1>
           <p className={styles.phaseWeek}>
-            {isFast36Hypocaloric ? `${es ? 'Plan Hipocalórico' : 'Hypocaloric Plan'} · ` : ''}
             {data.weekInPhase
               ? `${es ? 'Semana' : 'Week'} ${data.weekInPhase}`
               : (es ? 'Semana por confirmar' : 'Week to be confirmed')}

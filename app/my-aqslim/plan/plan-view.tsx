@@ -26,8 +26,7 @@ export function PlanView({ data, demo = false }: PlanViewProps) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const plan = data.planName || data.phase || (es ? 'Por confirmar' : 'To be confirmed')
-  const isFast36Hypocaloric = plan.toLowerCase().includes('fast 36') && plan.toLowerCase().includes('hipocal')
-  const planTitle = isFast36Hypocaloric ? 'FAST 36' : plan
+  const planTitle = plan
   const week = data.weekInPhase
   const buddyPath = demo ? '/my-aqslim/demo/buddy' : '/my-aqslim/buddy'
   const materialsPath = demo ? '/my-aqslim/demo/materials' : '/my-aqslim/materials'
@@ -50,7 +49,6 @@ export function PlanView({ data, demo = false }: PlanViewProps) {
           <p className={styles.eyebrow}>{es ? 'Tu plan actual' : 'Your current plan'}</p>
           <h2>{planTitle}</h2>
           <p>
-            {isFast36Hypocaloric ? `${es ? 'Plan Hipocalórico' : 'Hypocaloric Plan'} · ` : ''}
             {week ? `${es ? 'Semana' : 'Week'} ${week}` : (es ? 'Semana por confirmar' : 'Week to be confirmed')}
           </p>
         </div>
