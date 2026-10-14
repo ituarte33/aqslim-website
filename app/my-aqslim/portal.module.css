@@ -476,8 +476,10 @@
 
 .planHero { display: flex; align-items: center; gap: 22px; }
 .planHero .phaseSeal { flex-basis: 104px; width: 104px; height: 104px; }
+.planHero > div:last-child { min-width: 0; flex: 1; }
 .planHero h2,
 .materialsHero h2 { margin: 0; color: var(--portal-gold-light); font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 400; letter-spacing: .05em; text-transform: uppercase; }
+.planHero h2 { max-width: 100%; overflow-wrap: anywhere; line-height: 1.08; }
 .planHero > div:last-child > p:last-child,
 .materialsHero > p:last-child { margin: 7px 0 0; color: var(--portal-muted); font-size: 15px; }
 .timelineRows { display: grid; }
@@ -752,7 +754,8 @@
   .main { padding-top: 28px; padding-bottom: 70px; }
   .planHero { gap: 16px; }
   .planHero .phaseSeal { flex-basis: 88px; width: 88px; height: 88px; }
-  .planHero h2, .materialsHero h2 { font-size: 36px; }
+  .planHero h2 { font-size: clamp(26px, 8vw, 36px); }
+  .materialsHero h2 { font-size: 36px; }
   .guidedIntro { display: grid; }
   .syntheticControls { width: 100%; justify-items: start; }
   .syntheticBadge { width: fit-content; }
