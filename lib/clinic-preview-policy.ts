@@ -1,4 +1,4 @@
-export const CLINIC_PREVIEW_BRANCH = 'myaq-clinic-record-integration-001' as const
+export const CLINIC_PREVIEW_BRANCH = 'myaq-clinic-functional-v1' as const
 export const CLINIC_FOUNDER_EMAIL = 'rom@ituarteconsulting.com' as const
 
 export type ClinicPreviewEnvironment = {

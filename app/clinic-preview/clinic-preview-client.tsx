@@ -170,6 +170,13 @@ type ClinicAccessReadiness = {
   }
 }
 
+type ClinicPlanSnapshot = {
+  draftStatus: string | null
+  hasDraft: boolean
+  hasLivePlan: boolean
+  visitCadenceDays: number | null
+}
+
 const tabs = ['Resumen','Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
 type Tab = typeof tabs[number]
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -306,6 +313,8 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
   const [activeTab, setActiveTab] = useState<Tab>('Resumen')
+  const [showPatientPicker, setShowPatientPicker] = useState(initialPatientId === null)
+  const [refreshNonce, setRefreshNonce] = useState(0)
 
   const [notes, setNotes] = useState<ClinicNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
@@ -363,6 +372,12 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [reportedWeightSaving, setReportedWeightSaving] = useState(false)
   const [reportedWeightMessage, setReportedWeightMessage] = useState('')
   const [visitCadenceDays, setVisitCadenceDays] = useState<number | null>(null)
+  const [planSnapshot, setPlanSnapshot] = useState<ClinicPlanSnapshot>({
+    draftStatus: null,
+    hasDraft: false,
+    hasLivePlan: false,
+    visitCadenceDays: null,
+  })
   const [nextAppointmentEdited, setNextAppointmentEdited] = useState(false)
   const [accessReadiness, setAccessReadiness] = useState<ClinicAccessReadiness | null>(null)
   const [accessReadinessLoading, setAccessReadinessLoading] = useState(false)
@@ -490,14 +505,30 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     }
   }
 
-  async function getSchedulingCadence(patientId: string) {
+  async function loadPlanSnapshot(patientId: string) {
     try {
       const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('load_failed')
-      return data.draft?.visitCadenceDays ?? null
+      const snapshot: ClinicPlanSnapshot = {
+        draftStatus: typeof data.draft?.status === 'string' ? data.draft.status : null,
+        hasDraft: Boolean(data.draft),
+        hasLivePlan: Boolean(data.livePlan),
+        visitCadenceDays: typeof data.draft?.visitCadenceDays === 'number' ? data.draft.visitCadenceDays : null,
+      }
+      setPlanSnapshot(snapshot)
+      setVisitCadenceDays(snapshot.visitCadenceDays)
+      return snapshot
     } catch {
-      return null
+      const snapshot: ClinicPlanSnapshot = {
+        draftStatus: null,
+        hasDraft: false,
+        hasLivePlan: false,
+        visitCadenceDays: null,
+      }
+      setPlanSnapshot(snapshot)
+      setVisitCadenceDays(null)
+      return snapshot
     }
   }
 
@@ -536,9 +567,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
           setNextAppointmentEdited(true)
         }
       })
-      void getSchedulingCadence(selectedId).then(days => {
-        if (!cancelled) setVisitCadenceDays(days)
-      })
+      void loadPlanSnapshot(selectedId)
       void loadAccessReadiness(selectedId, accessController.signal)
     } else {
       setNotes([])
@@ -546,6 +575,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       setClinicRecord(null)
       setClinicRecordError('')
       setVisitCadenceDays(null)
+      setPlanSnapshot({ draftStatus: null, hasDraft: false, hasLivePlan: false, visitCadenceDays: null })
       setAccessReadiness(null)
       setAccessReadinessError('')
     }
@@ -555,7 +585,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       notesController.abort()
       clinicRecordController.abort()
     }
-  }, [selectedId])
+  }, [selectedId, refreshNonce])
 
   useEffect(() => {
     authorizationRequestId.current += 1
@@ -993,6 +1023,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
 
   function choosePatient(id: string) {
     setSelectedId(id)
+    setShowPatientPicker(false)
     const clinicUrl = new URL(window.location.href)
     clinicUrl.searchParams.set('patient', id)
     window.history.replaceState(window.history.state, '', `${clinicUrl.pathname}${clinicUrl.search}${clinicUrl.hash}`)
@@ -1034,6 +1065,11 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   function openMyAqslim() { if (selected) setActiveTab('My AQSLIM') }
   function openMessages() { if (selected) setActiveTab('Mensajes') }
 
+  function refreshPatient() {
+    if (!selected) return
+    setRefreshNonce(value => value + 1)
+  }
+
   function changeConsultationType(type: string) {
     setConsultationType(type)
     const fee = feeForType(type)
@@ -1051,13 +1087,16 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       <header className="clinic-preview-header" style={{ position: 'relative', zIndex: 20, background: '#0A0A0A', borderBottom: '1px solid rgba(201,168,76,.28)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 24, letterSpacing: '.08em' }}>AQ<span style={{ color: '#C9A84C' }}>SLIM</span> Clinic</div>
-          <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>MYAQ-001-CLINIC-001 · PREVIEW · Founder-only</div>
+          <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>FUNCIONAL V1 · PREVIEW SEGURO · Sólo Rom</div>
         </div>
-        <a href="/my-aqslim" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Abrir mi My AQSLIM ↗</a>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {selected && <button type="button" className="clinic-preview-patient-picker-button" onClick={() => setShowPatientPicker(value => !value)} style={{ cursor: 'pointer', border: '1px solid rgba(201,168,76,.35)', borderRadius: 9, padding: '9px 12px', background: 'rgba(201,168,76,.08)', color: '#E2C87A', fontSize: 12 }}>{showPatientPicker ? 'Cerrar pacientes' : 'Cambiar paciente'}</button>}
+          <a href="/my-aqslim" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Abrir mi My AQSLIM ↗</a>
+        </div>
       </header>
 
       <div className="clinic-preview-shell" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', minHeight: 'calc(100vh - 80px)' }}>
-        <aside className="clinic-preview-sidebar" style={{ borderRight: '1px solid rgba(201,168,76,.18)', padding: 20 }}>
+        <aside className={`clinic-preview-sidebar${showPatientPicker ? ' is-open' : ''}`} style={{ borderRight: '1px solid rgba(201,168,76,.18)', padding: 20 }}>
           <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Pacientes</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 30, margin: '6px 0 16px' }}>Atención clínica</h1>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar nombre, email o teléfono…" style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(201,168,76,.28)', color: '#FAFAF8', padding: '12px 14px', borderRadius: 10, outline: 'none', marginBottom: 14 }} />
@@ -1083,7 +1122,10 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
           ) : (
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div className="clinic-preview-patient-header" style={{ border: '1px solid rgba(201,168,76,.25)', borderRadius: 18, padding: 26, background: 'linear-gradient(135deg, rgba(201,168,76,.07), rgba(255,255,255,.02))', marginBottom: 18 }}>
-                <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Expediente</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Expediente</div>
+                  <button type="button" onClick={refreshPatient} disabled={notesLoading || consultationsLoading || clinicRecordLoading || accessReadinessLoading} style={{ cursor: notesLoading || consultationsLoading || clinicRecordLoading || accessReadinessLoading ? 'wait' : 'pointer', border: '1px solid rgba(255,255,255,.10)', borderRadius: 8, padding: '8px 10px', background: 'rgba(255,255,255,.025)', color: '#9A9590', fontSize: 11 }}>↻ Actualizar expediente</button>
+                </div>
                 <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 38, margin: '8px 0 10px' }}>{selected.name}</h2>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', color: '#9A9590', fontSize: 13 }}>
                   {selected.phone && <span>{selected.phone}</span>}{selected.email && <span>{selected.email}</span>}{selected.status && <span>Estado: {selected.status}</span>}{selected.language && <span>Idioma: {selected.language}</span>}
@@ -1120,6 +1162,21 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                     <div style={{ marginTop: 18 }}><ClinicRecordView record={clinicRecord} loading={clinicRecordLoading} error={clinicRecordError} /></div>
                   </div>
 
+                  <div style={{ display: 'grid', gap: 16 }}>
+                  <div className="clinic-preview-card" style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.05)' }}>
+                    <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Flujo funcional V1</div>
+                    <h3 style={{ margin: '8px 0 0', fontFamily: 'Georgia, serif', fontSize: 25, fontWeight: 400 }}>Continúa la atención</h3>
+                    <div style={{ display: 'grid', gap: 9, marginTop: 16 }}>
+                      {[
+                        { label: '1. Revisar expediente', detail: clinicRecordLoading ? 'Cargando…' : clinicRecord ? 'Expediente disponible' : 'Requiere revisión', done: Boolean(clinicRecord), action: () => setActiveTab('Resumen') },
+                        { label: '2. Registrar consulta', detail: consultations.length > 0 ? `${consultations.length} registro${consultations.length === 1 ? '' : 's'} disponible${consultations.length === 1 ? '' : 's'}` : 'Sin consultas Preview', done: consultations.some(item => item.publishedToClinic), action: openConsultations },
+                        { label: '3. Preparar y publicar plan', detail: planSnapshot.hasLivePlan ? 'Plan publicado en My AQSLIM' : planSnapshot.hasDraft ? `Borrador: ${planSnapshot.draftStatus || 'guardado'}` : 'Sin borrador', done: planSnapshot.hasLivePlan, action: openPlan },
+                        { label: '4. Verificar acceso My AQSLIM', detail: accessReadinessLoading ? 'Verificando…' : accessReadiness?.accessLabel || 'Requiere revisión', done: accessReadiness?.accessState === 'linked', action: openMyAqslim },
+                      ].map(step => <button type="button" key={step.label} onClick={step.action} style={{ cursor: 'pointer', width: '100%', textAlign: 'left', padding: 12, border: `1px solid ${step.done ? 'rgba(158,212,168,.26)' : 'rgba(255,255,255,.08)'}`, borderRadius: 10, background: step.done ? 'rgba(158,212,168,.045)' : 'rgba(255,255,255,.018)', color: '#FAFAF8' }}><div style={{ fontSize: 12 }}>{step.done ? '✓ ' : '○ '}{step.label}</div><div style={{ color: step.done ? '#9ED4A8' : '#8E8881', fontSize: 10, marginTop: 5 }}>{step.detail}</div></button>)}
+                    </div>
+                    <div style={{ color: '#77716A', fontSize: 10, lineHeight: 1.5, marginTop: 11 }}>Cada botón abre únicamente el área correspondiente. Guardar o publicar siempre requiere una acción y confirmación separada.</div>
+                  </div>
+
                   <div className="clinic-preview-card" style={{ border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.035)' }}>
                     <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Estado clínico actual</div>
                     <div className="clinic-preview-summary-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12, marginTop: 16 }}>
@@ -1139,6 +1196,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                       <div style={{ color: selected.conditions ? '#D9D5CF' : '#8E8881', fontSize: 12, lineHeight: 1.6, marginTop: 8, whiteSpace: 'pre-wrap' }}>{selected.conditions || 'No hay información registrada.'}</div>
                     </div>
                     {selected.goal && <div style={{ borderTop: '1px solid rgba(201,168,76,.18)', marginTop: 18, paddingTop: 16 }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Meta del cliente</div><div style={{ color: '#D9D5CF', fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>{selected.goal}</div></div>}
+                  </div>
                   </div>
                 </div>
               ) : activeTab === 'Notas' ? (
