@@ -9,6 +9,7 @@ import {
   type PatientMaterialsData,
   type PlanMaterialAttachment,
 } from '@/lib/materials-policy'
+import { phaseGuideMaterial } from '@/lib/phase-materials'
 
 function validAttachment(value: AirtableAttachment): value is AirtableAttachment & PlanMaterialAttachment {
   return Boolean(value.id && value.url && value.filename)
@@ -28,9 +29,11 @@ export const getPatientPortalMaterials = cache(async (
   const attachments = Array.isArray(plan.fields['Materiales asignados'])
     ? plan.fields['Materiales asignados'].filter(validAttachment)
     : []
+  const assignedMaterials = visiblePlanMaterials({ attachments, kenkhoTier, weekInPhase })
+  const phaseMaterial = phaseGuideMaterial(plan.fields['Fase Actual'])
 
   return {
     kenkhoTier,
-    materials: visiblePlanMaterials({ attachments, kenkhoTier, weekInPhase }),
+    materials: phaseMaterial ? [phaseMaterial, ...assignedMaterials] : assignedMaterials,
   }
 })
