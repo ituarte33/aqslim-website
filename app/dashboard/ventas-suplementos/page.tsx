@@ -11,11 +11,16 @@ export default async function SupplementSalesPage() {
 
   const user = await currentUser()
   const [clientsResult, productsResult] = await Promise.allSettled([getClientes(), getSupplementos()])
+  const loadError = clientsResult.status === 'rejected' || productsResult.status === 'rejected'
+    ? 'No se pudieron cargar los clientes o suplementos. Recarga la página antes de guardar una venta.'
+    : undefined
+  if (loadError) console.error('[supplement-sales] page_data_unavailable')
   return (
     <SupplementSalesClient
+      loadError={loadError}
       user={user ? { firstName: user.firstName, lastName: user.lastName } : null}
-      clients={clientsResult.status === 'fulfilled' ? clientsResult.value : []}
-      products={productsResult.status === 'fulfilled' ? productsResult.value : []}
+      clients={clientsResult.status === 'fulfilled' ? clientsResult.value.map(client => ({ id: client.id, fields: { 'Nombre Completo': client.fields['Nombre Completo'] ?? '', Email: client.fields.Email ?? '' } })) : []}
+      products={productsResult.status === 'fulfilled' ? productsResult.value.map(product => ({ id: product.id, fields: { Nombre: product.fields.Nombre ?? 'Suplemento', 'Precio de Venta ($)': product.fields['Precio de Venta ($)'] ?? 0 } })) : []}
     />
   )
 }
