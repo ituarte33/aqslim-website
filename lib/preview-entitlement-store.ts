@@ -86,6 +86,16 @@ function isPreviewStoreEnabled(): boolean {
     && Boolean(process.env.AIRTABLE_PAT)
 }
 
+function isPortalAccessStoreEnabled(): boolean {
+  const supportedEnvironment = process.env.VERCEL_ENV === 'production'
+    || (process.env.VERCEL_ENV === 'preview'
+      && process.env.VERCEL_GIT_COMMIT_REF === CLINIC_PREVIEW_BRANCH)
+
+  return supportedEnvironment
+    && process.env.AIRTABLE_BASE_ID === SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID
+    && Boolean(process.env.AIRTABLE_PAT)
+}
+
 function text(fields: Record<string, unknown>, fieldId: string): string | null {
   const value = fields[fieldId]
   return typeof value === 'string' && value.trim() ? value.trim() : null
@@ -111,8 +121,11 @@ function escapeFormulaString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-async function queryPreviewEntitlementRecords(filterByFormula: string): Promise<AirtableEntitlementRecord[]> {
-  if (!isPreviewStoreEnabled()) return []
+async function queryPreviewEntitlementRecords(
+  filterByFormula: string,
+  enabled = isPreviewStoreEnabled(),
+): Promise<AirtableEntitlementRecord[]> {
+  if (!enabled) return []
 
   const baseId = process.env.AIRTABLE_BASE_ID as string
   const pat = process.env.AIRTABLE_PAT as string
@@ -230,6 +243,34 @@ export async function getPreviewEntitlementSourceRecordByPatientRecordId({
   )
   if (records.length === 0) return null
   if (records.length > 1) throw new Error('Duplicate Preview entitlement patient records')
+
+  return parsePreviewEntitlementRecord({
+    airtableRecord: records[0],
+    canonicalSubjectId,
+    expectedPatientRecordId: patientRecordId,
+  })
+}
+
+// My AQSLIM must honor a Clinic access restriction on the official production
+// domain. This narrowly scoped reader is the only production path into the
+// entitlement table; all provisioning and mutation paths remain Preview-only.
+export async function getPortalAccessRecordByPatientRecordId({
+  patientRecordId,
+  canonicalSubjectId,
+}: {
+  patientRecordId: string
+  canonicalSubjectId: string
+}): Promise<PreviewEntitlementSourceRecord | null> {
+  if (!isPortalAccessStoreEnabled()) return null
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientRecordId)) return null
+  if (!canonicalSubjectId.trim()) return null
+
+  const records = await queryPreviewEntitlementRecords(
+    `AND({Patient Record ID} = "${escapeFormulaString(patientRecordId)}", {Preview Only} = TRUE())`,
+    true,
+  )
+  if (records.length === 0) return null
+  if (records.length > 1) throw new Error('Duplicate portal access records')
 
   return parsePreviewEntitlementRecord({
     airtableRecord: records[0],
