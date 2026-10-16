@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { getActor } from '@/lib/auth'
 import { portalAccessIsRestricted } from '@/lib/portal-access-policy'
-import { getPreviewEntitlementSourceRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
+import { getPortalAccessRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
 
 export default async function MyAqslimLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor()
   const entitlement = actor?.boundPatientId
-    ? await getPreviewEntitlementSourceRecordByPatientRecordId({
+    ? await getPortalAccessRecordByPatientRecordId({
         patientRecordId: actor.boundPatientId,
         canonicalSubjectId: actor.clerkUserId,
       }).catch(() => null)
