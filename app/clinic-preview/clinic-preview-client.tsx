@@ -393,6 +393,9 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [authorizationExecutionEnabled, setAuthorizationExecutionEnabled] = useState(false)
   const [activationExecuting, setActivationExecuting] = useState(false)
   const [activationComplete, setActivationComplete] = useState(false)
+  const [accessRestrictionConfirmation, setAccessRestrictionConfirmation] = useState('')
+  const [accessRestrictionSaving, setAccessRestrictionSaving] = useState(false)
+  const [accessRestrictionMessage, setAccessRestrictionMessage] = useState('')
   const authorizationRequestId = useRef(0)
   const consultationSubmitGuard = useRef<ClinicSubmitGuard>({ active: false })
   const consultationPublicationSubmitGuard = useRef<ClinicSubmitGuard>({ active: false })
@@ -596,7 +599,36 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     setAuthorizationExecutionEnabled(false)
     setActivationExecuting(false)
     setActivationComplete(false)
+    setAccessRestrictionConfirmation('')
+    setAccessRestrictionSaving(false)
+    setAccessRestrictionMessage('')
   }, [selectedId, accessReadiness?.authorization.operationFingerprint])
+
+  async function changeAccessRestriction(action: 'suspend' | 'restore') {
+    if (!selected || !accessReadiness || accessRestrictionSaving) return
+    const confirmation = action === 'suspend' ? 'RESTRINGIR' : 'RESTAURAR'
+    if (accessRestrictionConfirmation.trim().toUpperCase() !== confirmation) return
+    setAccessRestrictionSaving(true)
+    setAccessRestrictionMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-access-restriction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId: selected.id, action, confirmation }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok || data.result?.verified !== true) throw new Error('restriction_failed')
+      await loadAccessReadiness(selected.id)
+      setAccessRestrictionConfirmation('')
+      setAccessRestrictionMessage(action === 'suspend'
+        ? '✓ Acceso restringido y verificado. La cuenta permanece vinculada para poder reactivarla.'
+        : '✓ Acceso restaurado y verificado en My AQSLIM Preview.')
+    } catch {
+      setAccessRestrictionMessage('No se pudo cambiar el acceso. No se aplicó una confirmación verificable.')
+    } finally {
+      setAccessRestrictionSaving(false)
+    }
+  }
 
   async function validateAccessAuthorization() {
     if (!selected || !accessReadiness || accessReadiness.authorization.state !== 'ready') return
@@ -1543,6 +1575,18 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                         style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${authorizationExecutionEnabled && !activationComplete ? 'rgba(201,168,76,.45)' : 'rgba(255,255,255,.08)'}`, background: authorizationExecutionEnabled && !activationComplete ? '#C9A84C' : 'rgba(255,255,255,.025)', color: authorizationExecutionEnabled && !activationComplete ? '#0A0A0A' : activationComplete ? '#9ED4A8' : '#77716A', textAlign: 'left', cursor: authorizationExecutionEnabled && !activationExecuting && !activationComplete ? 'pointer' : 'not-allowed', fontWeight: 600 }}
                       >{activationExecuting ? 'Ejecutando y verificando…' : activationComplete ? '✓ Activación verificada' : authorizationExecutionEnabled ? 'Ejecutar activación autorizada' : authorizedFingerprint ? 'Ejecutar activación · servidor no habilitado' : 'Ejecutar activación · requiere autorización validada'}</button>
                     </div>
+                    {accessReadiness?.entitlement.present && accessReadiness.entitlement.binding === 'linked' ? <div style={{ marginTop: 18, padding: 14, border: '1px solid rgba(224,160,160,.28)', borderRadius: 10, background: 'rgba(224,160,160,.035)' }}>
+                      <div style={{ color: '#E0A0A0', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.12em' }}>Control de acceso del cliente</div>
+                      <p style={{ color: '#9A9590', fontSize: 11, lineHeight: 1.55, margin: '9px 0 12px' }}>Activo 0–30 días · gracia 31–60 días · inactivo después de 60 días. La restricción manual bloquea My AQSLIM inmediatamente, conserva el expediente y puede revertirse.</p>
+                      {accessReadiness.entitlement.status === 'suspended' ? <>
+                        <input value={accessRestrictionConfirmation} onChange={event => setAccessRestrictionConfirmation(event.target.value)} placeholder="Escribe RESTAURAR" style={inputStyle} />
+                        <button type="button" onClick={() => void changeAccessRestriction('restore')} disabled={accessRestrictionSaving || accessRestrictionConfirmation.trim().toUpperCase() !== 'RESTAURAR'} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.42)', background: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTAURAR' ? 'rgba(106,160,116,.16)' : 'rgba(255,255,255,.025)', color: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTAURAR' ? '#9ED4A8' : '#77716A', cursor: accessRestrictionSaving ? 'wait' : 'pointer', fontWeight: 600 }}>{accessRestrictionSaving ? 'Verificando…' : 'Restaurar acceso'}</button>
+                      </> : <>
+                        <input value={accessRestrictionConfirmation} onChange={event => setAccessRestrictionConfirmation(event.target.value)} placeholder="Escribe RESTRINGIR" style={inputStyle} />
+                        <button type="button" onClick={() => void changeAccessRestriction('suspend')} disabled={accessRestrictionSaving || accessRestrictionConfirmation.trim().toUpperCase() !== 'RESTRINGIR'} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(224,160,160,.42)', background: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTRINGIR' ? 'rgba(224,160,160,.12)' : 'rgba(255,255,255,.025)', color: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTRINGIR' ? '#E0A0A0' : '#77716A', cursor: accessRestrictionSaving ? 'wait' : 'pointer', fontWeight: 600 }}>{accessRestrictionSaving ? 'Verificando…' : 'Restringir acceso'}</button>
+                      </>}
+                      {accessRestrictionMessage ? <div style={{ marginTop: 10, color: accessRestrictionMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 11, lineHeight: 1.5 }}>{accessRestrictionMessage}</div> : null}
+                    </div> : null}
                     {accessInvitationDrafts.length > 0 && <div style={{ marginTop: 16, padding: 12, border: '1px solid rgba(106,160,116,.24)', borderRadius: 9, background: 'rgba(106,160,116,.05)' }}>
                       <div style={{ color: '#9ED4A8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{accessInvitationDrafts.length} borrador{accessInvitationDrafts.length === 1 ? '' : 'es'} guardado{accessInvitationDrafts.length === 1 ? '' : 's'}</div>
                       <div style={{ color: '#D9D5CF', fontSize: 12, marginTop: 7 }}>{accessInvitationDrafts[0].messageDraft?.subject || 'Invitación My AQSLIM'}</div>
