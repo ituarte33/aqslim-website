@@ -513,6 +513,11 @@
 .materialHelp { margin: 22px 0 18px; padding: 20px; border-top: 1px solid var(--portal-line); border-bottom: 1px solid var(--portal-line); text-align: center; }
 .materialHelp p { margin: 0 0 13px; color: var(--portal-muted); font-size: 12px; }
 .materialHelp .goldButton { width: 100%; }
+.phaseGuideLead { display: grid; grid-template-columns: 52px 1fr; gap: 15px; align-items: start; }
+.phaseGuideLead > div:last-child > p:last-child { margin: 7px 0 0; color: var(--portal-text); font-family: 'Playfair Display', serif; font-size: 20px; line-height: 1.55; }
+.phaseGuideSection ul { display: grid; gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
+.phaseGuideSection li { position: relative; padding-left: 20px; color: var(--portal-text); font-size: 13px; line-height: 1.55; }
+.phaseGuideSection li::before { content: ''; position: absolute; left: 1px; top: .55em; width: 7px; height: 7px; transform: rotate(45deg); background: var(--portal-gold-light); }
 .buddyPageAnchor { min-height: calc(100vh - 260px); }
 .buddyAction { font-family: Montserrat, sans-serif; }
 
