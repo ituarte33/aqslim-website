@@ -7,6 +7,7 @@ import {
   visiblePlanMaterials,
   type PlanMaterialAttachment,
 } from '../lib/materials-policy.ts'
+import { getPhaseGuide, phaseGuideMaterial } from '../lib/phase-materials.ts'
 
 const attachment = (filename: string): PlanMaterialAttachment => ({
   id: `att-${filename}`,
@@ -47,10 +48,19 @@ test('assigned hypocaloric PDF is presented as the current nutrition plan', () =
   assert.equal(materials[0].titleEs, 'Plan hipocalórico')
 })
 
-test('the patient UI renders real assigned links instead of invented phase cards', async () => {
+test('the patient UI renders governed material links', async () => {
   const view = await readFile(new URL('../app/my-aqslim/materials/materials-view.tsx', import.meta.url), 'utf8')
   assert.match(view, /materials\.map/)
   assert.match(view, /href=\{item\.url\}/)
   assert.doesNotMatch(view, /Cartografía Semana \$\{week/)
-  assert.doesNotMatch(view, /Guía \$\{phase/)
+})
+
+test('the published phase produces the matching governed phase guide', () => {
+  assert.equal(getPhaseGuide('Jing')?.number, 1)
+  assert.equal(getPhaseGuide('Qi')?.number, 2)
+  assert.equal(getPhaseGuide('Xue')?.number, 3)
+  assert.equal(getPhaseGuide('Yang Sheng')?.number, 4)
+  assert.equal(getPhaseGuide('Sin fase'), null)
+  assert.equal(phaseGuideMaterial('Jing')?.url, '/my-aqslim/materials/phase-guide')
+  assert.match(phaseGuideMaterial('Jing')?.titleEs ?? '', /Jing/)
 })

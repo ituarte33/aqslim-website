@@ -21,6 +21,53 @@ html { scroll-behavior:smooth; }
 body { font-family:'Montserrat',sans-serif; background:var(--black); color:var(--white); overflow-x:hidden; }
 body.marketing { cursor:none; }
 
+/* Clinic Preview responsive shell */
+.clinic-preview-tabs {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  padding: 0;
+}
+
+.clinic-preview-patient-picker-button { display: none; }
+
+@media (max-width: 860px) {
+  .clinic-preview-header {
+    position: static !important;
+    flex-wrap: wrap;
+    padding: 14px 16px !important;
+  }
+  .clinic-preview-shell { grid-template-columns: minmax(0, 1fr) !important; }
+  .clinic-preview-sidebar {
+    display: none;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(201,168,76,.18);
+    padding: 16px !important;
+  }
+  .clinic-preview-sidebar.is-open { display: block; }
+  .clinic-preview-patient-picker-button { display: inline-flex; }
+  .clinic-preview-patient-list { max-height: 230px !important; }
+  .clinic-preview-content { min-width: 0; padding: 16px !important; }
+  .clinic-preview-consultations-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .clinic-preview-summary-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .clinic-preview-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 560px) {
+  .clinic-preview-header > div:last-child { width: 100%; justify-content: space-between !important; }
+  .clinic-preview-patient-list { max-height: 180px !important; }
+  .clinic-preview-patient-header { padding: 18px !important; }
+  .clinic-preview-patient-header h2 { font-size: 30px !important; overflow-wrap: anywhere; }
+  .clinic-preview-metrics,
+  .clinic-record-profile-grid,
+  .clinic-record-questionnaire-grid,
+  .clinic-preview-review-grid,
+  .clinic-preview-readiness-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .clinic-preview-summary-fields { grid-template-columns: minmax(0, 1fr) !important; }
+  .clinic-preview-card { min-width: 0; padding: 16px !important; }
+  .clinic-preview-tabs button { min-width: 0; padding: 10px 6px !important; font-size: 11px !important; }
+}
+
 .finance-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 @media (max-width: 760px) {

@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -11,9 +12,11 @@ const isPublicRoute = createRouteMatcher([
   '/signed-out',
   '/fast(.*)',
   '/my-aqslim/login(.*)',
+  '/clinic-preview/login(.*)',
 ])
 
 const isPatientPortalRoute = createRouteMatcher(['/my-aqslim(.*)'])
+const isClinicPreviewRoute = createRouteMatcher(['/clinic-preview(.*)'])
 
 function isOperationalRoute(pathname: string) {
   if (pathname === '/dashboard/plan-preview' || pathname.startsWith('/dashboard/plan-preview/')) {
@@ -30,6 +33,18 @@ export default clerkMiddleware(async (auth, req) => {
   const isRecipePreview = process.env.VERCEL_ENV === 'preview'
     && process.env.VERCEL_GIT_COMMIT_REF === 'myaq-rec-001-preview-010'
 
+  const isClinicPreview = isClinicPreviewEnvironment({
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+  })
+
+  // This branch is now the working AQSLIM Clinic Preview. Opening a Vercel
+  // deployment at its root should take the Founder directly into Clinic instead
+  // of requiring a manual /clinic-preview path edit. Production is unchanged.
+  if (isClinicPreview && req.nextUrl.pathname === '/') {
+    return NextResponse.redirect(new URL('/clinic-preview', req.url))
+  }
+
   if (isRecipePreview && isOperationalRoute(req.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/dashboard/plan-preview', req.url))
   }
@@ -38,6 +53,13 @@ export default clerkMiddleware(async (auth, req) => {
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.redirect(new URL('/my-aqslim/login', req.url))
+    }
+  }
+
+  if (isClinicPreview && isClinicPreviewRoute(req) && !isPublicRoute(req)) {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.redirect(new URL('/clinic-preview/login', req.url))
     }
   }
 
