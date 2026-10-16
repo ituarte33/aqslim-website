@@ -61,8 +61,7 @@ export function MaterialsView({ data, materialsData, demo = false, demoProfileId
               <a
                 className={styles.materialAction}
                 href={item.url}
-                target="_blank"
-                rel="noreferrer"
+                {...(item.url.startsWith('/') ? {} : { target: '_blank', rel: 'noreferrer' })}
               >
                 {es ? 'Abrir material' : 'Open material'} <ChevronIcon />
               </a>
