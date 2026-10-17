@@ -1166,7 +1166,7 @@ export async function createMealLog(data: {
 export async function updateMealLogConsumptionStatus(
   recordId: string,
   userId: string,
-  status: Exclude<ConsumptionStatus, 'Unconfirmed'>,
+  status: ConsumptionStatus,
 ): Promise<MealLog | null> {
   const record = await getMealLogForUser(recordId, userId)
   if (!record) return null
@@ -1177,6 +1177,16 @@ export async function updateMealLogConsumptionStatus(
       fields: { [MEAL_LOGS_FIELDS.CONSUMPTION_STATUS]: status },
     }),
   })
+}
+
+export async function deleteMealLogForUser(recordId: string, userId: string): Promise<boolean> {
+  const record = await getMealLogForUser(recordId, userId)
+  if (!record) return false
+
+  const deleted = await airtableFetch(`/${MEAL_LOGS_TABLE}/${recordId}`, {
+    method: 'DELETE',
+  }) as { deleted?: boolean; id?: string }
+  return deleted.deleted === true && deleted.id === recordId
 }
 
 export async function updateMealLogMealType(

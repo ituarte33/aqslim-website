@@ -99,3 +99,33 @@ test('today view exposes a direct edit button for only the latest meal', async (
   assert.match(widget, /editLatest: 'Editar'/)
   assert.match(widget, /editLatest: 'Edit'/)
 })
+
+test('changing a saved portion updates the same meal and does not create a duplicate', async () => {
+  const component = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+  const route = await readFile(new URL('../app/api/food-scan/route.ts', import.meta.url), 'utf8')
+  const airtable = await readFile(new URL('../lib/airtable.ts', import.meta.url), 'utf8')
+
+  assert.match(component, /action: 'update_portion'/)
+  assert.match(component, /mealLogId: result\.mealLogId/)
+  assert.match(route, /payload\.action === 'update_portion'/)
+  const updateBranch = route.match(/if \(payload\.action === 'update_portion'\)[\s\S]*?\n  }\n\n  if \(payload\.action === 'reanalyze'\)/)?.[0] ?? ''
+  assert.match(updateBranch, /updateUnconfirmedMealLogEstimate/)
+  assert.doesNotMatch(updateBranch, /createMealLog/)
+  assert.match(airtable, /Consumption Status.*Unconfirmed/s)
+})
+
+test('meal history supports unconfirming and deleting only owned records', async () => {
+  const widget = await readFile(new URL('../app/food-log-widget.tsx', import.meta.url), 'utf8')
+  const scanner = await readFile(new URL('../app/food-scanner/scanner-client.tsx', import.meta.url), 'utf8')
+  const route = await readFile(new URL('../app/api/food-scan/route.ts', import.meta.url), 'utf8')
+  const airtable = await readFile(new URL('../lib/airtable.ts', import.meta.url), 'utf8')
+
+  assert.match(widget, /onConsumptionStatusChange/)
+  assert.match(widget, /onDelete/)
+  assert.match(widget, /window\.confirm\(t\.deleteConfirm\)/)
+  assert.match(scanner, /confirm: true/)
+  assert.match(route, /export async function DELETE/)
+  assert.match(route, /payload\.confirm !== true/)
+  assert.match(airtable, /deleteMealLogForUser[\s\S]*?getMealLogForUser\(recordId, userId\)/)
+  assert.match(route, /\['Unconfirmed', 'Consumed', 'Reference only'\]/)
+})

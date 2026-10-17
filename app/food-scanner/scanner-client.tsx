@@ -153,6 +153,8 @@ const COPY = {
     confirmationSaving: 'Guardando…',
     confirmedConsumed: 'Registrado como consumido. Ya cuenta en tu presupuesto de hoy.',
     confirmedReference: 'Guardado solo como referencia. No cuenta como alimento consumido.',
+    unconfirm: 'Desconfirmar',
+    portionSaving: 'Actualizando porción…',
     confirmationError: 'No pudimos guardar tu elección. Inténtalo de nuevo.',
     disclosureTitle: 'Antes de tu primer análisis',
     disclosureBody: 'AQ Buddy utiliza análisis automatizado de fotografías o descripciones para estimar calorías, carbohidratos, grasas y proteínas. Los resultados pueden contener errores y variar según las porciones, los ingredientes y la preparación.',
@@ -234,6 +236,8 @@ const COPY = {
     confirmationSaving: 'Saving…',
     confirmedConsumed: 'Logged as consumed. It now counts toward today’s budget.',
     confirmedReference: 'Saved for reference only. It does not count as food consumed.',
+    unconfirm: 'Mark unconfirmed',
+    portionSaving: 'Updating serving…',
     confirmationError: 'We could not save your choice. Please try again.',
     disclosureTitle: 'Before your first analysis',
     disclosureBody: 'AQ Buddy uses automated photo or description analysis to estimate calories, carbohydrates, fats, and protein. Results may contain errors and vary with portions, ingredients, and preparation.',
@@ -271,6 +275,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [scanning, setScanning] = useState(false)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [adjustingPortion, setAdjustingPortion] = useState(false)
   const [updatingMealType, setUpdatingMealType] = useState(false)
   const [correctionOpen, setCorrectionOpen] = useState(false)
   const [correction, setCorrection] = useState('')
@@ -433,7 +438,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       const response = await fetch('/api/food-scan', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reanalyze', mealLogId: result.mealLogId, imageBase64: base64, mimeType, correction, language: lang }),
+        body: JSON.stringify({ action: 'reanalyze', mealLogId: result.mealLogId, imageBase64: base64, mimeType, correction, portionPercent, language: lang }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -455,18 +460,64 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     finally { setRecalculating(false) }
   }
 
-  async function confirmConsumption(consumptionStatus: 'Consumed' | 'Reference only') {
+  async function updateConsumptionStatus(mealLogId: string, consumptionStatus: 'Unconfirmed' | 'Consumed' | 'Reference only') {
+    const response = await fetch('/api/food-scan', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mealLogId, consumptionStatus }) })
+    const data = await response.json()
+    if (!response.ok) throw new Error('confirmation_failed')
+    setResult(current => current?.mealLogId === mealLogId ? { ...current, consumptionStatus: data.consumptionStatus } : current)
+    setLogs(current => current.map(log => log.id === mealLogId ? { ...log, fields: { ...log.fields, 'Consumption Status': data.consumptionStatus } } : log))
+    return data.consumptionStatus as ScanResult['consumptionStatus']
+  }
+
+  async function confirmConsumption(consumptionStatus: 'Unconfirmed' | 'Consumed' | 'Reference only') {
     if (!result || confirming) return
     setConfirming(true)
     setConfirmationError(null)
     try {
-      const response = await fetch('/api/food-scan', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mealLogId: result.mealLogId, consumptionStatus }) })
-      const data = await response.json()
-      if (!response.ok) throw new Error('confirmation_failed')
-      setResult(current => current ? { ...current, consumptionStatus: data.consumptionStatus } : current)
-      setLogs(current => current.map(log => log.id === result.mealLogId ? { ...log, fields: { ...log.fields, 'Consumption Status': data.consumptionStatus } } : log))
+      await updateConsumptionStatus(result.mealLogId, consumptionStatus)
     } catch { setConfirmationError(t.confirmationError) }
     finally { setConfirming(false) }
+  }
+
+  async function updateSavedPortion(nextPortionPercent: number) {
+    const next = Math.min(100, Math.max(10, Math.round(nextPortionPercent)))
+    if (!result) { setPortionPercent(next); return }
+    if (adjustingPortion || next === result.portionPercent) { setPortionPercent(next); return }
+    const previous = result.portionPercent
+    setPortionPercent(next)
+    setAdjustingPortion(true)
+    setConfirmationError(null)
+    try {
+      const response = await fetch('/api/food-scan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_portion', mealLogId: result.mealLogId, portionPercent: next }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'portion_update_failed')
+      setResult(current => current ? { ...current, ...data } : current)
+      setLogs(current => current.map(log => log.id === result.mealLogId ? {
+        ...log,
+        fields: { ...log.fields, 'Calories': data.calories, 'Carbs (g)': data.carbs, 'Fats (g)': data.fats, 'Proteins (g)': data.proteins },
+      } : log))
+    } catch {
+      setPortionPercent(previous)
+      setConfirmationError(t.confirmationError)
+    } finally {
+      setAdjustingPortion(false)
+    }
+  }
+
+  async function deleteSavedMeal(mealLogId: string) {
+    const response = await fetch('/api/food-scan', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mealLogId, confirm: true }),
+    })
+    const data = await response.json()
+    if (!response.ok || data.deleted !== true) throw new Error(data.error || 'deletion_failed')
+    setLogs(current => current.filter(log => log.id !== mealLogId))
+    setResult(current => current?.mealLogId === mealLogId ? null : current)
   }
 
   async function updateSavedMealType(mealLogId: string, nextMealType: MealType) {
@@ -551,13 +602,14 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
             <div className="fs-portion-block">
               <div className="fs-portion-title">{t.portionTitle}</div>
-              <div className="fs-portion-options">{[25, 50, 75, 100].map(value => <button type="button" key={value} className={portionPercent === value ? 'active' : ''} aria-pressed={portionPercent === value} onClick={() => { setPortionPercent(value); setResult(null) }}><strong>{value}%</strong><span>{t.portionOptions[value]}</span></button>)}</div>
-              <label className="fs-custom-portion"><span>{t.customPortion}</span><input type="number" min="10" max="100" step="5" value={portionPercent} onChange={event => { const next = Math.min(100, Math.max(10, Number(event.target.value) || 10)); setPortionPercent(Math.round(next)); setResult(null) }} /><span>%</span></label>
+              <div className="fs-portion-options">{[25, 50, 75, 100].map(value => <button type="button" key={value} className={portionPercent === value ? 'active' : ''} aria-pressed={portionPercent === value} disabled={adjustingPortion} onClick={() => void updateSavedPortion(value)}><strong>{value}%</strong><span>{t.portionOptions[value]}</span></button>)}</div>
+              <label className="fs-custom-portion"><span>{t.customPortion}</span><input type="number" min="10" max="100" step="5" value={portionPercent} disabled={adjustingPortion} onChange={event => setPortionPercent(Math.min(100, Math.max(10, Number(event.target.value) || 10)))} onBlur={() => void updateSavedPortion(portionPercent)} /><span>%</span></label>
+              {adjustingPortion ? <div className="fs-estimate-notice" aria-live="polite">{t.portionSaving}</div> : null}
             </div>
 
             <div className="fs-btn-row">
               {inputMode === 'photo' && image && <button className="fs-btn-secondary" onClick={() => { setImage(null); setResult(null); setError(null); setConfirmationError(null); setFeedbackTarget(null) }}>{t.clear}</button>}
-              <button className="fs-btn-primary" onClick={analyze} disabled={(inputMode === 'photo' ? !image : description.trim().length < 3) || scanning || remaining <= 0}>{scanning ? t.analyzing : t.analyze}</button>
+              <button className="fs-btn-primary" onClick={analyze} disabled={(inputMode === 'photo' ? !image : description.trim().length < 3) || scanning || remaining <= 0 || Boolean(result)}>{scanning ? t.analyzing : t.analyze}</button>
             </div>
             {error && <div className="fs-error">{error}</div>}
             {error && feedbackTarget ? <PilotFeedback key={feedbackTarget.id} tool="Escáner de alimentos" language={lang} responseId={feedbackTarget.id} context={feedbackTarget.context} issueOnly /> : null}
@@ -586,7 +638,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
               )}
 
               <div className="fs-confirmation" aria-live="polite">
-                {result.consumptionStatus === 'Unconfirmed' ? <><div className="fs-confirmation-title">{t.confirmationTitle}</div><div className="fs-confirmation-detail">{t.confirmationDetail}</div><div className="fs-confirmation-actions"><button type="button" onClick={() => void confirmConsumption('Consumed')} disabled={confirming}>{confirming ? t.confirmationSaving : t.confirmConsumed}</button><button type="button" onClick={() => void confirmConsumption('Reference only')} disabled={confirming}>{t.confirmReference}</button></div></> : <div className={`fs-confirmation-state fs-confirmation-state--${result.consumptionStatus === 'Consumed' ? 'consumed' : 'reference'}`}>{result.consumptionStatus === 'Consumed' ? t.confirmedConsumed : t.confirmedReference}</div>}
+                {result.consumptionStatus === 'Unconfirmed' ? <><div className="fs-confirmation-title">{t.confirmationTitle}</div><div className="fs-confirmation-detail">{t.confirmationDetail}</div><div className="fs-confirmation-actions"><button type="button" onClick={() => void confirmConsumption('Consumed')} disabled={confirming}>{confirming ? t.confirmationSaving : t.confirmConsumed}</button><button type="button" onClick={() => void confirmConsumption('Reference only')} disabled={confirming}>{t.confirmReference}</button></div></> : <><div className={`fs-confirmation-state fs-confirmation-state--${result.consumptionStatus === 'Consumed' ? 'consumed' : 'reference'}`}>{result.consumptionStatus === 'Consumed' ? t.confirmedConsumed : t.confirmedReference}</div><div className="fs-confirmation-actions"><button type="button" onClick={() => void confirmConsumption('Unconfirmed')} disabled={confirming}>{confirming ? t.confirmationSaving : t.unconfirm}</button></div></>}
                 {confirmationError && <div className="fs-confirmation-error">{confirmationError}</div>}
               </div>
 
@@ -600,7 +652,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
           ) : <div className="fs-card fs-result-placeholder"><div className="fs-placeholder-icon"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="1.5" opacity=".3"/><path d="M16 24h16M24 16v16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".5"/></svg></div><div className="fs-placeholder-text">{t.placeholder}</div></div>}
         </div>
 
-        {logToday && <div className="fs-log-section" id="food-history"><FoodLogWidget logs={logs} today={logToday} weekStart={logWeekStart} monthStart={logMonthStart} lang={lang} onMealTypeChange={updateSavedMealType} /></div>}
+        {logToday && <div className="fs-log-section" id="food-history"><FoodLogWidget logs={logs} today={logToday} weekStart={logWeekStart} monthStart={logMonthStart} lang={lang} onMealTypeChange={updateSavedMealType} onConsumptionStatusChange={updateConsumptionStatus} onDelete={deleteSavedMeal} /></div>}
         {typedPlan === 'free' && <div className="fs-upgrade-banner"><div className="fs-upgrade-text"><strong>{t.wantMore}</strong> {t.upgradeText}</div><a href="/#food-scanner" className="fs-upgrade-btn">{t.viewPlans}</a></div>}
       </main>
     </div>

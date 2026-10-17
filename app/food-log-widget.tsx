@@ -37,6 +37,10 @@ const COPY = {
     editLatest: 'Editar',
     mealTypes: { Breakfast: 'Desayuno', Lunch: 'Almuerzo', Dinner: 'Cena', Snack: 'Bocadillo', Other: 'Otro' } as Record<MealType, string>,
     updateError: 'No se pudo cambiar la categoría. Inténtalo de nuevo.',
+    unconfirm: 'Desconfirmar',
+    delete: 'Eliminar',
+    deleteConfirm: '¿Eliminar este registro de comida? Esta acción no se puede deshacer.',
+    actionError: 'No se pudo actualizar este registro. Inténtalo de nuevo.',
     kcal: 'kcal', carbs: 'carbos', fats: 'grasas', protein: 'proteína',
   },
   en: {
@@ -53,6 +57,10 @@ const COPY = {
     editLatest: 'Edit',
     mealTypes: { Breakfast: 'Breakfast', Lunch: 'Lunch', Dinner: 'Dinner', Snack: 'Snack', Other: 'Other' } as Record<MealType, string>,
     updateError: 'The category could not be changed. Please try again.',
+    unconfirm: 'Mark unconfirmed',
+    delete: 'Delete',
+    deleteConfirm: 'Delete this meal record? This cannot be undone.',
+    actionError: 'This record could not be updated. Please try again.',
     kcal: 'kcal', carbs: 'carbs', fats: 'fats', protein: 'protein',
   },
 }
@@ -64,9 +72,11 @@ interface Props {
   monthStart?: string
   lang?: 'es' | 'en'
   onMealTypeChange?: (mealLogId: string, mealType: MealType) => Promise<unknown>
+  onConsumptionStatusChange?: (mealLogId: string, status: 'Unconfirmed') => Promise<unknown>
+  onDelete?: (mealLogId: string) => Promise<unknown>
 }
 
-export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: propWeekStart, monthStart: propMonthStart, lang = 'en', onMealTypeChange }: Props) {
+export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: propWeekStart, monthStart: propMonthStart, lang = 'en', onMealTypeChange, onConsumptionStatusChange, onDelete }: Props) {
   const selfFetch = propLogs === undefined
 
   const [fetched, setFetched] = useState<{
@@ -80,6 +90,8 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
   const [editingMealTypeId, setEditingMealTypeId] = useState<string | null>(null)
   const [savingMealTypeId, setSavingMealTypeId] = useState<string | null>(null)
   const [mealTypeErrorId, setMealTypeErrorId] = useState<string | null>(null)
+  const [recordActionId, setRecordActionId] = useState<string | null>(null)
+  const [recordActionErrorId, setRecordActionErrorId] = useState<string | null>(null)
 
   const t = COPY[lang]
 
@@ -139,6 +151,32 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
       setMealTypeErrorId(logId)
     } finally {
       setSavingMealTypeId(null)
+    }
+  }
+
+  async function unconfirm(logId: string) {
+    if (!onConsumptionStatusChange || recordActionId) return
+    setRecordActionId(logId)
+    setRecordActionErrorId(null)
+    try {
+      await onConsumptionStatusChange(logId, 'Unconfirmed')
+    } catch {
+      setRecordActionErrorId(logId)
+    } finally {
+      setRecordActionId(null)
+    }
+  }
+
+  async function deleteLog(logId: string) {
+    if (!onDelete || recordActionId || !window.confirm(t.deleteConfirm)) return
+    setRecordActionId(logId)
+    setRecordActionErrorId(null)
+    try {
+      await onDelete(logId)
+    } catch {
+      setRecordActionErrorId(logId)
+    } finally {
+      setRecordActionId(null)
     }
   }
 
@@ -222,6 +260,14 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
                   {t.editLatest}
                 </a>
               )}
+              {(onConsumptionStatusChange || onDelete) && (
+                <div className="flw-record-actions">
+                  {onConsumptionStatusChange && (log.fields['Consumption Status'] ?? 'Unconfirmed') !== 'Unconfirmed' ? (
+                    <button type="button" disabled={recordActionId === log.id} onClick={() => void unconfirm(log.id)}>{t.unconfirm}</button>
+                  ) : null}
+                  {onDelete ? <button type="button" className="flw-delete" disabled={recordActionId === log.id} onClick={() => void deleteLog(log.id)}>{t.delete}</button> : null}
+                </div>
+              )}
               {editingMealTypeId === log.id && (
                 <div className="flw-meal-type-menu" role="group" aria-label={t.editMealType}>
                   {(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'] as MealType[]).map(option => (
@@ -238,6 +284,7 @@ export function FoodLogWidget({ logs: propLogs, today: propToday, weekStart: pro
                 </div>
               )}
               {mealTypeErrorId === log.id && <div className="flw-meal-type-error">{t.updateError}</div>}
+              {recordActionErrorId === log.id && <div className="flw-meal-type-error">{t.actionError}</div>}
             </div>
           ))}
         </div>

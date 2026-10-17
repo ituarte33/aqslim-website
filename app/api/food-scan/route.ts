@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import {
   countScansBetween,
   createMealLog,
+  deleteMealLogForUser,
   getMealLogForUser,
   getMealLogsSince,
   updateUnconfirmedMealLogEstimate,
@@ -23,10 +24,12 @@ import { getPilotAccess } from '@/lib/pilot-access'
 import { isFoodAnalysisConsistent, normalizeFoodAnalysisMath, parseFoodAnalysis, type FoodAnalysis } from '@/lib/food-analysis'
 import {
   applyMealPortion,
+  loggedMealPortion,
   parseMealCorrection,
   parseMealDescription,
   parseMealPortion,
   parseMealType,
+  rescaleLoggedMealPortion,
 } from '@/lib/meal-entry'
 import {
   getPreviewReanalysisUsage,
@@ -280,7 +283,7 @@ export async function PATCH(req: Request) {
   const payload = await req.json() as {
     mealLogId?: string
     consumptionStatus?: ConsumptionStatus
-    action?: 'reanalyze' | 'update_meal_type'
+    action?: 'reanalyze' | 'update_meal_type' | 'update_portion'
     imageBase64?: string
     mimeType?: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
     correction?: string
@@ -303,6 +306,43 @@ export async function PATCH(req: Request) {
       const correlationId = crypto.randomUUID()
       console.error('[food-scan] meal_type_update_failed', { correlationId, errorType: error instanceof Error ? error.name : 'unknown' })
       return Response.json({ error: 'meal_type_unavailable', correlationId }, { status: 503 })
+    }
+  }
+
+  if (payload.action === 'update_portion') {
+    const portionPercent = parseMealPortion(payload.portionPercent)
+    if (typeof mealLogId !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(mealLogId) || !portionPercent) {
+      return Response.json({ error: 'invalid_portion' }, { status: 400 })
+    }
+    try {
+      const log = await getMealLogForUser(mealLogId, userId)
+      if (!log) return Response.json({ error: 'not_found' }, { status: 404 })
+      if ((log.fields['Consumption Status'] ?? 'Unconfirmed') !== 'Unconfirmed') {
+        return Response.json({ error: 'meal_must_be_unconfirmed' }, { status: 409 })
+      }
+      const previousPercent = loggedMealPortion(log.fields['Notes'])
+      const scaled = rescaleLoggedMealPortion({
+        food: log.fields['Food Description'] ?? '—',
+        calories: log.fields['Calories'] ?? 0,
+        carbs: log.fields['Carbs (g)'] ?? 0,
+        fats: log.fields['Fats (g)'] ?? 0,
+        proteins: log.fields['Proteins (g)'] ?? 0,
+        notes: log.fields['Notes'] ?? '',
+      }, previousPercent, portionPercent)
+      const updated = await updateUnconfirmedMealLogEstimate(mealLogId, userId, {
+        foodDescription: scaled.food,
+        calories: scaled.calories,
+        carbs: scaled.carbs,
+        fats: scaled.fats,
+        proteins: scaled.proteins,
+        notes: scaled.notes,
+      })
+      if (!updated) return Response.json({ error: 'not_found_or_confirmed' }, { status: 409 })
+      return Response.json({ ...scaled, mealLogId, portionPercent, consumptionStatus: 'Unconfirmed' })
+    } catch (error) {
+      const correlationId = crypto.randomUUID()
+      console.error('[food-scan] portion_update_failed', { correlationId, errorType: error instanceof Error ? error.name : 'unknown' })
+      return Response.json({ error: 'portion_update_unavailable', correlationId }, { status: 503 })
     }
   }
 
@@ -476,14 +516,14 @@ export async function PATCH(req: Request) {
   if (
     typeof mealLogId !== 'string' ||
     !/^rec[A-Za-z0-9]{14}$/.test(mealLogId) ||
-    !['Consumed', 'Reference only'].includes(consumptionStatus ?? '')
+    !['Unconfirmed', 'Consumed', 'Reference only'].includes(consumptionStatus ?? '')
   ) return Response.json({ error: 'invalid_confirmation' }, { status: 400 })
 
   try {
     const mealLog = await updateMealLogConsumptionStatus(
       mealLogId,
       userId,
-      consumptionStatus as Exclude<ConsumptionStatus, 'Unconfirmed'>,
+      consumptionStatus as ConsumptionStatus,
     )
     if (!mealLog) return Response.json({ error: 'not_found' }, { status: 404 })
     return Response.json({ mealLogId: mealLog.id, consumptionStatus: mealLog.fields['Consumption Status'] })
@@ -491,6 +531,30 @@ export async function PATCH(req: Request) {
     const correlationId = crypto.randomUUID()
     console.error('[food-scan] confirmation_failed', { correlationId, errorType: error instanceof Error ? error.name : 'unknown' })
     return Response.json({ error: 'confirmation_unavailable', correlationId }, { status: 503 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  const { userId } = await auth()
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let payload: { mealLogId?: unknown; confirm?: unknown }
+  try {
+    payload = await req.json()
+  } catch {
+    return Response.json({ error: 'invalid_request' }, { status: 400 })
+  }
+  if (typeof payload.mealLogId !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(payload.mealLogId) || payload.confirm !== true) {
+    return Response.json({ error: 'invalid_deletion' }, { status: 400 })
+  }
+  try {
+    const deleted = await deleteMealLogForUser(payload.mealLogId, userId)
+    if (!deleted) return Response.json({ error: 'not_found' }, { status: 404 })
+    return Response.json({ mealLogId: payload.mealLogId, deleted: true })
+  } catch (error) {
+    const correlationId = crypto.randomUUID()
+    console.error('[food-scan] deletion_failed', { correlationId, errorType: error instanceof Error ? error.name : 'unknown' })
+    return Response.json({ error: 'deletion_unavailable', correlationId }, { status: 503 })
   }
 }
 

@@ -43,3 +43,28 @@ export function applyMealPortion(result: FoodAnalysis, portionPercent: number): 
     proteins: scale(result.proteins),
   }
 }
+
+export function loggedMealPortion(notes: string | undefined): number {
+  const match = notes?.match(/(?:Porción registrada|Portion logged):\s*(\d+)%/i)
+  return parseMealPortion(match?.[1]) ?? 100
+}
+
+export function rescaleLoggedMealPortion(
+  result: FoodAnalysis,
+  previousPercent: number,
+  nextPercent: number,
+): FoodAnalysis {
+  const factor = nextPercent / previousPercent
+  const scale = (value: number) => Math.max(0, Math.round(value * factor))
+  return {
+    ...result,
+    calories: scale(result.calories),
+    carbs: scale(result.carbs),
+    fats: scale(result.fats),
+    proteins: scale(result.proteins),
+    notes: result.notes.replace(
+      /((?:Porción registrada|Portion logged):\s*)\d+%/i,
+      `$1${nextPercent}%`,
+    ),
+  }
+}

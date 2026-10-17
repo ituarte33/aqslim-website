@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   applyMealPortion,
+  loggedMealPortion,
   parseMealDescription,
   parseMealCorrection,
   parseMealPortion,
   parseMealType,
+  rescaleLoggedMealPortion,
 } from '../lib/meal-entry.ts'
 
 test('accepts supported meal portions and rejects unsafe values', () => {
@@ -14,6 +16,17 @@ test('accepts supported meal portions and rejects unsafe values', () => {
   assert.equal(parseMealPortion(9), null)
   assert.equal(parseMealPortion(101), null)
   assert.equal(parseMealPortion(50.5), null)
+})
+
+test('rescales a saved meal portion without creating a new analysis', () => {
+  const notes = 'Estimate. Porción registrada: 100% de la porción completa estimada.'
+  assert.equal(loggedMealPortion(notes), 100)
+  assert.deepEqual(rescaleLoggedMealPortion({
+    food: 'Cheeseburger with Caesar salad', calories: 720, carbs: 42, fats: 42, proteins: 48, notes,
+  }, 100, 50), {
+    food: 'Cheeseburger with Caesar salad', calories: 360, carbs: 21, fats: 21, proteins: 24,
+    notes: 'Estimate. Porción registrada: 50% de la porción completa estimada.',
+  })
 })
 
 test('normalizes ingredient corrections and rejects empty or oversized corrections', () => {

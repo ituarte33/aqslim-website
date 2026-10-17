@@ -2338,9 +2338,28 @@ body.aqb-fullscreen-active {
 .flw-row-edit-latest:hover,
 .flw-row-edit-latest[aria-expanded='true'] { background: var(--gold-dim); }
 .flw-row-edit-latest:disabled { cursor: wait; opacity: .65; }
+.flw-record-actions {
+  display: flex;
+  gap: 7px;
+  margin-left: auto;
+}
+.flw-record-actions button {
+  border: 1px solid rgba(201,168,76,.42);
+  background: transparent;
+  color: var(--gold);
+  padding: 7px 10px;
+  font: 600 10px/1 var(--font-sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.flw-record-actions button:hover { background: var(--gold-dim); }
+.flw-record-actions button.flw-delete { border-color: rgba(224,111,111,.45); color: #e6b7b7; }
+.flw-record-actions button:disabled { cursor: wait; opacity: .6; }
 
 @media (max-width: 640px) {
   .flw-row-edit-latest { grid-column: 1 / -1; justify-self: start; }
+  .flw-record-actions { margin-left: 0; }
 }
 .flw-row-status {
   display: inline-block;
