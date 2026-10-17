@@ -35,6 +35,8 @@ import {
 } from '@/lib/preview-reanalysis-store'
 import { evaluateUsageGate } from '@/lib/usage-gate'
 import { observeUsageShadow, observeUsageShadowUnavailable } from '@/lib/usage-shadow'
+import { hasActiveAccountScanOverride } from '@/lib/scan-account-access'
+import { scanUsageResponse } from '@/lib/scan-account-policy'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -123,6 +125,7 @@ export async function POST(req: Request) {
   if (!access.allowed) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const usagePolicy = effectiveUsageContext(legacyPolicy, access)
+  const unlimited = await hasActiveAccountScanOverride()
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
@@ -144,7 +147,7 @@ export async function POST(req: Request) {
     }, { status: 503 })
   }
   const decision = evaluateUsageGate(usagePolicy, { dailyUsed, monthlyUsed })
-  if (!decision.allowed) {
+  if (!unlimited && !decision.allowed) {
     return Response.json({
       error: 'limit_reached',
       period: decision.reason === 'monthly_limit' ? 'month' : 'day',
@@ -258,12 +261,7 @@ Write the food name and notes in ${responseLanguage}. All numeric values are non
       portionBasis: 'selected_percentage',
       mealLogId: mealLog.id,
       consumptionStatus: mealLog.fields['Consumption Status'] ?? 'Unconfirmed',
-      used: dailyUsed + 1,
-      limit: usagePolicy.dailyLimit,
-      remaining: Math.max(0, usagePolicy.dailyLimit - dailyUsed - 1),
-      monthlyUsed: monthlyUsed + 1,
-      monthlyLimit: usagePolicy.monthlyLimit,
-      monthlyRemaining: Math.max(0, usagePolicy.monthlyLimit - monthlyUsed - 1),
+      ...scanUsageResponse(usagePolicy, dailyUsed + 1, monthlyUsed + 1, unlimited),
       reanalysisUsed: 0,
       reanalysisLimit: REANALYSIS_LIMIT_PER_MEAL,
       reanalysisRemaining: REANALYSIS_LIMIT_PER_MEAL,
@@ -518,6 +516,7 @@ export async function GET() {
   if (!access.allowed) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const policy = effectiveUsageContext(legacyPolicy, access)
+  const unlimited = await hasActiveAccountScanOverride()
   const today = todayPT()
   const boundaries = foodScanPeriodBoundaries(today)
   const [y, m, d] = today.split('-').map(Number)
@@ -532,12 +531,7 @@ export async function GET() {
   ])
 
   return Response.json({
-    used,
-    limit: policy.dailyLimit,
-    remaining: Math.max(0, policy.dailyLimit - used),
-    monthlyUsed,
-    monthlyLimit: policy.monthlyLimit,
-    monthlyRemaining: Math.max(0, policy.monthlyLimit - monthlyUsed),
+    ...scanUsageResponse(policy, used, monthlyUsed, unlimited),
     plan: policy.plan,
     today,
     weekStart,

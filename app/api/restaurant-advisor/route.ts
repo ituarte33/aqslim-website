@@ -6,6 +6,7 @@ import { getActor } from '@/lib/auth'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { pilotHasFeature } from '@/lib/pilot-policy'
 import { getPatientPortalData } from '@/lib/patient-portal'
+import { hasActiveAccountScanOverride } from '@/lib/scan-account-access'
 import {
   isRestaurantAdvisorResultForPhase,
   parseRestaurantAdvisorJson,
@@ -65,11 +66,12 @@ export async function POST(request: Request) {
   const { userId } = await auth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [pilot, actor] = await Promise.all([
+  const [pilot, actor, accountAccess] = await Promise.all([
     getPilotAccess(),
     getActor(),
+    hasActiveAccountScanOverride(),
   ])
-  const currentAccessAllowed = Boolean(pilot && pilotHasFeature(pilot, 'restaurant_advisor'))
+  const currentAccessAllowed = accountAccess || Boolean(pilot && pilotHasFeature(pilot, 'restaurant_advisor'))
   const access = await evaluateAiEntitlementAccess({
     clerkUserId: userId,
     capability: 'restaurant_menu:analyze',

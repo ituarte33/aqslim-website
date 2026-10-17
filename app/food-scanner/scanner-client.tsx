@@ -24,11 +24,12 @@ interface ScanResult {
   proteins: number
   notes: string
   used: number
-  limit: number
-  remaining: number
+  unlimited?: boolean
+  limit: number | null
+  remaining: number | null
   monthlyUsed: number
-  monthlyLimit: number
-  monthlyRemaining: number
+  monthlyLimit: number | null
+  monthlyRemaining: number | null
   inputMode: 'photo' | 'description'
   portionPercent: number
   portionBasis: 'selected_percentage' | 'described_serving'
@@ -279,6 +280,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
   const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; context: unknown } | null>(null)
   const [used, setUsed] = useState(0)
   const [limit, setLimit] = useState(1)
+  const [unlimited, setUnlimited] = useState(false)
   const [monthlyUsed, setMonthlyUsed] = useState(0)
   const [monthlyLimit, setMonthlyLimit] = useState(30)
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -320,6 +322,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
         setEffectivePlan(current => normalizePlan(d.plan, current))
         setUsed(d.used ?? 0)
         setLimit(d.limit ?? 1)
+        setUnlimited(d.unlimited === true)
         setMonthlyUsed(d.monthlyUsed ?? 0)
         setMonthlyLimit(d.monthlyLimit ?? 30)
         setLogs(d.logs ?? [])
@@ -394,9 +397,10 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
       setCorrection('')
       setFeedbackTarget({ id: data.mealLogId, context: { mealType, inputMode, portionPercent, result: data } })
       setUsed(data.used)
-      setLimit(data.limit)
+      setLimit(data.limit ?? 1)
+      setUnlimited(data.unlimited === true)
       setMonthlyUsed(data.monthlyUsed)
-      setMonthlyLimit(data.monthlyLimit)
+      setMonthlyLimit(data.monthlyLimit ?? 30)
       publishFoodScanContext(data.mealLogId)
       setLogs(prev => [{
         id: data.mealLogId,
@@ -483,7 +487,7 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
     finally { setUpdatingMealType(false) }
   }
 
-  const remaining = Math.min(limit - used, monthlyLimit - monthlyUsed)
+  const remaining = unlimited ? Infinity : Math.min(limit - used, monthlyLimit - monthlyUsed)
   const pct = (val: number, total: number) => total > 0 ? Math.min(100, Math.round((val / total) * 100)) : 0
 
   return (
@@ -519,12 +523,12 @@ export function ScannerClient({ plan, userName }: { plan: string; userName: stri
 
         <div className="fs-usage-bar">
           <span className="fs-usage-label">{t.usage(userName)}</span>
-          <div className="fs-usage-pips">
+          {!unlimited && <div className="fs-usage-pips">
             {limit <= 10 ? Array.from({ length: limit }).map((_, i) => <div key={i} className={`fs-pip ${i < used ? 'used' : ''}`} />) : <><div className="fs-usage-bar-track"><div className="fs-usage-bar-fill" style={{ width: `${Math.min(100, Math.round((used / limit) * 100))}%` }} /></div><span className="fs-usage-count">{used} / {limit}</span></>}
-          </div>
-          <span className="fs-usage-remain">{remaining > 0 ? t.remaining(remaining) : t.limitReached}</span>
+          </div>}
+          <span className="fs-usage-remain">{unlimited ? (lang === 'es' ? 'Escaneos ilimitados' : 'Unlimited scans') : remaining > 0 ? t.remaining(remaining) : t.limitReached}</span>
         </div>
-        <div className="fs-monthly-usage">{t.monthlyUsage(monthlyUsed, monthlyLimit)}</div>
+        {!unlimited && <div className="fs-monthly-usage">{t.monthlyUsage(monthlyUsed, monthlyLimit)}</div>}
 
         <div className="fs-grid">
           <div className="fs-card">
