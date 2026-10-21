@@ -331,6 +331,49 @@ export async function POST(request: NextRequest) {
     const patient = await getClienteById(patientId)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
 
+    if (body.action === 'correctWeight') {
+      const recordId = safeText(body.previewRecordId, 100)
+      const reason = safeText(body.reason, 500)
+      const normalized = normalizeClinicWeightEntry(body.weight, body.weightUnit)
+      if (!/^rec[A-Za-z0-9]{14}$/.test(recordId) || !normalized.ok || reason.length < 10) {
+        return NextResponse.json({ ok: false, error: 'invalid_correction' }, { status: 400 })
+      }
+      const previous = await getPreviewConsultation(recordId)
+      const before = previous?.fields ?? {}
+      if (before[F.PATIENT_ID] !== patientId || before[F.PREVIEW_ONLY] !== true) {
+        return NextResponse.json({ ok: false, error: 'preview_record_not_found' }, { status: 404 })
+      }
+      const oldUnit = selectName(before[F.WEIGHT_UNIT])
+      const oldNotes = String(before[F.RECOMMENDATIONS] ?? '')
+      // A retry after a successful write must not append a second correction.
+      if (before[F.WEIGHT] === normalized.weight && oldUnit === normalized.unit) {
+        return NextResponse.json({ ok: true, verified: true, recordId })
+      }
+      if (before[F.WEIGHT] !== body.expectedWeight || oldUnit !== body.expectedUnit
+        || oldNotes !== body.expectedRecommendations) {
+        return NextResponse.json({ ok: false, error: 'record_changed' }, { status: 409 })
+      }
+      const audit = `Corrección de peso sólo en Preview · ${new Date().toISOString()} · ${actor.email}: ${before[F.WEIGHT]} ${oldUnit} → ${normalized.weight} ${normalized.unit}. Motivo: ${reason}`
+      const notes = [oldNotes, audit].filter(Boolean).join('\n')
+      const response = await fetch(`${baseUrl()}/${recordId}?returnFieldsByFieldId=true`, {
+        method: 'PATCH', headers: headers(), cache: 'no-store',
+        body: JSON.stringify({ fields: {
+          [F.WEIGHT]: normalized.weight,
+          [F.WEIGHT_UNIT]: normalized.unit,
+          [F.RECOMMENDATIONS]: notes,
+        } }),
+      })
+      if (!response.ok) return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+      const verified = await getPreviewConsultation(recordId)
+      const after = verified?.fields ?? {}
+      if (after[F.PATIENT_ID] !== patientId || after[F.PREVIEW_ONLY] !== true
+        || after[F.WEIGHT] !== normalized.weight || selectName(after[F.WEIGHT_UNIT]) !== normalized.unit
+        || after[F.RECOMMENDATIONS] !== notes) {
+        return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, verified: true, recordId })
+    }
+
     if (body.action === 'publish') {
       return publishPreviewConsultation({
         patientId,
