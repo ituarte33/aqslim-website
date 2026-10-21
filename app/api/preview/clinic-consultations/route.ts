@@ -310,6 +310,7 @@ export async function GET(request: NextRequest) {
       amountCollected: record.fields?.[F.AMOUNT_COLLECTED] ?? null,
       paymentMethod: record.fields?.[F.PAYMENT_METHOD] ?? '',
       authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
+      weightCorrectedInPreview: String(record.fields?.[F.RECOMMENDATIONS] ?? '').includes('Corrección de peso sólo en Preview ·'),
       publishedToClinic: Boolean(clinicPublishedConsultationId(record.fields?.[F.KEY])),
       liveConsultationId: clinicPublishedConsultationId(record.fields?.[F.KEY]),
     }))
