@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toCanonicalPhaseName } from '@/lib/phase-names'
 import { normalizeClinicSearch } from '@/lib/clinic-search'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
@@ -353,12 +354,13 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [armsCm, setArmsCm] = useState('')
   const [thighsCm, setThighsCm] = useState('')
   const [chestCm, setChestCm] = useState('')
+  const consultationPhaseEdited = useRef(false)
   const [phase, setPhase] = useState('Sin fase')
   const [phaseWeek, setPhaseWeek] = useState('')
   const [recommendations, setRecommendations] = useState('')
   const [nextAppointment, setNextAppointment] = useState('')
   const [consultationFee, setConsultationFee] = useState('30')
-  const [amountCollected, setAmountCollected] = useState('30')
+  const [amountCollected, setAmountCollected] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('Sin especificar')
   const [consultationSaving, setConsultationSaving] = useState(false)
   const [consultationMessage, setConsultationMessage] = useState('')
@@ -508,11 +510,17 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     }
   }
 
-  async function loadPlanSnapshot(patientId: string) {
+  async function loadPlanSnapshot(patientId: string, signal?: AbortSignal) {
     try {
-      const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store', signal })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('load_failed')
+      if (signal?.aborted) return
+      if (!consultationPhaseEdited.current) {
+        const livePhase = toCanonicalPhaseName(data.livePlan?.phase ?? null) ?? 'Sin fase'
+        setPhase(['Jing', 'Qi', 'Xue', 'Yang Sheng'].includes(livePhase) ? livePhase : 'Sin fase')
+        setPhaseWeek(data.livePlan?.phaseWeek == null ? '' : String(data.livePlan.phaseWeek))
+      }
       const snapshot: ClinicPlanSnapshot = {
         draftStatus: typeof data.draft?.status === 'string' ? data.draft.status : null,
         hasDraft: Boolean(data.draft),
@@ -523,6 +531,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       setVisitCadenceDays(snapshot.visitCadenceDays)
       return snapshot
     } catch {
+      if (signal?.aborted) return
       const snapshot: ClinicPlanSnapshot = {
         draftStatus: null,
         hasDraft: false,
@@ -570,7 +579,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
           setNextAppointmentEdited(true)
         }
       })
-      void loadPlanSnapshot(selectedId)
+      void loadPlanSnapshot(selectedId, clinicRecordController.signal)
       void loadAccessReadiness(selectedId, accessController.signal)
     } else {
       setNotes([])
@@ -957,7 +966,8 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       setArmsCm('')
       setThighsCm('')
       setChestCm('')
-      setPhaseWeek('')
+      setAmountCollected('')
+      setPaymentMethod('Sin especificar')
       setRecommendations('')
       const refreshed = await loadConsultations(selected.id)
       if (!refreshed || (appointmentIso && !refreshed.some(item => sameClinicAppointment(item.nextAppointment, appointmentIso)))) {
@@ -1054,6 +1064,11 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   }
 
   function choosePatient(id: string) {
+    consultationPhaseEdited.current = false
+    setPhase('Sin fase')
+    setPhaseWeek('')
+    setAmountCollected('')
+    setPaymentMethod('Sin especificar')
     setSelectedId(id)
     setShowPatientPicker(false)
     const clinicUrl = new URL(window.location.href)
@@ -1106,7 +1121,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     setConsultationType(type)
     const fee = feeForType(type)
     setConsultationFee(fee)
-    setAmountCollected(fee)
+    setAmountCollected('')
   }
 
   const inputStyle = { width: '100%', boxSizing: 'border-box' as const, padding: '11px 12px', borderRadius: 9, background: '#111', color: '#FAFAF8', border: '1px solid rgba(201,168,76,.25)' }
@@ -1310,7 +1325,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                     </div>
 
                     <div style={sectionTitle}>Plan actual</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8 }}><select value={phase} onChange={e => setPhase(e.target.value)} style={inputStyle}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select><input inputMode="numeric" value={phaseWeek} onChange={e => setPhaseWeek(e.target.value)} placeholder="Semana" style={inputStyle} /></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8 }}><select value={phase} onChange={e => { consultationPhaseEdited.current = true; setPhase(e.target.value) }} style={inputStyle}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select><input inputMode="numeric" value={phaseWeek} onChange={e => { consultationPhaseEdited.current = true; setPhaseWeek(e.target.value) }} placeholder="Semana" style={inputStyle} /></div>
 
                     <div style={sectionTitle}>Recomendaciones</div>
                     <textarea value={recommendations} onChange={e => setRecommendations(e.target.value)} placeholder="Instrucciones, observaciones o recomendaciones para esta consulta…" rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
