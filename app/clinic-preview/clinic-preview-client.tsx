@@ -78,6 +78,7 @@ type ClinicConsultation = {
   amountCollected: number | null
   paymentMethod: string
   authorLabel: string
+  weightCorrectedInPreview: boolean
   publishedToClinic: boolean
   liveConsultationId: string | null
 }
@@ -426,15 +427,22 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
   const completeWeightEntries = useMemo(() => {
     const liveIds = new Set(clinicRecord?.consultations.map(item => item.id) ?? [])
+    // A verified Preview correction overrides only its linked live weight here.
+    // The live clinical record itself remains unchanged.
+    const correctedLiveIds = new Set(consultations
+      .filter(item => item.weightCorrectedInPreview && item.liveConsultationId)
+      .map(item => item.liveConsultationId))
     const previewEntries = consultations
-      .filter(item => !item.liveConsultationId || !liveIds.has(item.liveConsultationId))
+      .filter(item => item.weightCorrectedInPreview || !item.liveConsultationId || !liveIds.has(item.liveConsultationId))
       .map(item => ({
         weight: item.weight,
         weightUnit: item.weightUnit,
         consultationDate: item.consultationDate,
         consultationAt: item.consultationAt,
       }))
-    const liveEntries = (clinicRecord?.consultations ?? []).map(item => ({
+    const liveEntries = (clinicRecord?.consultations ?? [])
+      .filter(item => !correctedLiveIds.has(item.id))
+      .map(item => ({
       weight: item.weightKg,
       weightUnit: 'kg',
       consultationDate: item.consultationDate,
