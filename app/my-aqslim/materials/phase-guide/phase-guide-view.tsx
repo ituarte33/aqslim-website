@@ -8,7 +8,7 @@ import { PortalShell } from '../../portal-shell'
 import { usePortalLanguage } from '../../use-portal-language'
 import styles from '../../portal.module.css'
 
-export function PhaseGuideView({ data, guide }: { data: PatientPortalData; guide: PhaseGuide }) {
+export function PhaseGuideView({ data, guide, previewReview = false }: { data: PatientPortalData; guide: PhaseGuide; previewReview?: boolean }) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const objectives = es ? guide.objectivesEs : guide.objectivesEn
@@ -23,6 +23,15 @@ export function PhaseGuideView({ data, guide }: { data: PatientPortalData; guide
           <p>{es ? guide.subtitleEs : guide.subtitleEn}</p>
         </div>
       </section>
+
+      {previewReview ? (
+        <div className={styles.dataNotice}>
+          <InfoIcon />
+          <p>{es
+            ? 'Este es un resumen de tu fase. La guía completa todavía no está vinculada en tus materiales.'
+            : 'This is a summary of your phase. The full guide has not been linked in your materials yet.'}</p>
+        </div>
+      ) : null}
 
       <section className={`${styles.panel} ${styles.phaseGuideLead}`}>
         <div className={styles.materialIcon}><MaterialsIcon /></div>

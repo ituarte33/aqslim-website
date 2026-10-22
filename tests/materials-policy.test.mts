@@ -5,9 +5,25 @@ import {
   isPlanMaterialVisible,
   normalizeKenkhoTier,
   visiblePlanMaterials,
+  reviewClinicMaterials,
   type PlanMaterialAttachment,
 } from '../lib/materials-policy.ts'
 import { getPhaseGuide, phaseGuideMaterial } from '../lib/phase-materials.ts'
+import { isClinicPreviewEnvironment } from '../lib/clinic-preview-policy.ts'
+
+test('Clinic candidate distinguishes summaries and unverified attachment dates without changing Production', () => {
+  const original = [phaseGuideMaterial('Jing')!, ...visiblePlanMaterials({
+    attachments: [attachment('Romulo_hipocaloric_plan_Aug17.pdf')], kenkhoTier: null, weekInPhase: 3,
+  })]
+  const production = reviewClinicMaterials(original, isClinicPreviewEnvironment({ VERCEL_ENV: 'production', VERCEL_GIT_COMMIT_REF: 'myaq-clinic-functional-v1' }))
+  assert.strictEqual(production, original)
+  const preview = reviewClinicMaterials(original, isClinicPreviewEnvironment({ VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'myaq-clinic-functional-v1' }))
+  assert.match(preview[0].titleEs, /Resumen/)
+  assert.match(preview[1].detailEs, /Revisa sus fechas/)
+  assert.equal(preview[1].url, original[1].url)
+  assert.match(original[0].titleEs, /Guía/)
+  assert.equal(isClinicPreviewEnvironment({ VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'main' }), false)
+})
 
 const attachment = (filename: string): PlanMaterialAttachment => ({
   id: `att-${filename}`,

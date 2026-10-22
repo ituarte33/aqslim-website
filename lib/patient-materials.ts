@@ -6,10 +6,12 @@ import { requireOwnPatient } from '@/lib/auth'
 import {
   normalizeKenkhoTier,
   visiblePlanMaterials,
+  reviewClinicMaterials,
   type PatientMaterialsData,
   type PlanMaterialAttachment,
 } from '@/lib/materials-policy'
 import { phaseGuideMaterial } from '@/lib/phase-materials'
+import { isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
 function validAttachment(value: AirtableAttachment): value is AirtableAttachment & PlanMaterialAttachment {
   return Boolean(value.id && value.url && value.filename)
@@ -31,9 +33,11 @@ export const getPatientPortalMaterials = cache(async (
     : []
   const assignedMaterials = visiblePlanMaterials({ attachments, kenkhoTier, weekInPhase })
   const phaseMaterial = phaseGuideMaterial(plan.fields['Fase Actual'])
+  const previewReview = isClinicPreviewEnvironment({ VERCEL_ENV: process.env.VERCEL_ENV, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF })
 
   return {
     kenkhoTier,
-    materials: phaseMaterial ? [phaseMaterial, ...assignedMaterials] : assignedMaterials,
+    materials: reviewClinicMaterials(phaseMaterial ? [phaseMaterial, ...assignedMaterials] : assignedMaterials, previewReview),
+    previewReview,
   }
 })

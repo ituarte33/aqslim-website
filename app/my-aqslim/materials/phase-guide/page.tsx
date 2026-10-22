@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getPatientPortalData } from '@/lib/patient-portal'
 import { getPhaseGuide } from '@/lib/phase-materials'
 import { PhaseGuideView } from './phase-guide-view'
+import { isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,5 +13,6 @@ export default async function PhaseGuidePage() {
   const guide = getPhaseGuide(data.phase)
   if (!guide) redirect('/my-aqslim/materials')
 
-  return <PhaseGuideView data={data} guide={guide} />
+  const previewReview = isClinicPreviewEnvironment({ VERCEL_ENV: process.env.VERCEL_ENV, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF })
+  return <PhaseGuideView data={data} guide={guide} previewReview={previewReview} />
 }

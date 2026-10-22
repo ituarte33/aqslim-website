@@ -21,6 +21,28 @@ export type PortalMaterial = PlanMaterialAttachment & {
 export type PatientMaterialsData = {
   kenkhoTier: KenkhoTier | null
   materials: PortalMaterial[]
+  previewReview?: boolean
+}
+
+// An attachment alone does not establish a nutrition plan's effective dates.
+// Keep this clarification scoped to the Clinic candidate until physical review.
+export function reviewClinicMaterials(materials: PortalMaterial[], enabled: boolean): PortalMaterial[] {
+  if (!enabled) return materials
+  return materials.map(material => {
+    if (material.id.startsWith('phase-guide-')) return {
+      ...material,
+      titleEs: material.titleEs.replace('Guía de fase', 'Resumen de fase'),
+      titleEn: material.titleEn.replace('phase guide', 'phase summary'),
+      detailEs: 'Resumen dentro de la app. La guía completa de esta fase todavía no está vinculada.',
+      detailEn: 'In-app summary. The full guide for this phase has not been linked yet.',
+    }
+    if (material.kind !== 'nutrition-plan') return material
+    return {
+      ...material,
+      detailEs: 'Archivo adjunto a tu plan. Revisa sus fechas con AQSLIM antes de usarlo como plan vigente.',
+      detailEn: 'File attached to your plan. Confirm its dates with AQSLIM before using it as your current plan.',
+    }
+  })
 }
 
 const KENKHO_TIERS = new Set<KenkhoTier>(['Start', 'Plus', 'Elite'])
