@@ -84,6 +84,25 @@ export function getPhaseGuide(value: string | null | undefined): PhaseGuide | nu
   return phase && phase in PHASE_GUIDES ? PHASE_GUIDES[phase as AQSLIMPhase] : null
 }
 
+// Original patient handout selected from Rom's supplied Drive folder.
+// Linking preserves the source file and its existing sharing permissions.
+export function phaseGuideDocument(value: string | null | undefined): PortalMaterial | null {
+  if (toCanonicalPhaseName(value ?? null) !== 'Jing') return null
+  return {
+    id: 'phase-document-jing',
+    url: 'https://drive.google.com/file/d/1pr47HsDbGHufCs3HJRiMEm4phmhPwAWR/view',
+    filename: 'KenkoPath Fase1 JING Claro.pdf',
+    type: 'application/pdf',
+    kind: 'guide',
+    titleEs: 'Guía completa de Jing · PDF',
+    titleEn: 'Full Jing guide · PDF (Spanish)',
+    typeEs: 'Fase 1 · Documento original',
+    typeEn: 'Phase 1 · Original document',
+    detailEs: 'Guía original en español con las listas de alimentos de Jing. Su contenido está pendiente de revisión clínica antes de entregarse a clientes.',
+    detailEn: 'Original Spanish guide with Jing food lists. Its content is awaiting clinical review before client release.',
+  }
+}
+
 export function phaseGuideMaterial(value: string | null | undefined): PortalMaterial | null {
   const guide = getPhaseGuide(value)
   if (!guide) return null

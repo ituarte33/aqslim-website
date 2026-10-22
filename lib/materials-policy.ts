@@ -33,8 +33,12 @@ export function reviewClinicMaterials(materials: PortalMaterial[], enabled: bool
       ...material,
       titleEs: material.titleEs.replace('Guía de fase', 'Resumen de fase'),
       titleEn: material.titleEn.replace('phase guide', 'phase summary'),
-      detailEs: 'Resumen dentro de la app. La guía completa de esta fase todavía no está vinculada.',
-      detailEn: 'In-app summary. The full guide for this phase has not been linked yet.',
+      detailEs: materials.some(item => item.id === material.id.replace('phase-guide-', 'phase-document-'))
+        ? 'Resumen dentro de la app. El documento completo aparece por separado en esta biblioteca.'
+        : 'Resumen dentro de la app. La guía completa de esta fase todavía no está vinculada.',
+      detailEn: materials.some(item => item.id === material.id.replace('phase-guide-', 'phase-document-'))
+        ? 'In-app summary. The full document is listed separately in this library.'
+        : 'In-app summary. The full guide for this phase has not been linked yet.',
     }
     if (material.kind !== 'nutrition-plan') return material
     return {

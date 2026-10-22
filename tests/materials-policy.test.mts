@@ -8,7 +8,7 @@ import {
   reviewClinicMaterials,
   type PlanMaterialAttachment,
 } from '../lib/materials-policy.ts'
-import { getPhaseGuide, phaseGuideMaterial } from '../lib/phase-materials.ts'
+import { getPhaseGuide, phaseGuideMaterial, phaseGuideDocument } from '../lib/phase-materials.ts'
 import { isClinicPreviewEnvironment } from '../lib/clinic-preview-policy.ts'
 
 test('Clinic candidate distinguishes summaries and unverified attachment dates without changing Production', () => {
@@ -23,6 +23,17 @@ test('Clinic candidate distinguishes summaries and unverified attachment dates w
   assert.equal(preview[1].url, original[1].url)
   assert.match(original[0].titleEs, /Guía/)
   assert.equal(isClinicPreviewEnvironment({ VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'main' }), false)
+})
+
+test('the original Jing PDF follows Jing only and the summary points to the linked document', () => {
+  const document = phaseGuideDocument('Jing')!
+  assert.equal(document.url, 'https://drive.google.com/file/d/1pr47HsDbGHufCs3HJRiMEm4phmhPwAWR/view')
+  assert.equal(phaseGuideDocument('Qi'), null)
+  assert.equal(phaseGuideDocument(null), null)
+  const reviewed = reviewClinicMaterials([phaseGuideMaterial('Jing')!, document], true)
+  assert.match(reviewed[0].detailEs, /por separado/)
+  assert.doesNotMatch(reviewed[0].detailEs, /no está vinculada/)
+  assert.match(reviewed[1].detailEs, /revisión clínica/)
 })
 
 const attachment = (filename: string): PlanMaterialAttachment => ({
