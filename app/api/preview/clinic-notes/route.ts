@@ -1,3 +1,4 @@
+import { decodeClinicFast36 } from '@/lib/clinic-fast36'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
@@ -77,6 +78,7 @@ function escapeFormula(value: string) {
 
 function mapNote(record: any) {
   const rawNote = record?.fields?.[F.NOTE] ?? ''
+  const fast36 = decodeClinicFast36(rawNote, record?.id ?? '')
   const followup = decodeClinicFollowup(rawNote)
   const messageDraft = decodeClinicMessageDraft(rawNote)
   return {
@@ -85,7 +87,7 @@ function mapNote(record: any) {
     authorEmail: record?.fields?.[F.AUTHOR_EMAIL] ?? '',
     authorLabel: record?.fields?.[F.AUTHOR_LABEL] ?? '',
     noteType: record?.fields?.[F.NOTE_TYPE] ?? 'General',
-    note: followup?.action ?? messageDraft?.body ?? rawNote,
+    note: fast36 ? `FAST 36 · semana ${fast36.week} · inicio local ${fast36.localStart} (${fast36.timeZone}) · ${fast36.provisional ? 'horario provisional' : 'horario confirmado'} · resultado: ${fast36.status}` : followup?.action ?? messageDraft?.body ?? rawNote,
     followupRequired: record?.fields?.[F.FOLLOWUP_REQUIRED] === true,
     followupDate: record?.fields?.[F.FOLLOWUP_DATE] ?? null,
     followup,

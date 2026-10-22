@@ -1,5 +1,6 @@
 'use server'
 
+import { getClinicFast36Sessions, saveClinicFast36Session } from '@/lib/clinic-fast36-store'
 import { revalidatePath } from 'next/cache'
 import {
   getFast36SessionsByPatient,
@@ -29,6 +30,19 @@ export async function confirmFast36SessionAction(
     if (!AIRTABLE_RECORD_ID.test(sessionId) || !isFast36ConfirmationOutcome(outcome)) {
       return { ok: false, error: 'La confirmación no es válida.' }
     }
+
+    const previewSessions = await getClinicFast36Sessions(patient.id)
+    const previewSession = previewSessions.find(session => session.id === sessionId)
+    if (previewSession) {
+      if (!canConfirmFast36Outcome(previewSession, outcome)) return { ok: false, error: 'Confirma primero el horario con Clinic; esta sesión todavía no admite un resultado.' }
+      const saved = await saveClinicFast36Session(patient.id, { ...previewSession, status: outcome, actualEndAt: outcome === 'completed' ? previewSession.plannedEndAt : null }, 'Paciente / confirmación propia')
+      const readback = await getClinicFast36Sessions(patient.id)
+      if (!readback.some(session => session.id === saved.id && session.status === outcome)) return { ok: false, error: 'No pudimos verificar la confirmación. Recarga antes de intentarlo nuevamente.' }
+      revalidatePath('/my-aqslim/pilot/fast-36')
+      return { ok: true }
+    }
+    // While Clinic Preview schedules exist, never fall through to a live write.
+    if (previewSessions.length) return { ok: false, error: 'El horario cambió. Recarga y revisa la sesión vigente.' }
 
     const records = await getFast36SessionsByPatient(patient.id)
     const record = records.find(candidate => candidate.id === sessionId)

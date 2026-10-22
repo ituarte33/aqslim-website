@@ -1,3 +1,4 @@
+import { getClinicFast36Sessions } from '@/lib/clinic-fast36-store'
 import { redirect } from 'next/navigation'
 import { getPilotAccess } from '@/lib/pilot-access'
 import { getPatientPortalData } from '@/lib/patient-portal'
@@ -16,6 +17,7 @@ export default async function PilotPage() {
     getPatientPortalData(),
   ])
   if (!pilot) redirect('/my-aqslim')
+  const previewFast36Sessions = patient ? await getClinicFast36Sessions(patient.clienteId) : []
   const fast36Sessions = patient
     ? await getFast36SessionsByPatient(patient.clienteId).catch(() => [])
     : []
@@ -28,7 +30,7 @@ export default async function PilotPage() {
       }}
       profileId={patient?.clienteId ?? pilot.clerkUserId}
       linkedProfileName={patient?.fullName ?? null}
-      fast36Enabled={fast36Sessions.length > 0}
+      fast36Enabled={previewFast36Sessions.length > 0 || fast36Sessions.length > 0}
     />
   )
 }

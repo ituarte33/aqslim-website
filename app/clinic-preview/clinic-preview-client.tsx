@@ -9,6 +9,7 @@ import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, 
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
+import { ClinicFast36Panel } from './clinic-fast36-panel'
 import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
 
 type Patient = {
@@ -1498,6 +1499,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                 </div>
               ) : activeTab === 'My AQSLIM' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.8fr)', gap: 16, alignItems: 'start' }}>
+                  <ClinicFast36Panel key={selected.id} patientId={selected.id} />
                   <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.28)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.045)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>

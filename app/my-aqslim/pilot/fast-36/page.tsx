@@ -1,3 +1,4 @@
+import { getClinicFast36Sessions } from '@/lib/clinic-fast36-store'
 import { redirect } from 'next/navigation'
 import { getFast36SessionsByPatient } from '@/lib/airtable'
 import { requireOwnPatient } from '@/lib/auth'
@@ -15,8 +16,9 @@ export const metadata = {
 
 export default async function Fast36Page() {
   const patient = await requireOwnPatient('fasting:read:self')
-  const records = await getFast36SessionsByPatient(patient.id)
-  if (!records.length) redirect('/my-aqslim/pilot')
+  const previewSessions = await getClinicFast36Sessions(patient.id)
+  const records = previewSessions.length ? [] : await getFast36SessionsByPatient(patient.id)
+  if (!records.length && !previewSessions.length) redirect('/my-aqslim/pilot')
 
   const sessions: Fast36Session[] = records.flatMap(record => {
     const week = record.fields['Semana']
@@ -44,7 +46,7 @@ export default async function Fast36Page() {
       firstName={patient.fields['Nombre Completo']?.trim().split(/\s+/)[0] || 'Paciente'}
       profileId={patient.id}
       initialLanguage={initialLanguage}
-      sessions={sessions}
+      sessions={previewSessions.length ? previewSessions : sessions}
     />
   )
 }
