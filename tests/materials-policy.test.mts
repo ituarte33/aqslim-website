@@ -91,3 +91,13 @@ test('the published phase produces the matching governed phase guide', () => {
   assert.equal(phaseGuideMaterial('Jing')?.url, '/my-aqslim/materials/phase-guide')
   assert.match(phaseGuideMaterial('Jing')?.titleEs ?? '', /Jing/)
 })
+
+test('Previous nutrition is marked only in Preview and preserves the file', () => {
+ const materials = visiblePlanMaterials({attachments:[attachment('old_hipocaloric.pdf')],kenkhoTier:null,weekInPhase:1})
+ assert.strictEqual(reviewClinicMaterials(materials,false,true),materials)
+ const previous = reviewClinicMaterials(materials,true,true)[0]
+ assert.equal(previous.previous,true)
+ assert.equal(previous.url,materials[0].url)
+ assert.match(previous.typeEs,/No vigente/)
+ assert.equal(reviewClinicMaterials(materials,true)[0].previous,undefined)
+})

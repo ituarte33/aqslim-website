@@ -9,6 +9,7 @@ export type PlanMaterialAttachment = {
 }
 
 export type PortalMaterial = PlanMaterialAttachment & {
+  previous?: boolean
   kind: 'nutrition-plan' | 'quick-start' | 'cartography' | 'participant-manual' | 'guide' | 'document'
   titleEs: string
   titleEn: string
@@ -26,7 +27,7 @@ export type PatientMaterialsData = {
 
 // An attachment alone does not establish a nutrition plan's effective dates.
 // Keep this clarification scoped to the Clinic candidate until physical review.
-export function reviewClinicMaterials(materials: PortalMaterial[], enabled: boolean): PortalMaterial[] {
+export function reviewClinicMaterials(materials: PortalMaterial[], enabled: boolean, previousNutrition = false): PortalMaterial[] {
   if (!enabled) return materials
   return materials.map(material => {
     if (material.id.startsWith('phase-guide-')) return {
@@ -41,6 +42,7 @@ export function reviewClinicMaterials(materials: PortalMaterial[], enabled: bool
         : 'In-app summary. The full guide for this phase has not been linked yet.',
     }
     if (material.kind !== 'nutrition-plan') return material
+    if (previousNutrition) return { ...material, previous: true, titleEs: 'Plan hipocalórico anterior', titleEn: 'Previous hypocaloric plan', typeEs: 'Material previo · No vigente', typeEn: 'Previous material · Not current', detailEs: 'Conservado como referencia del plan anterior. No corresponde a tu plan Jing actual.', detailEn: 'Kept as a reference from your previous plan. This is not your current Jing plan.' }
     return {
       ...material,
       detailEs: 'Archivo adjunto a tu plan. Revisa sus fechas con AQSLIM antes de usarlo como plan vigente.',

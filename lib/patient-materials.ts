@@ -42,7 +42,7 @@ export const getPatientPortalMaterials = cache(async (
       ...(phaseMaterial ? [phaseMaterial] : []),
       ...(fullGuide ? [fullGuide] : []),
       ...assignedMaterials,
-    ], previewReview),
+    ], previewReview, plan.fields['Dieta en Nutrimind'] === 'Plan Jing' && /Sin FAST 36 durante este periodo/i.test(String(plan.fields['Instrucciones Especiales'] ?? ''))),
     previewReview,
   }
 })

@@ -371,7 +371,7 @@ export function ClinicPlanCompatibility() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
               <div>{fieldLabel('Modalidad / Kenkho Tier')}<select value={draft.kenkhoTier || 'Clinic'} onChange={e => set('kenkhoTier', e.target.value)} style={field}><option>Clinic</option><option>Start</option><option>Plus</option><option>Elite</option></select></div>
-              <div>{fieldLabel('Cadencia de citas (días)')}<input type="number" min="1" value={numeric(draft.visitCadenceDays)} onChange={e => set('visitCadenceDays', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+              <div>{fieldLabel('Cadencia interna de Clinic (días)')}<input type="number" min="1" value={numeric(draft.visitCadenceDays)} onChange={e => set('visitCadenceDays', e.target.value ? Number(e.target.value) : null)} style={field} /><small style={{ display: 'block', color: '#aaa' }}>Se guarda en Clinic; no se publica como próxima cita en My AQSLIM.</small></div>
             </div>
             <div style={{ color: '#6F6A64', fontSize: 11, marginTop: 7, lineHeight: 1.5 }}>{cadenceNote}</div>
 

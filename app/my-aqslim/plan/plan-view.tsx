@@ -1,29 +1,23 @@
 'use client'
 
 import Link from 'next/link'
+import { formatPortalPlanDate } from '@/lib/portal-plan-date'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import { CalendarIcon, ChevronIcon, InfoIcon, PlanIcon } from '../portal-icons'
 import { PortalShell } from '../portal-shell'
 import { usePortalLanguage } from '../use-portal-language'
 import styles from '../portal.module.css'
 
-function formatDate(value: string | null, language: 'es' | 'en') {
-  if (!value) return language === 'es' ? 'Por confirmar' : 'To be confirmed'
-  return new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : 'en-US', {
-    timeZone: 'America/Los_Angeles',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(value))
-}
 
 type PlanViewProps = {
   data: PatientPortalData
   demo?: boolean
+  calendarDates?: boolean
 }
 
-export function PlanView({ data, demo = false }: PlanViewProps) {
+export function PlanView({ data, demo = false, calendarDates = false }: PlanViewProps) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
+  const formatDate = (value: string | null, locale: 'es' | 'en') => formatPortalPlanDate(value, locale, calendarDates)
   const es = language === 'es'
   const plan = data.planName || data.phase || (es ? 'Por confirmar' : 'To be confirmed')
   const isFast36Hypocaloric = plan.toLowerCase().includes('fast 36') && plan.toLowerCase().includes('hipocal')
