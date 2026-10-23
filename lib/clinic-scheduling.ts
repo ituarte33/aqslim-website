@@ -56,3 +56,9 @@ export function toClinicDateTimeLocal(value: string | null | undefined) {
   if (!Number.isFinite(date.getTime())) return ''
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+// Restore only future appointments; past entries remain in the clinical history.
+export function futureClinicAppointment(value: string | null | undefined, now = new Date()) {
+  if (!value || !Number.isFinite(Date.parse(value)) || Date.parse(value) <= now.getTime()) return ''
+  return toClinicDateTimeLocal(value)
+}

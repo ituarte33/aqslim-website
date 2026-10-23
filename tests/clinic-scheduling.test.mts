@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '../lib/clinic-scheduling.ts'
+import { futureClinicAppointment, resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '../lib/clinic-scheduling.ts'
 
 test('uses a valid plan cadence before the standard fallback', () => {
   assert.deepEqual(resolveClinicCadence(10), {
@@ -40,4 +40,14 @@ test('restores a persisted appointment into the local date-time field', () => {
   const localAppointment = new Date(2026, 8, 27, 20, 45, 0)
   assert.equal(toClinicDateTimeLocal(localAppointment.toISOString()), '2026-09-27T20:45')
   assert.equal(toClinicDateTimeLocal('not-a-date'), '')
+})
+
+test('a new consultation never restores an expired appointment', () => {
+ const now = new Date(2026, 9, 23, 16, 20)
+ assert.equal(futureClinicAppointment(new Date(2026, 9, 1, 20, 50).toISOString(), now), '')
+ assert.equal(futureClinicAppointment(now.toISOString(), now), '')
+ assert.equal(futureClinicAppointment('invalid', now), '')
+ assert.equal(futureClinicAppointment(null, now), '')
+ assert.equal(futureClinicAppointment(new Date(2026, 9, 30, 16, 20).toISOString(), now), '2026-10-30T16:20')
+ assert.equal(suggestClinicAppointment('2026-10-23', 7, now), '2026-10-30T16:20')
 })

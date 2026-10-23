@@ -5,7 +5,7 @@ import { toCanonicalPhaseName } from '@/lib/phase-names'
 import { normalizeClinicSearch } from '@/lib/clinic-search'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
-import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
+import { futureClinicAppointment, resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
@@ -586,8 +586,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       void loadClinicRecord(selectedId, clinicRecordController.signal)
       void loadConsultations(selectedId).then(loaded => {
         if (cancelled || !loaded) return
-        const persistedAppointment = loaded.find(item => item.nextAppointment)?.nextAppointment
-        const localAppointment = toClinicDateTimeLocal(persistedAppointment)
+        const localAppointment = loaded.map(item => futureClinicAppointment(item.nextAppointment)).find(Boolean)
         if (localAppointment) {
           setNextAppointment(localAppointment)
           setNextAppointmentEdited(true)
