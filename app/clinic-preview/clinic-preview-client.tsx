@@ -1247,6 +1247,20 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                       <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Resumen clínico</h3>
                       <span style={{ color: '#9ED4A8', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase' }}>Sólo lectura</span>
                     </div>
+                    <section aria-label="Seguimientos guardados" style={{ marginTop: 18, padding: 16, border: '1px solid rgba(201,168,76,.24)', borderRadius: 12, background: 'rgba(201,168,76,.035)' }}>
+                      <h4 style={{ margin: 0, color: '#E2C87A', fontSize: 16 }}>Seguimiento clínico</h4>
+                      {notesLoading ? <p style={{ color: '#9A9590', fontSize: 12 }}>Cargando seguimientos…</p> : structuredFollowups.length === 0 ? <p style={{ color: '#9A9590', fontSize: 12 }}>Sin seguimientos estructurados registrados.</p> : <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                        {structuredFollowups.map(note => {
+                          const item = note.followup!
+                          return <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 9, padding: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', fontSize: 11 }}><span style={{ color: '#E2C87A' }}>Prioridad {item.priority}</span><span style={{ color: item.status === 'Completado' ? '#9ED4A8' : '#E2C87A' }}>{item.status}</span></div>
+                            <div style={{ color: '#D9D5CF', marginTop: 8, fontSize: 13, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.action}</div>
+                            <div style={{ color: '#9A9590', marginTop: 7, fontSize: 11 }}>{note.followupDate ? `Fecha objetivo: ${note.followupDate}` : 'Sin fecha objetivo'}</div>
+                          </div>
+                        })}
+                      </div>}
+                      <button type="button" onClick={() => setActiveTab('Seguimiento')} style={{ marginTop: 12, padding: 0, border: 0, background: 'transparent', color: '#C9A84C', cursor: 'pointer', fontSize: 12 }}>Abrir Seguimiento →</button>
+                    </section>
                     <ClinicWeightHistory history={weightHistory} loading={consultationsLoading || clinicRecordLoading} />
                     <div style={{ marginTop: 18 }}><ClinicRecordView record={clinicRecord} loading={clinicRecordLoading} error={clinicRecordError} /></div>
                   </div>
