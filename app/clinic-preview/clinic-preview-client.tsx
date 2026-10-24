@@ -5,7 +5,7 @@ import { toCanonicalPhaseName } from '@/lib/phase-names'
 import { normalizeClinicSearch } from '@/lib/clinic-search'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
-import { futureClinicAppointment, resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
+import { clinicAppointmentHeading, selectClinicAppointment, futureClinicAppointment, resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
@@ -425,7 +425,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const accessInvitationDrafts = messageDrafts.filter(note => note.messageDraft?.purpose === 'Acceso')
   const cadence = useMemo(() => resolveClinicCadence(visitCadenceDays), [visitCadenceDays])
   const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
-  const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
+  const latestScheduledAppointment = selectClinicAppointment(consultations.map(item => item.nextAppointment))
   const completeWeightEntries = useMemo(() => {
     const liveIds = new Set(clinicRecord?.consultations.map(item => item.id) ?? [])
     // A verified Preview correction overrides only its linked live weight here.
@@ -1320,7 +1320,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                     {weightCorrectionMessage && <p role="status" style={{ color: '#E2C87A' }}>{weightCorrectionMessage}</p>}
                     {consultationPublicationMessage && <div style={{ marginTop: 14, padding: 12, border: `1px solid ${consultationPublicationMessage.startsWith('✓') ? 'rgba(158,212,168,.28)' : 'rgba(224,160,160,.32)'}`, borderRadius: 10, color: consultationPublicationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>{consultationPublicationMessage}</div>}
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-                      {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Próxima consulta preliminar</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
+                      {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{clinicAppointmentHeading(latestScheduledAppointment)}</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
                       {consultationsLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : consultations.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay consultas registradas en Clinic Preview.</div> : consultations.map(item => <div key={item.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><strong style={{ color: '#C9A84C', fontSize: 12 }}>{item.consultationType}</strong><span style={{ color: '#6F6A64', fontSize: 11 }}>{item.consultationDate || (item.consultationAt ? new Date(item.consultationAt).toLocaleDateString('es-US') : '')}</span></div>
                         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', color: '#D9D5CF', fontSize: 12, marginTop: 10 }}>
@@ -1339,7 +1339,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                         </div>}
                         {item.phase && <div style={{ marginTop: 8, color: '#8E8881', fontSize: 11 }}>Fase: {item.phase}{item.phaseWeek !== null ? ` · semana ${item.phaseWeek}` : ''}</div>}
                         {item.recommendations && <div style={{ marginTop: 8, color: '#B8B3AD', fontSize: 12, lineHeight: 1.5 }}>{item.recommendations}</div>}
-                        {item.nextAppointment && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 11 }}>Próxima consulta preliminar: {new Date(item.nextAppointment).toLocaleString('es-US')}</div>}
+                        {item.nextAppointment && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 11 }}>{clinicAppointmentHeading(item.nextAppointment)}: {new Date(item.nextAppointment).toLocaleString('es-US')}</div>}
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8, color: '#6F6A64', fontSize: 11 }}>
                           {item.amountCollected !== null && <span>Cobrado: ${Number(item.amountCollected).toFixed(2)}</span>}{item.paymentMethod && <span>{item.paymentMethod}</span>}{item.authorLabel && <span>{item.authorLabel}</span>}
                         </div>
