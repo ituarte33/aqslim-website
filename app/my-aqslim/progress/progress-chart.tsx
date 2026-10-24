@@ -7,10 +7,10 @@ type Props = {
   unit: 'lb' | 'kg'
 }
 
-function formatShortDate(value: string | null, language: 'es' | 'en') {
+function formatShortDate(value: string | null, language: 'es' | 'en', calendarDate = false) {
   if (!value) return '—'
   return new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : 'en-US', {
-    timeZone: 'America/Los_Angeles',
+    timeZone: calendarDate && /^\d{4}-\d{2}-\d{2}$/.test(value) ? 'UTC' : 'America/Los_Angeles',
     month: 'short',
     day: 'numeric',
   }).format(new Date(value))
@@ -73,7 +73,7 @@ export function ProgressChart({ measurements, language, unit }: Props) {
           <g key={point.id}>
             <circle cx={point.x} cy={point.y} r="5.5" className={styles.chartPoint} />
             <text x={point.x} y="218" textAnchor="middle" className={styles.chartLabel}>
-              {point.label || formatShortDate(point.date, language)}
+              {point.label || formatShortDate(point.date, language, point.calendarDate)}
             </text>
           </g>
         ))}
