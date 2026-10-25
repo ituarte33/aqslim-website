@@ -84,22 +84,43 @@ export function getPhaseGuide(value: string | null | undefined): PhaseGuide | nu
   return phase && phase in PHASE_GUIDES ? PHASE_GUIDES[phase as AQSLIMPhase] : null
 }
 
-// Original patient handout selected from Rom's supplied Drive folder.
-// Linking preserves the source file and its existing sharing permissions.
-export function phaseGuideDocument(value: string | null | undefined): PortalMaterial | null {
-  if (toCanonicalPhaseName(value ?? null) !== 'Jing') return null
-  return {
-    id: 'phase-document-jing',
-    url: 'https://drive.google.com/file/d/1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS/view',
+// Phase-specific handouts selected from Rom's supplied Drive folder.
+// Existing files and Drive sharing permissions are preserved.
+const PHASE_DOCUMENTS: Readonly<Record<AQSLIMPhase, { fileId: string; filename: string }>> = {
+  Jing: {
+    fileId: '1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS',
     filename: 'KenkoPath Fase1 JING Claro - Una vez por semana.pdf',
+  },
+  Qi: {
+    fileId: '1VREBJrvan2fZp9IpdNeyojnlX-emR8ij',
+    filename: 'KenkoPath Fase2 QI Claro.pdf',
+  },
+  Xue: {
+    fileId: '1g0w3Ev1Ef3NSxzkrTnzX8XRCnSsRszLj',
+    filename: 'KenkoPath Fase3 XUE Claro.pdf',
+  },
+  'Yang Sheng': {
+    fileId: '1Et8W7aM6llJO3TE3D2bAusrfpjoU4L3n',
+    filename: 'KenkoPath Fase4 YANGSHENG Claro.pdf',
+  },
+}
+
+export function phaseGuideDocument(value: string | null | undefined): PortalMaterial | null {
+  const guide = getPhaseGuide(value)
+  if (!guide) return null
+  const document = PHASE_DOCUMENTS[guide.phase]
+  return {
+    id: `phase-document-${guide.phase.toLowerCase().replace(/\s+/g, '-')}`,
+    url: `https://drive.google.com/file/d/${document.fileId}/view`,
+    filename: document.filename,
     type: 'application/pdf',
     kind: 'guide',
-    titleEs: 'Guía completa de Jing · PDF',
-    titleEn: 'Full Jing guide · PDF (Spanish)',
-    typeEs: 'Fase 1 · Documento original',
-    typeEn: 'Phase 1 · Original document',
-    detailEs: 'Guía original en español con las listas de alimentos de Jing. Su contenido está pendiente de revisión clínica antes de entregarse a clientes.',
-    detailEn: 'Original Spanish guide with Jing food lists. Its content is awaiting clinical review before client release.',
+    titleEs: `Guía completa de ${guide.phase} · PDF`,
+    titleEn: `Full ${guide.phase} guide · PDF (Spanish)`,
+    typeEs: `Fase ${guide.number} · Documento original`,
+    typeEn: `Phase ${guide.number} · Original document`,
+    detailEs: `Guía original en español con las listas de alimentos de ${guide.phase}. Su contenido está pendiente de revisión clínica antes de entregarse a clientes.`,
+    detailEn: `Original Spanish guide with ${guide.phase} food lists. Its content is awaiting clinical review before client release.`,
   }
 }
 

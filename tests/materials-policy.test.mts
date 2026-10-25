@@ -25,15 +25,34 @@ test('Clinic candidate distinguishes summaries and unverified attachment dates w
   assert.equal(isClinicPreviewEnvironment({ VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'main' }), false)
 })
 
-test('the original Jing PDF follows Jing only and the summary points to the linked document', () => {
-  const document = phaseGuideDocument('Jing')!
-  assert.equal(document.url, 'https://drive.google.com/file/d/1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS/view')
-  assert.equal(phaseGuideDocument('Qi'), null)
-  assert.equal(phaseGuideDocument(null), null)
-  const reviewed = reviewClinicMaterials([phaseGuideMaterial('Jing')!, document], true)
-  assert.match(reviewed[0].detailEs, /por separado/)
-  assert.doesNotMatch(reviewed[0].detailEs, /no está vinculada/)
-  assert.match(reviewed[1].detailEs, /revisión clínica/)
+test('each published phase selects its own complete PDF and matching summary', () => {
+  const files = [
+    ['Jing', '1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS'],
+    ['Qi', '1VREBJrvan2fZp9IpdNeyojnlX-emR8ij'],
+    ['Xue', '1g0w3Ev1Ef3NSxzkrTnzX8XRCnSsRszLj'],
+    ['Yang Sheng', '1Et8W7aM6llJO3TE3D2bAusrfpjoU4L3n'],
+  ] as const
+  const documentIds = new Set<string>()
+  for (const [phase, fileId] of files) {
+    const document = phaseGuideDocument(phase)!
+    assert.equal(document.url, `https://drive.google.com/file/d/${fileId}/view`)
+    assert.match(document.titleEs, new RegExp(phase))
+    assert.ok(!documentIds.has(document.id))
+    documentIds.add(document.id)
+    const summary = phaseGuideMaterial(phase)!
+    assert.equal(summary.id.replace('phase-guide-', 'phase-document-'), document.id)
+    const reviewed = reviewClinicMaterials([summary, document], true)
+    assert.match(reviewed[0].detailEs, /por separado/)
+    assert.doesNotMatch(reviewed[0].detailEs, /no está vinculada/)
+    assert.match(reviewed[1].detailEs, /revisión clínica/)
+  }
+})
+
+test('an absent or unknown phase never falls back to another phase PDF', () => {
+  for (const phase of [null, undefined, '', 'Sin fase', 'Tao', 'not-a-phase']) {
+    assert.equal(phaseGuideDocument(phase), null)
+  }
+  assert.equal(phaseGuideDocument('Qi-Xue (Keto)')?.id, phaseGuideDocument('Jing')?.id)
 })
 
 const attachment = (filename: string): PlanMaterialAttachment => ({
