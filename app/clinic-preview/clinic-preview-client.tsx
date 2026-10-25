@@ -9,6 +9,7 @@ import { clinicAppointmentHeading, selectClinicAppointment, futureClinicAppointm
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
+import { activePlanIncludesFast36 } from '@/lib/clinic-plan-materials'
 import { ClinicFast36Panel } from './clinic-fast36-panel'
 import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
 
@@ -174,6 +175,8 @@ type ClinicAccessReadiness = {
 }
 
 type ClinicPlanSnapshot = {
+  patientId: string | null
+  fast36Status: 'loading' | 'active' | 'inactive' | 'unavailable'
   draftStatus: string | null
   hasDraft: boolean
   hasLivePlan: boolean
@@ -313,6 +316,7 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
 }
 
 export function ClinicPreviewClient({ patients, initialPatientId, mode = 'preview' }: { patients: Patient[]; initialPatientId: string | null; mode?: 'preview' | 'candidate' | 'production' }) {
+  const candidateReadOnly = mode === 'candidate'
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
   const [activeTab, setActiveTab] = useState<Tab>('Resumen')
@@ -382,6 +386,8 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   const [reportedWeightMessage, setReportedWeightMessage] = useState('')
   const [visitCadenceDays, setVisitCadenceDays] = useState<number | null>(null)
   const [planSnapshot, setPlanSnapshot] = useState<ClinicPlanSnapshot>({
+    patientId: null,
+    fast36Status: 'loading',
     draftStatus: null,
     hasDraft: false,
     hasLivePlan: false,
@@ -525,6 +531,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function loadPlanSnapshot(patientId: string, signal?: AbortSignal) {
+    setPlanSnapshot(previous => ({ ...previous, patientId, fast36Status: 'loading' }))
     try {
       const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store', signal })
       const data = await response.json()
@@ -536,6 +543,15 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
         setPhaseWeek(data.livePlan?.phaseWeek == null ? '' : String(data.livePlan.phaseWeek))
       }
       const snapshot: ClinicPlanSnapshot = {
+        patientId,
+        fast36Status: activePlanIncludesFast36(data.livePlan ? {
+          id: data.livePlan.id,
+          fields: {
+            'Notas del Plan': data.livePlan.planLabel,
+            'Dieta en Nutrimind': data.livePlan.dietName,
+            'Instrucciones Especiales': data.livePlan.specialInstructions,
+          },
+        } : null) ? 'active' : 'inactive',
         draftStatus: typeof data.draft?.status === 'string' ? data.draft.status : null,
         hasDraft: Boolean(data.draft),
         hasLivePlan: Boolean(data.livePlan),
@@ -547,6 +563,8 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
     } catch {
       if (signal?.aborted) return
       const snapshot: ClinicPlanSnapshot = {
+        patientId,
+        fast36Status: 'unavailable',
         draftStatus: null,
         hasDraft: false,
         hasLivePlan: false,
@@ -600,7 +618,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
       setClinicRecord(null)
       setClinicRecordError('')
       setVisitCadenceDays(null)
-      setPlanSnapshot({ draftStatus: null, hasDraft: false, hasLivePlan: false, visitCadenceDays: null })
+      setPlanSnapshot({ patientId: null, fast36Status: 'loading', draftStatus: null, hasDraft: false, hasLivePlan: false, visitCadenceDays: null })
       setAccessReadiness(null)
       setAccessReadinessError('')
     }
@@ -627,6 +645,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }, [selectedId, accessReadiness?.authorization.operationFingerprint])
 
   async function changeAccessRestriction(action: 'suspend' | 'restore') {
+    if (candidateReadOnly) return
     if (!selected || !accessReadiness || accessRestrictionSaving) return
     const confirmation = action === 'suspend' ? 'RESTRINGIR' : 'RESTAURAR'
     if (accessRestrictionConfirmation.trim().toUpperCase() !== confirmation) return
@@ -653,6 +672,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function validateAccessAuthorization() {
+    if (candidateReadOnly) return
     if (!selected || !accessReadiness || accessReadiness.authorization.state !== 'ready') return
     const requestId = authorizationRequestId.current + 1
     authorizationRequestId.current = requestId
@@ -691,6 +711,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function executeAccessActivation() {
+    if (candidateReadOnly) return
     if (!selected || !accessReadiness || !authorizedFingerprint || !authorizationExecutionEnabled || activationComplete) return
     const acknowledgements = accessReadiness.authorization.acknowledgements
       .filter(item => authorizationChecks[item.key] === true)
@@ -731,6 +752,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }, [selectedId, consultationDate, cadence.days, nextAppointmentEdited])
 
   async function saveNote() {
+    if (candidateReadOnly) return
     if (!selected || !noteText.trim()) return
     const intendedNote = noteText.trim()
     const intendedDate = followupRequired ? followupDate : ''
@@ -760,6 +782,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function saveFollowup() {
+    if (candidateReadOnly) return
     if (!selected || !followupAction.trim()) return
     const intendedAction = followupAction.trim()
     const intendedDate = followupDueDate
@@ -795,6 +818,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function updateFollowupStatus(note: ClinicNote, nextStatus: 'Pendiente' | 'En progreso' | 'Completado') {
+    if (candidateReadOnly) return
     if (!selected || !note.followup) return
     setFollowupUpdatingId(note.id)
     setFollowupMessage('')
@@ -824,6 +848,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function saveMessageDraft() {
+    if (candidateReadOnly) return
     const draftBody = messageBody.trim()
     if (!selected || !draftBody) return
     setMessageSaving(true)
@@ -857,6 +882,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function updateMessageDraftStatus(note: ClinicNote, nextStatus: 'Borrador' | 'Listo para revisar' | 'Archivado') {
+    if (candidateReadOnly) return
     if (!selected || !note.messageDraft) return
     setMessageUpdatingId(note.id)
     setMessageStatus('')
@@ -899,6 +925,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function saveAccessInvitationDraft() {
+    if (candidateReadOnly) return
     const draftBody = accessInvitationBody.trim()
     const draftSubject = accessInvitationSubject.trim()
     if (!selected || !accessReadiness?.readyForReview || !draftBody) return
@@ -934,6 +961,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function saveConsultation() {
+    if (candidateReadOnly) return
     if (!selected) return
     if (!consultationReadiness.ready) {
       setConsultationMessage('Revisa los datos marcados antes de guardar la consulta.')
@@ -998,6 +1026,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function saveReportedWeight() {
+    if (candidateReadOnly) return
     if (!selected) return
     const normalized = normalizeClinicWeightEntry(reportedWeight, reportedWeightUnit)
     if (!normalized.ok) {
@@ -1037,6 +1066,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function correctPreviewWeight() {
+    if (candidateReadOnly) return
     const correction = weightCorrection
     if (!selected || !correction || correction.patientId !== selected.id || weightCorrectionGuard.current) return
     weightCorrectionGuard.current = true
@@ -1066,6 +1096,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   }
 
   async function publishConsultation(item: ClinicConsultation) {
+    if (candidateReadOnly) return
     if (!selected || item.publishedToClinic || item.consultationType === CLINIC_WEIGHT_UPDATE_TYPE) return
     if (!consultationPublicationConfirmed) {
       setConsultationPublicationMessage('Confirma que revisaste la consulta antes de publicarla.')
@@ -1172,7 +1203,8 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
   const quickActionStyle = { cursor: 'pointer', padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.08)', color: '#E2C87A', textAlign: 'left' as const }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8', fontFamily: 'Montserrat, Arial, sans-serif' }}>
+    <main data-clinic-mode={mode} style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FAFAF8', fontFamily: 'Montserrat, Arial, sans-serif' }}>
+      <style>{`[data-clinic-mode="candidate"] button:disabled { opacity: .5; cursor: not-allowed !important; }`}</style>
       <header className="clinic-preview-header" style={{ position: 'relative', zIndex: 20, background: '#0A0A0A', borderBottom: '1px solid rgba(201,168,76,.28)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 24, letterSpacing: '.08em' }}>AQ<span style={{ color: '#C9A84C' }}>SLIM</span> Clinic</div>
@@ -1320,7 +1352,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                     <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Escribe aquí lo relevante de la consulta…" rows={8} style={{ ...inputStyle, marginTop: 12, resize: 'vertical' }} />
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#9A9590', fontSize: 12, marginTop: 12 }}><input type="checkbox" checked={followupRequired} onChange={e => setFollowupRequired(e.target.checked)} /> Seguimiento requerido</label>
                     {followupRequired && <input aria-label="Fecha de seguimiento de la nota" type="date" value={followupDate} onInput={event => setFollowupDate(event.currentTarget.value)} onChange={event => setFollowupDate(event.currentTarget.value)} style={{ ...inputStyle, marginTop: 10 }} />}
-                    <button onClick={saveNote} disabled={saving || !noteText.trim()} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || !noteText.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || !noteText.trim() ? '#8E8881' : '#0A0A0A', cursor: saving || !noteText.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar nota'}</button>
+                    <button onClick={saveNote} disabled={candidateReadOnly || saving || !noteText.trim()} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || !noteText.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || !noteText.trim() ? '#8E8881' : '#0A0A0A', cursor: saving || !noteText.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar nota'}</button>
                     {statusMessage && <div style={{ marginTop: 12, color: statusMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{statusMessage}</div>}
                   </div>
                 </div>
@@ -1341,14 +1373,14 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                           {item.weight !== null && <span>Peso: {item.weight} {item.weightUnit}</span>}{item.bodyFat !== null && <span>Grasa: {item.bodyFat}%</span>}{item.waistCm !== null && <span>Cintura: {item.waistCm} cm</span>}{item.hipsCm !== null && <span>Cadera: {item.hipsCm} cm</span>}
                         </div>
                         {item.weight !== null && <div style={{ marginTop: 12 }}>
-                          <button type="button" disabled={weightCorrectionBusy} onClick={() => { setWeightCorrection({ patientId: selected.id, item, weight: String(item.weight), unit: item.weightUnit === 'kg' ? 'kg' : 'lb', reason: '' }); setWeightCorrectionMessage('') }} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>Corregir peso en Preview</button>
+                          <button type="button" disabled={candidateReadOnly || weightCorrectionBusy} onClick={() => { setWeightCorrection({ patientId: selected.id, item, weight: String(item.weight), unit: item.weightUnit === 'kg' ? 'kg' : 'lb', reason: '' }); setWeightCorrectionMessage('') }} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>Corregir peso en Preview</button>
                           {weightCorrection?.patientId === selected.id && weightCorrection.item.id === item.id && <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
                             <p style={{ color: '#E2C87A', fontSize: 12 }}>Corrige únicamente el peso de este registro en Preview. Se conservarán la fecha y el motivo del ajuste; el expediente real permanece sin cambios.</p>
-                            <label style={labelStyle}>Peso corregido<input aria-label="Peso corregido" type="number" step="0.1" value={weightCorrection.weight} disabled={weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, weight: e.target.value })} style={inputStyle} /></label>
-                            <label style={labelStyle}>Unidad<select value={weightCorrection.unit} disabled={weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, unit: e.target.value as ClinicWeightUnit })} style={inputStyle}><option value="lb">lb</option><option value="kg">kg</option></select></label>
-                            <label style={labelStyle}>Motivo de la corrección<textarea value={weightCorrection.reason} maxLength={500} disabled={weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, reason: e.target.value })} style={inputStyle} /></label>
-                            <button type="button" disabled={weightCorrectionBusy || weightCorrection.reason.trim().length < 10 || !normalizeClinicWeightEntry(weightCorrection.weight, weightCorrection.unit).ok} onClick={() => void correctPreviewWeight()} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>{weightCorrectionBusy ? 'Verificando…' : 'Guardar corrección Preview'}</button>
-                            <button type="button" disabled={weightCorrectionBusy} onClick={() => setWeightCorrection(null)} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>Cancelar</button>
+                            <label style={labelStyle}>Peso corregido<input aria-label="Peso corregido" type="number" step="0.1" value={weightCorrection.weight} disabled={candidateReadOnly || weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, weight: e.target.value })} style={inputStyle} /></label>
+                            <label style={labelStyle}>Unidad<select value={weightCorrection.unit} disabled={candidateReadOnly || weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, unit: e.target.value as ClinicWeightUnit })} style={inputStyle}><option value="lb">lb</option><option value="kg">kg</option></select></label>
+                            <label style={labelStyle}>Motivo de la corrección<textarea value={weightCorrection.reason} maxLength={500} disabled={candidateReadOnly || weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, reason: e.target.value })} style={inputStyle} /></label>
+                            <button type="button" disabled={candidateReadOnly || weightCorrectionBusy || weightCorrection.reason.trim().length < 10 || !normalizeClinicWeightEntry(weightCorrection.weight, weightCorrection.unit).ok} onClick={() => void correctPreviewWeight()} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>{weightCorrectionBusy ? 'Verificando…' : 'Guardar corrección Preview'}</button>
+                            <button type="button" disabled={candidateReadOnly || weightCorrectionBusy} onClick={() => setWeightCorrection(null)} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>Cancelar</button>
                           </div>}
                         </div>}
                         {item.phase && <div style={{ marginTop: 8, color: '#8E8881', fontSize: 11 }}>Fase: {item.phase}{item.phaseWeek !== null ? ` · semana ${item.phaseWeek}` : ''}</div>}
@@ -1366,8 +1398,8 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                           <div style={{ color: '#B8B3AD', fontSize: 11, lineHeight: 1.55, marginTop: 8 }}>Se copiarán esta fecha, tipo de consulta, mediciones, recomendaciones y pago al expediente clínico real. La próxima cita seguirá requiriendo confirmación por separado en Square.</div>
                           <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', color: '#D9D5CF', fontSize: 11, lineHeight: 1.45, marginTop: 11 }}><input type="checkbox" checked={consultationPublicationConfirmed} onChange={event => setConsultationPublicationConfirmed(event.target.checked)} /> Confirmo que revisé esta consulta y deseo publicarla una sola vez.</label>
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                            <button type="button" onClick={() => void publishConsultation(item)} disabled={!consultationPublicationConfirmed || consultationPublicationSaving} aria-busy={consultationPublicationSaving} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(201,168,76,.48)', background: !consultationPublicationConfirmed || consultationPublicationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: !consultationPublicationConfirmed || consultationPublicationSaving ? '#8E8881' : '#0A0A0A', cursor: !consultationPublicationConfirmed || consultationPublicationSaving ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600 }}>{consultationPublicationSaving ? 'Publicando una sola vez…' : 'Confirmar publicación'}</button>
-                            <button type="button" onClick={() => { setConsultationPublicationTargetId(''); setConsultationPublicationConfirmed(false) }} disabled={consultationPublicationSaving} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#9A9590', cursor: consultationPublicationSaving ? 'not-allowed' : 'pointer', fontSize: 11 }}>Cancelar</button>
+                            <button type="button" onClick={() => void publishConsultation(item)} disabled={candidateReadOnly || !consultationPublicationConfirmed || consultationPublicationSaving} aria-busy={consultationPublicationSaving} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(201,168,76,.48)', background: !consultationPublicationConfirmed || consultationPublicationSaving ? 'rgba(201,168,76,.08)' : '#C9A84C', color: !consultationPublicationConfirmed || consultationPublicationSaving ? '#8E8881' : '#0A0A0A', cursor: !consultationPublicationConfirmed || consultationPublicationSaving ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600 }}>{consultationPublicationSaving ? 'Publicando una sola vez…' : 'Confirmar publicación'}</button>
+                            <button type="button" onClick={() => { setConsultationPublicationTargetId(''); setConsultationPublicationConfirmed(false) }} disabled={candidateReadOnly || consultationPublicationSaving} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#9A9590', cursor: consultationPublicationSaving ? 'not-allowed' : 'pointer', fontSize: 11 }}>Cancelar</button>
                           </div>
                         </div>}
                       </div>)}
@@ -1418,7 +1450,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
 
                     <ClinicConsultationReadinessPanel ready={consultationReadiness.ready} checks={consultationReadiness.checks} />
 
-                    <button onClick={saveConsultation} disabled={consultationSaving || !consultationReadiness.ready} aria-busy={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving || !consultationReadiness.ready ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving || !consultationReadiness.ready ? '#8E8881' : '#0A0A0A', cursor: consultationSaving || !consultationReadiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando una sola vez…' : consultationReadiness.ready ? 'Guardar consulta Preview' : 'Revisa los datos para guardar'}</button>
+                    <button onClick={saveConsultation} disabled={candidateReadOnly || consultationSaving || !consultationReadiness.ready} aria-busy={consultationSaving} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: consultationSaving || !consultationReadiness.ready ? 'rgba(201,168,76,.08)' : '#C9A84C', color: consultationSaving || !consultationReadiness.ready ? '#8E8881' : '#0A0A0A', cursor: consultationSaving || !consultationReadiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{consultationSaving ? 'Guardando una sola vez…' : consultationReadiness.ready ? 'Guardar consulta Preview' : 'Revisa los datos para guardar'}</button>
                     <div style={{ marginTop: 8, color: '#77716A', fontSize: 10, lineHeight: 1.45 }}>Protección contra doble guardado activa: mientras se procesa esta consulta, los clics repetidos se ignoran.</div>
                     {consultationMessage && <div style={{ marginTop: 12, color: consultationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12 }}>{consultationMessage}</div>}
                   </div>
@@ -1437,7 +1469,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                         return <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: draft.status === 'Archivado' ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.025)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{draft.channel}</span><span style={{ color: '#8E8881', fontSize: 11 }}>{draft.purpose}</span></div>
-                            <select value={draft.status} disabled={messageUpdatingId === note.id} onChange={event => void updateMessageDraftStatus(note, event.target.value as 'Borrador' | 'Listo para revisar' | 'Archivado')} style={{ ...inputStyle, width: 175, padding: '8px 10px' }}><option>Borrador</option><option>Listo para revisar</option><option>Archivado</option></select>
+                            <select value={draft.status} disabled={candidateReadOnly || messageUpdatingId === note.id} onChange={event => void updateMessageDraftStatus(note, event.target.value as 'Borrador' | 'Listo para revisar' | 'Archivado')} style={{ ...inputStyle, width: 175, padding: '8px 10px' }}><option>Borrador</option><option>Listo para revisar</option><option>Archivado</option></select>
                           </div>
                           {draft.subject && <div style={{ color: '#FAFAF8', fontWeight: 600, marginTop: 12 }}>{draft.subject}</div>}
                           <div style={{ color: '#D9D5CF', lineHeight: 1.6, marginTop: 10, whiteSpace: 'pre-wrap' }}>{draft.body}</div>
@@ -1459,7 +1491,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                     <label style={{ ...labelStyle, marginTop: 12 }}>Mensaje</label>
                     <textarea value={messageBody} onChange={event => setMessageBody(event.target.value)} placeholder="Escribe el borrador aquí…" rows={8} style={{ ...inputStyle, resize: 'vertical' }} />
                     <div style={{ marginTop: 12, padding: 11, border: '1px solid rgba(226,142,142,.22)', borderRadius: 9, color: '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>Sin envío: guardar sólo registra este texto dentro de Clinic Preview.</div>
-                    <button onClick={saveMessageDraft} disabled={messageSaving || !messageBody.trim()} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: messageSaving || !messageBody.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: messageSaving || !messageBody.trim() ? '#8E8881' : '#0A0A0A', cursor: messageSaving || !messageBody.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{messageSaving ? 'Guardando…' : 'Guardar borrador Preview'}</button>
+                    <button onClick={saveMessageDraft} disabled={candidateReadOnly || messageSaving || !messageBody.trim()} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: messageSaving || !messageBody.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: messageSaving || !messageBody.trim() ? '#8E8881' : '#0A0A0A', cursor: messageSaving || !messageBody.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{messageSaving ? 'Guardando…' : 'Guardar borrador Preview'}</button>
                     {messageStatus && <div style={{ marginTop: 12, color: messageStatus.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{messageStatus}</div>}
                   </div>
                 </div>
@@ -1478,7 +1510,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                         return <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: item.status === 'Completado' ? 'rgba(106,160,116,.05)' : 'rgba(255,255,255,.02)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ color: priorityColor, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Prioridad {item.priority}</span>
-                            <select value={item.status} disabled={followupUpdatingId === note.id} onChange={event => void updateFollowupStatus(note, event.target.value as 'Pendiente' | 'En progreso' | 'Completado')} style={{ ...inputStyle, width: 160, padding: '8px 10px' }}><option>Pendiente</option><option>En progreso</option><option>Completado</option></select>
+                            <select value={item.status} disabled={candidateReadOnly || followupUpdatingId === note.id} onChange={event => void updateFollowupStatus(note, event.target.value as 'Pendiente' | 'En progreso' | 'Completado')} style={{ ...inputStyle, width: 160, padding: '8px 10px' }}><option>Pendiente</option><option>En progreso</option><option>Completado</option></select>
                           </div>
                           <div style={{ color: '#D9D5CF', lineHeight: 1.6, marginTop: 10, textDecoration: item.status === 'Completado' ? 'line-through' : 'none' }}>{item.action}</div>
                           <div style={{ color: '#77716A', fontSize: 11, marginTop: 9 }}>{note.followupDate ? `Fecha objetivo: ${note.followupDate}` : 'Sin fecha objetivo'}{note.authorLabel ? ` · ${note.authorLabel}` : ''}</div>
@@ -1495,7 +1527,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                       <div><label style={labelStyle}>Prioridad</label><select value={followupPriority} onChange={event => setFollowupPriority(event.target.value as 'Normal' | 'Alta' | 'Urgente')} style={inputStyle}><option>Normal</option><option>Alta</option><option>Urgente</option></select></div>
                       <div><label style={labelStyle}>Fecha objetivo</label><input aria-label="Fecha objetivo del seguimiento" type="date" value={followupDueDate} onInput={event => setFollowupDueDate(event.currentTarget.value)} onChange={event => setFollowupDueDate(event.currentTarget.value)} style={inputStyle} /></div>
                     </div>
-                    <button onClick={saveFollowup} disabled={followupSaving || !followupAction.trim()} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: followupSaving || !followupAction.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: followupSaving || !followupAction.trim() ? '#8E8881' : '#0A0A0A', cursor: followupSaving || !followupAction.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{followupSaving ? 'Guardando…' : 'Guardar seguimiento Preview'}</button>
+                    <button onClick={saveFollowup} disabled={candidateReadOnly || followupSaving || !followupAction.trim()} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: followupSaving || !followupAction.trim() ? 'rgba(201,168,76,.08)' : '#C9A84C', color: followupSaving || !followupAction.trim() ? '#8E8881' : '#0A0A0A', cursor: followupSaving || !followupAction.trim() ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{followupSaving ? 'Guardando…' : 'Guardar seguimiento Preview'}</button>
                     {followupMessage && <div style={{ marginTop: 12, color: followupMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{followupMessage}</div>}
                   </div>
                   <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 18, background: 'rgba(201,168,76,.035)' }}>
@@ -1512,7 +1544,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                 </div>
               ) : activeTab === 'My AQSLIM' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.8fr)', gap: 16, alignItems: 'start' }}>
-                  <ClinicFast36Panel key={selected.id} patientId={selected.id} />
+                  <ClinicFast36Panel key={`${selected.id}-${planSnapshot.patientId === selected.id ? planSnapshot.fast36Status : 'loading'}`} patientId={selected.id} planStatus={planSnapshot.patientId === selected.id ? planSnapshot.fast36Status : 'loading'} readOnly={candidateReadOnly} previewOnly={mode === 'preview'} />
                   <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.28)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.045)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
@@ -1530,7 +1562,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                       <div><label style={labelStyle}>Peso informado</label><input aria-label="Peso informado por el cliente" inputMode="decimal" value={reportedWeight} onChange={event => setReportedWeight(event.target.value)} placeholder="Ej. 184.5" style={inputStyle} /></div>
                       <div><label style={labelStyle}>Unidad</label><select aria-label="Unidad del peso informado" value={reportedWeightUnit} onChange={event => setReportedWeightUnit(event.target.value as ClinicWeightUnit)} style={inputStyle}><option value="lb">lb</option><option value="kg">kg</option></select></div>
                       <div><label style={labelStyle}>Fecha recibida</label><input aria-label="Fecha del peso informado" type="date" value={reportedWeightDate} onChange={event => setReportedWeightDate(event.target.value)} style={inputStyle} /></div>
-                      <button type="button" onClick={() => void saveReportedWeight()} disabled={reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate} style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? 'rgba(201,168,76,.08)' : '#C9A84C', color: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? '#8E8881' : '#0A0A0A', cursor: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{reportedWeightSaving ? 'Guardando…' : 'Actualizar peso Preview'}</button>
+                      <button type="button" onClick={() => void saveReportedWeight()} disabled={candidateReadOnly || reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate} style={{ padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? 'rgba(201,168,76,.08)' : '#C9A84C', color: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? '#8E8881' : '#0A0A0A', cursor: reportedWeightSaving || !reportedWeight.trim() || !reportedWeightDate ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{reportedWeightSaving ? 'Guardando…' : 'Actualizar peso Preview'}</button>
                     </div>
                     {reportedWeightMessage && <div style={{ marginTop: 12, color: reportedWeightMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{reportedWeightMessage}</div>}
                   </div>
@@ -1634,14 +1666,14 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                           <div style={{ color: '#77716A', fontSize: 10, marginTop: 8 }}>Huella de operación: {accessReadiness.authorization.operationFingerprint}</div>
                           <div style={{ display: 'grid', gap: 9, marginTop: 12 }}>
                             {accessReadiness.authorization.acknowledgements.map(item => <label key={item.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 10, border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, color: '#D9D5CF', fontSize: 11, lineHeight: 1.45, cursor: authorizedFingerprint ? 'default' : 'pointer' }}>
-                              <input type="checkbox" checked={authorizationChecks[item.key] === true} disabled={Boolean(authorizedFingerprint)} onChange={event => setAuthorizationChecks(current => ({ ...current, [item.key]: event.target.checked }))} />
+                              <input type="checkbox" checked={authorizationChecks[item.key] === true} disabled={candidateReadOnly || Boolean(authorizedFingerprint)} onChange={event => setAuthorizationChecks(current => ({ ...current, [item.key]: event.target.checked }))} />
                               <span>{item.label}</span>
                             </label>)}
                           </div>
                           <button
                             type="button"
                             onClick={() => void validateAccessAuthorization()}
-                            disabled={authorizationValidating || Boolean(authorizedFingerprint) || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true)}
+                            disabled={candidateReadOnly || authorizationValidating || Boolean(authorizedFingerprint) || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true)}
                             style={{ width: '100%', marginTop: 12, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.42)', background: authorizedFingerprint ? 'rgba(106,160,116,.09)' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#C9A84C' : 'rgba(201,168,76,.08)', color: authorizedFingerprint ? '#9ED4A8' : accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? '#0A0A0A' : '#77716A', cursor: authorizationValidating || authorizedFingerprint || !accessReadiness.authorization.acknowledgements.every(item => authorizationChecks[item.key] === true) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
                           >{authorizationValidating ? 'Validando en servidor…' : authorizedFingerprint ? '✓ Autorización validada por el servidor' : 'Validar autorización de prueba'}</button>
                         </> : null}
@@ -1651,11 +1683,11 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                     </> : <div style={{ color: '#9A9590', marginTop: 14 }}>Sin estado disponible.</div>}
                     <div style={{ marginTop: 18, padding: 12, border: `1px solid ${activationComplete ? 'rgba(106,160,116,.24)' : 'rgba(226,142,142,.22)'}`, borderRadius: 9, color: activationComplete ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>{activationComplete ? 'La activación autorizada fue verificada en Airtable y Clerk. No creó cobros, invitaciones ni efectos en Producción.' : 'Ningún cambio se ejecuta sin validación y confirmación explícitas. Esta operación no crea cobros, invitaciones ni efectos en Producción.'}</div>
                     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-                      <button onClick={prepareAccessInvitation} disabled={!accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
+                      <button onClick={prepareAccessInvitation} disabled={candidateReadOnly || !accessReadiness?.readyForReview || accessReadinessLoading} style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${accessReadiness?.readyForReview ? 'rgba(201,168,76,.42)' : 'rgba(255,255,255,.08)'}`, background: accessReadiness?.readyForReview ? 'rgba(201,168,76,.10)' : 'rgba(255,255,255,.025)', color: accessReadiness?.readyForReview ? '#E2C87A' : '#77716A', textAlign: 'left', cursor: accessReadiness?.readyForReview ? 'pointer' : 'not-allowed' }}>{accessReadiness?.readyForReview ? 'Preparar invitación interna →' : 'Preparar invitación · requiere email válido'}</button>
                       <button
                         type="button"
                         onClick={() => void executeAccessActivation()}
-                        disabled={!authorizedFingerprint || !authorizationExecutionEnabled || activationExecuting || activationComplete}
+                        disabled={candidateReadOnly || !authorizedFingerprint || !authorizationExecutionEnabled || activationExecuting || activationComplete}
                         style={{ padding: '12px 14px', borderRadius: 9, border: `1px solid ${authorizationExecutionEnabled && !activationComplete ? 'rgba(201,168,76,.45)' : 'rgba(255,255,255,.08)'}`, background: authorizationExecutionEnabled && !activationComplete ? '#C9A84C' : 'rgba(255,255,255,.025)', color: authorizationExecutionEnabled && !activationComplete ? '#0A0A0A' : activationComplete ? '#9ED4A8' : '#77716A', textAlign: 'left', cursor: authorizationExecutionEnabled && !activationExecuting && !activationComplete ? 'pointer' : 'not-allowed', fontWeight: 600 }}
                       >{activationExecuting ? 'Ejecutando y verificando…' : activationComplete ? '✓ Activación verificada' : authorizationExecutionEnabled ? 'Ejecutar activación autorizada' : authorizedFingerprint ? 'Ejecutar activación · servidor no habilitado' : 'Ejecutar activación · requiere autorización validada'}</button>
                     </div>
@@ -1664,10 +1696,10 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                       <p style={{ color: '#9A9590', fontSize: 11, lineHeight: 1.55, margin: '9px 0 12px' }}>Activo 0–30 días · gracia 31–60 días · inactivo después de 60 días. La restricción manual bloquea My AQSLIM inmediatamente, conserva el expediente y puede revertirse.</p>
                       {accessReadiness.entitlement.status === 'suspended' ? <>
                         <input value={accessRestrictionConfirmation} onChange={event => setAccessRestrictionConfirmation(event.target.value)} placeholder="Escribe RESTAURAR" style={inputStyle} />
-                        <button type="button" onClick={() => void changeAccessRestriction('restore')} disabled={accessRestrictionSaving || accessRestrictionConfirmation.trim().toUpperCase() !== 'RESTAURAR'} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.42)', background: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTAURAR' ? 'rgba(106,160,116,.16)' : 'rgba(255,255,255,.025)', color: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTAURAR' ? '#9ED4A8' : '#77716A', cursor: accessRestrictionSaving ? 'wait' : 'pointer', fontWeight: 600 }}>{accessRestrictionSaving ? 'Verificando…' : 'Restaurar acceso'}</button>
+                        <button type="button" onClick={() => void changeAccessRestriction('restore')} disabled={candidateReadOnly || accessRestrictionSaving || accessRestrictionConfirmation.trim().toUpperCase() !== 'RESTAURAR'} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.42)', background: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTAURAR' ? 'rgba(106,160,116,.16)' : 'rgba(255,255,255,.025)', color: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTAURAR' ? '#9ED4A8' : '#77716A', cursor: accessRestrictionSaving ? 'wait' : 'pointer', fontWeight: 600 }}>{accessRestrictionSaving ? 'Verificando…' : 'Restaurar acceso'}</button>
                       </> : <>
                         <input value={accessRestrictionConfirmation} onChange={event => setAccessRestrictionConfirmation(event.target.value)} placeholder="Escribe RESTRINGIR" style={inputStyle} />
-                        <button type="button" onClick={() => void changeAccessRestriction('suspend')} disabled={accessRestrictionSaving || accessRestrictionConfirmation.trim().toUpperCase() !== 'RESTRINGIR'} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(224,160,160,.42)', background: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTRINGIR' ? 'rgba(224,160,160,.12)' : 'rgba(255,255,255,.025)', color: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTRINGIR' ? '#E0A0A0' : '#77716A', cursor: accessRestrictionSaving ? 'wait' : 'pointer', fontWeight: 600 }}>{accessRestrictionSaving ? 'Verificando…' : 'Restringir acceso'}</button>
+                        <button type="button" onClick={() => void changeAccessRestriction('suspend')} disabled={candidateReadOnly || accessRestrictionSaving || accessRestrictionConfirmation.trim().toUpperCase() !== 'RESTRINGIR'} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(224,160,160,.42)', background: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTRINGIR' ? 'rgba(224,160,160,.12)' : 'rgba(255,255,255,.025)', color: accessRestrictionConfirmation.trim().toUpperCase() === 'RESTRINGIR' ? '#E0A0A0' : '#77716A', cursor: accessRestrictionSaving ? 'wait' : 'pointer', fontWeight: 600 }}>{accessRestrictionSaving ? 'Verificando…' : 'Restringir acceso'}</button>
                       </>}
                       {accessRestrictionMessage ? <div style={{ marginTop: 10, color: accessRestrictionMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 11, lineHeight: 1.5 }}>{accessRestrictionMessage}</div> : null}
                     </div> : null}
@@ -1691,7 +1723,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                     <input value={accessInvitationSubject} onChange={event => setAccessInvitationSubject(event.target.value)} maxLength={500} placeholder="Asunto de la invitación" style={inputStyle} />
                     <label style={{ ...labelStyle, marginTop: 12 }}>Mensaje</label>
                     <textarea value={accessInvitationBody} onChange={event => setAccessInvitationBody(event.target.value)} rows={8} placeholder="Prepara primero la invitación para generar una plantilla editable…" style={{ ...inputStyle, resize: 'vertical' }} />
-                    <button onClick={saveAccessInvitationDraft} disabled={accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? 'rgba(201,168,76,.08)' : '#C9A84C', color: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? '#8E8881' : '#0A0A0A', cursor: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{accessInvitationSaving ? 'Guardando…' : 'Guardar borrador de invitación Preview'}</button>
+                    <button onClick={saveAccessInvitationDraft} disabled={candidateReadOnly || accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview} style={{ width: '100%', marginTop: 14, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? 'rgba(201,168,76,.08)' : '#C9A84C', color: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? '#8E8881' : '#0A0A0A', cursor: accessInvitationSaving || !accessInvitationBody.trim() || !accessReadiness?.readyForReview ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{accessInvitationSaving ? 'Guardando…' : 'Guardar borrador de invitación Preview'}</button>
                     {accessInvitationMessage && <div style={{ marginTop: 12, color: accessInvitationMessage.startsWith('✓') ? '#9ED4A8' : accessInvitationMessage.startsWith('No se') ? '#E0A0A0' : '#E2C87A', fontSize: 12, lineHeight: 1.5 }}>{accessInvitationMessage}</div>}
                   </div>}
                 </div>

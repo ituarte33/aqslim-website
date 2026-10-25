@@ -34,3 +34,11 @@ Existing portal access restrictions retain their approved storage contract. Rest
 - Preserve the rollback target above. A code rollback does not reverse subsequent clinical writes; no destructive data migration is included.
 
 After Rom approves publication, configure the production enablement flag, build a production deployment without assigning the public domains, check it, then promote that exact staged deployment. Do not promote this Preview build as proof of Production behavior.
+
+## October 25 — corrections from Founder screenshots
+
+The Clinic My AQSLIM tab now checks the published plan before displaying FAST 36 scheduling. Plans without FAST 36, missing plans, loading states and failed plan reads expose no schedule form. A patient switch cannot reuse the previous patient's plan status. No existing schedule or clinical record is deleted.
+
+Candidate save, publication, access-change and status-change controls are disabled in the UI, and their event handlers return without issuing writes. The portaled plan editor and materials panel inherit the same mode. The existing server-side write block remains unchanged. Navigation, account reconciliation and read-only records remain available.
+
+Validation: TypeScript passed; all 154 Clinic/materials tests passed; seven synthetic React server-render scenarios passed. Browser plugin is unavailable and no local Chromium binary is installed, so browser interactions and visual confirmation of these corrections remain pending. These changes do not enable or deploy Production, alter access grants, migrate patient data or change Drive sharing.

@@ -99,6 +99,7 @@ export function ClinicPlanCompatibility() {
   const pathname = usePathname()
   const [host, setHost] = useState<HTMLElement | null>(null)
   const [active, setActive] = useState(false)
+  const [readOnly, setReadOnly] = useState(true)
   const [identity, setIdentity] = useState<PatientIdentity | null>(null)
   const [patientId, setPatientId] = useState('')
   const [draft, setDraft] = useState<PlanData>(emptyPlan)
@@ -144,6 +145,8 @@ export function ClinicPlanCompatibility() {
         nav.insertAdjacentElement('afterend', planHost)
       }
       setHost(planHost)
+      const clinicMode = planHost.closest('[data-clinic-mode]')?.getAttribute('data-clinic-mode')
+      setReadOnly(clinicMode !== 'preview' && clinicMode !== 'production')
 
       const next = planHost.nextElementSibling as HTMLElement | null
       if (next && !next.dataset.clinicPlanHost) {
@@ -231,6 +234,7 @@ export function ClinicPlanCompatibility() {
   const changedFields = comparison.filter(item => item.changed)
 
   async function persistDraft(status: 'Draft' | 'Ready for Review') {
+    if (readOnly) return false
     if (!patientId || !identity) return
     const intendedDraft = normalizePlan({ ...draft, status })
     setSaving(true)
@@ -273,6 +277,7 @@ export function ClinicPlanCompatibility() {
   }
 
   async function publishPlan() {
+    if (readOnly) return
     if (!patientId || !identity || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 || publishGuard.current) return
     publishGuard.current = true
     const intendedPlan = normalizePlan(draft)
@@ -393,22 +398,22 @@ export function ClinicPlanCompatibility() {
               </div>
             </div>
 
-            <button onClick={saveDraft} disabled={saving || publishing || !patientId} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || publishing || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || publishing || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || publishing || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar como borrador Preview'}</button>
-            <button onClick={markReady} disabled={saving || publishing || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || publishing || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || publishing || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || publishing || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
-            <button onClick={() => setPublishReviewOpen(true)} disabled={saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.35)', background: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'rgba(226,142,142,.035)' : 'rgba(226,142,142,.12)', color: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? '#9A7070' : '#F0B1B1', cursor: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{draft.status === 'Published' ? 'Publicado en My AQSLIM' : changedFields.length === 0 ? 'My AQSLIM ya está actualizado' : 'Revisar publicación en My AQSLIM'}</button>
+            <button onClick={saveDraft} disabled={readOnly || saving || publishing || !patientId} style={{ width: '100%', marginTop: 16, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(201,168,76,.45)', background: saving || publishing || !patientId ? 'rgba(201,168,76,.08)' : '#C9A84C', color: saving || publishing || !patientId ? '#8E8881' : '#0A0A0A', cursor: saving || publishing || !patientId ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar como borrador Preview'}</button>
+            <button onClick={markReady} disabled={readOnly || saving || publishing || !patientId || !readiness.ready} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(106,160,116,.45)', background: saving || publishing || !patientId || !readiness.ready ? 'rgba(255,255,255,.025)' : 'rgba(106,160,116,.16)', color: saving || publishing || !patientId || !readiness.ready ? '#6F6A64' : '#BDE5C5', cursor: saving || publishing || !patientId || !readiness.ready ? 'not-allowed' : 'pointer', fontWeight: 600 }}>Marcar listo para publicar</button>
+            <button onClick={() => setPublishReviewOpen(true)} disabled={readOnly || saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 9, border: '1px solid rgba(226,142,142,.35)', background: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'rgba(226,142,142,.035)' : 'rgba(226,142,142,.12)', color: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? '#9A7070' : '#F0B1B1', cursor: saving || publishing || !patientId || draft.status !== 'Ready for Review' || !readiness.ready || changedFields.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{draft.status === 'Published' ? 'Publicado en My AQSLIM' : changedFields.length === 0 ? 'My AQSLIM ya está actualizado' : 'Revisar publicación en My AQSLIM'}</button>
             <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>Publicar requiere una segunda confirmación explícita y después relee el plan del paciente antes de mostrar éxito.</div>
             {publishReviewOpen && <div style={{ marginTop: 12, padding: 14, borderRadius: 11, border: '1px solid rgba(226,142,142,.38)', background: 'rgba(226,142,142,.06)' }}>
               <div style={{ color: '#F0B1B1', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Confirmación final</div>
               <div style={{ color: '#D9D5CF', fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>Vas a reemplazar el plan visible en My AQSLIM para <strong>{identity.name}</strong> con <strong>{draft.planLabel}</strong>. Se actualizarán {changedFields.length} campos. El plan anterior quedará en el historial de Clinic; sus materiales dejarán de compartirse si cambia el plan.</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
-                <button type="button" onClick={() => setPublishReviewOpen(false)} disabled={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: '#A9A49E', cursor: publishing ? 'not-allowed' : 'pointer' }}>Cancelar</button>
-                <button type="button" onClick={() => void publishPlan()} disabled={publishing} aria-busy={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(226,142,142,.55)', background: publishing ? 'rgba(226,142,142,.05)' : '#D88B8B', color: publishing ? '#9A7070' : '#0A0A0A', cursor: publishing ? 'wait' : 'pointer', fontWeight: 700 }}>{publishing ? 'Publicando y verificando…' : 'Confirmar publicación'}</button>
+                <button type="button" onClick={() => setPublishReviewOpen(false)} disabled={readOnly || publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: '#A9A49E', cursor: publishing ? 'not-allowed' : 'pointer' }}>Cancelar</button>
+                <button type="button" onClick={() => void publishPlan()} disabled={readOnly || publishing} aria-busy={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(226,142,142,.55)', background: publishing ? 'rgba(226,142,142,.05)' : '#D88B8B', color: publishing ? '#9A7070' : '#0A0A0A', cursor: publishing ? 'wait' : 'pointer', fontWeight: 700 }}>{publishing ? 'Publicando y verificando…' : 'Confirmar publicación'}</button>
               </div>
             </div>}
             {message && <div role="status" aria-live="polite" style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
           </div>
 
-          <ClinicPlanMaterialsPanel key={`${patientId}-${livePlan?.phaseStart}-${livePlan?.dietName}-${livePlan?.phase}-${livePlan?.specialInstructions}-${livePlan?.planLabel}-${livePlan?.calorieTarget}`} patientId={patientId} />
+          <ClinicPlanMaterialsPanel key={`${patientId}-${livePlan?.phaseStart}-${livePlan?.dietName}-${livePlan?.phase}-${livePlan?.specialInstructions}-${livePlan?.planLabel}-${livePlan?.calorieTarget}`} patientId={patientId} readOnly={readOnly} />
 
           <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 20, background: 'rgba(255,255,255,.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

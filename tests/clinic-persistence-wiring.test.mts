@@ -128,7 +128,7 @@ test('consultation readiness blocks invalid dates and payment amounts before per
   const route = await readFile(new URL('../app/api/preview/clinic-consultations/route.ts', import.meta.url), 'utf8')
   assert.match(preview, /Lista para guardar/)
   assert.match(preview, /Las mediciones, recomendaciones y próxima cita pueden quedar vacías/)
-  assert.match(preview, /disabled=\{consultationSaving \|\| !consultationReadiness\.ready\}/)
+  assert.match(preview, /disabled=\{candidateReadOnly \|\| consultationSaving \|\| !consultationReadiness\.ready\}/)
   assert.match(route, /normalizeClinicIsoDate\(body\.consultationDate\)/)
   assert.match(route, /error: 'invalid_payment'/)
 })
