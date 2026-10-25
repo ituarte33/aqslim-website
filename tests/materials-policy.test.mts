@@ -27,7 +27,7 @@ test('Clinic candidate distinguishes summaries and unverified attachment dates w
 
 test('the original Jing PDF follows Jing only and the summary points to the linked document', () => {
   const document = phaseGuideDocument('Jing')!
-  assert.equal(document.url, 'https://drive.google.com/file/d/1pr47HsDbGHufCs3HJRiMEm4phmhPwAWR/view')
+  assert.equal(document.url, 'https://drive.google.com/file/d/1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS/view')
   assert.equal(phaseGuideDocument('Qi'), null)
   assert.equal(phaseGuideDocument(null), null)
   const reviewed = reviewClinicMaterials([phaseGuideMaterial('Jing')!, document], true)

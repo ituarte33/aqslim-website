@@ -90,8 +90,8 @@ export function phaseGuideDocument(value: string | null | undefined): PortalMate
   if (toCanonicalPhaseName(value ?? null) !== 'Jing') return null
   return {
     id: 'phase-document-jing',
-    url: 'https://drive.google.com/file/d/1pr47HsDbGHufCs3HJRiMEm4phmhPwAWR/view',
-    filename: 'KenkoPath Fase1 JING Claro.pdf',
+    url: 'https://drive.google.com/file/d/1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS/view',
+    filename: 'KenkoPath Fase1 JING Claro - Una vez por semana.pdf',
     type: 'application/pdf',
     kind: 'guide',
     titleEs: 'Guía completa de Jing · PDF',
