@@ -1,5 +1,7 @@
 'use server'
 
+import { patientActivePlanAllowsFast36 } from '@/lib/patient-active-plan'
+
 import { getClinicFast36Sessions, saveClinicFast36Session } from '@/lib/clinic-fast36-store'
 import { revalidatePath } from 'next/cache'
 import {
@@ -27,6 +29,7 @@ export async function confirmFast36SessionAction(
 ): Promise<Fast36ConfirmationResult> {
   try {
     const patient = await requireOwnPatient('fasting:write:self')
+    if (!await patientActivePlanAllowsFast36(patient)) return { ok: false, error: 'FAST 36 no forma parte de tu plan actual.' }
     if (!AIRTABLE_RECORD_ID.test(sessionId) || !isFast36ConfirmationOutcome(outcome)) {
       return { ok: false, error: 'La confirmación no es válida.' }
     }

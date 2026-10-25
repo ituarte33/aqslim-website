@@ -1,3 +1,4 @@
+import { decodeClinicMaterialEvent } from '@/lib/clinic-plan-materials'
 import { decodeClinicFast36 } from '@/lib/clinic-fast36'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
     if (!response.ok) return NextResponse.json({ ok: false }, { status: 500 })
     const data = await response.json()
 
-    const notes = (data.records ?? []).map(mapNote)
+    const notes = (data.records ?? []).filter((record: any) => !decodeClinicMaterialEvent(record.fields?.[F.NOTE])).map(mapNote)
 
     return NextResponse.json({ ok: true, notes })
   } catch (error) {

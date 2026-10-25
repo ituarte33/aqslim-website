@@ -1,3 +1,5 @@
+import { currentPlanAttachments } from '@/lib/clinic-plan-materials'
+import { getClinicMaterialEvents } from '@/lib/clinic-plan-materials-store'
 import 'server-only'
 
 import { cache } from 'react'
@@ -31,9 +33,12 @@ export const getPatientPortalMaterials = cache(async (
   const attachments = Array.isArray(plan.fields['Materiales asignados'])
     ? plan.fields['Materiales asignados'].filter(validAttachment)
     : []
-  const assignedMaterials = visiblePlanMaterials({ attachments, kenkhoTier, weekInPhase })
-  const phaseMaterial = phaseGuideMaterial(plan.fields['Fase Actual'])
   const previewReview = isClinicPreviewEnvironment({ VERCEL_ENV: process.env.VERCEL_ENV, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF })
+  const currentAttachments = previewReview
+    ? currentPlanAttachments(plan, await getClinicMaterialEvents(patient.id))
+    : attachments
+  const assignedMaterials = visiblePlanMaterials({ attachments: currentAttachments, kenkhoTier, weekInPhase })
+  const phaseMaterial = phaseGuideMaterial(plan.fields['Fase Actual'])
   const fullGuide = previewReview ? phaseGuideDocument(plan.fields['Fase Actual']) : null
 
   return {
@@ -42,7 +47,7 @@ export const getPatientPortalMaterials = cache(async (
       ...(phaseMaterial ? [phaseMaterial] : []),
       ...(fullGuide ? [fullGuide] : []),
       ...assignedMaterials,
-    ], previewReview, plan.fields['Dieta en Nutrimind'] === 'Plan Jing' && /Sin FAST 36 durante este periodo/i.test(String(plan.fields['Instrucciones Especiales'] ?? ''))),
+    ], previewReview),
     previewReview,
   }
 })

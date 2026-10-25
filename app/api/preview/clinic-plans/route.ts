@@ -1,3 +1,5 @@
+import { materialPlanRevision, planAttachments } from '@/lib/clinic-plan-materials'
+import { saveClinicMaterialEvent } from '@/lib/clinic-plan-materials-store'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import {
@@ -425,6 +427,22 @@ export async function PUT(request: NextRequest) {
     const linkedPlanIds = patient.fields['Plan AQSLIM']
     const linkedPlanId = Array.isArray(linkedPlanIds) && linkedPlanIds[0] ? String(linkedPlanIds[0]) : null
     const fields = livePlanFields(draft, patientName)
+    if (linkedPlanId) {
+      const previous = await getPlanById(linkedPlanId)
+      const nextRevision = materialPlanRevision({ id: previous.id, fields: {
+        'Notas del Plan': draft.planLabel, 'Dieta en Nutrimind': draft.dietName,
+        'Fase Actual': draft.phase, 'Fecha Inicio Tratamiento': draft.treatmentStart,
+        'Fecha Inicio Fase Actual': draft.phaseStart, 'Instrucciones Especiales': draft.specialInstructions,
+        'Calorías Objetivo': draft.calorieTarget ?? '',
+      } })
+      // Archive and verify before replacing a plan. A failed archive aborts publication.
+      if (nextRevision !== materialPlanRevision(previous)) await saveClinicMaterialEvent(patient.id, {
+        kind: 'clinic-plan-materials-v1', action: 'archive', planId: previous.id,
+        revision: materialPlanRevision(previous), at: new Date().toISOString(),
+        label: String(previous.fields['Notas del Plan'] ?? previous.fields['Dieta en Nutrimind'] ?? 'Plan anterior'),
+        attachments: planAttachments(previous), planFields: previous.fields,
+      }, actor.email)
+    }
     const published = linkedPlanId
       ? await updatePlan(linkedPlanId, fields, { typecast: true })
       : await createPlanForPatient(patient.id, fields, { typecast: true })

@@ -1,3 +1,4 @@
+import { patientActivePlanAllowsFast36 } from '@/lib/patient-active-plan'
 import { getClinicFast36Sessions } from '@/lib/clinic-fast36-store'
 import { redirect } from 'next/navigation'
 import { getFast36SessionsByPatient } from '@/lib/airtable'
@@ -16,6 +17,7 @@ export const metadata = {
 
 export default async function Fast36Page() {
   const patient = await requireOwnPatient('fasting:read:self')
+  if (!await patientActivePlanAllowsFast36(patient)) redirect('/my-aqslim/plan')
   const previewSessions = await getClinicFast36Sessions(patient.id)
   const records = previewSessions.length ? [] : await getFast36SessionsByPatient(patient.id)
   if (!records.length && !previewSessions.length) redirect('/my-aqslim/pilot')
