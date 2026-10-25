@@ -50,11 +50,13 @@ export function Fast36View({
   profileId,
   initialLanguage,
   sessions,
+  clinicPreviewPatientId,
 }: {
   firstName: string
   profileId: string
   initialLanguage: 'es' | 'en'
   sessions: Fast36Session[]
+  clinicPreviewPatientId?: string
 }) {
   const router = useRouter()
   const [language] = usePortalLanguage(initialLanguage, profileId)
@@ -98,11 +100,13 @@ export function Fast36View({
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/my-aqslim/pilot" className={styles.back}>← {es ? 'Panel' : 'Dashboard'}</Link>
+        <Link href={clinicPreviewPatientId ? `/clinic-preview?patient=${encodeURIComponent(clinicPreviewPatientId)}` : "/my-aqslim/pilot"} className={styles.back}>← {es ? 'Panel' : 'Dashboard'}</Link>
         <span className={styles.brand}>AQ<span>SLIM</span> · FAST 36</span>
       </header>
 
       <div className={styles.content}>
+        {clinicPreviewPatientId && <p className={styles.lead}>Vista de seguimiento Clinic Preview · sólo lectura.</p>}
+        {current.provisional && <p className={styles.lead} role="status">{es ? 'Horario provisional, pendiente de confirmar por el paciente. El contador representa únicamente el horario propuesto.' : 'Provisional schedule awaiting patient confirmation. The timer reflects the proposed schedule only.'}</p>}
         <p className={styles.eyebrow}>{es ? `SEMANA ${current.week} DE 6 · ${firstName.toUpperCase()}` : `WEEK ${current.week} OF 6 · ${firstName.toUpperCase()}`}</p>
         <div className={styles.status}><span />{STATUS_LABELS[status][language]}</div>
         <h1>{status === 'active'
@@ -136,7 +140,7 @@ export function Fast36View({
           <div className={styles.timerMeta}><span>{Math.round(progress)}% {es ? 'del horario' : 'of schedule'}</span><span>36 {es ? 'horas' : 'hours'}</span></div>
         </section>
 
-        {status === 'awaiting_confirmation' ? (
+        {status === 'awaiting_confirmation' && !current.provisional && !clinicPreviewPatientId ? (
           <section className={styles.confirmationPanel} aria-labelledby="fast36-confirmation-title">
             <small>{es ? 'CONFIRMA TU RESULTADO' : 'CONFIRM YOUR RESULT'}</small>
             <h2 id="fast36-confirmation-title">{es ? '¿Cómo terminó esta sesión?' : 'How did this session end?'}</h2>

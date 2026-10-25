@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import type { PatientPortalData } from '@/lib/patient-portal'
 import type { PhaseGuide } from '@/lib/phase-materials'
+import type { PortalMaterial } from '@/lib/materials-policy'
 import { ChevronIcon, InfoIcon, MaterialsIcon } from '../../portal-icons'
 import { PortalShell } from '../../portal-shell'
 import { usePortalLanguage } from '../../use-portal-language'
 import styles from '../../portal.module.css'
 
-export function PhaseGuideView({ data, guide }: { data: PatientPortalData; guide: PhaseGuide }) {
+export function PhaseGuideView({ data, guide, previewReview = false, fullGuide = null }: { data: PatientPortalData; guide: PhaseGuide; previewReview?: boolean; fullGuide?: PortalMaterial | null }) {
   const [language] = usePortalLanguage(data.language, data.clienteId)
   const es = language === 'es'
   const objectives = es ? guide.objectivesEs : guide.objectivesEn
@@ -23,6 +24,15 @@ export function PhaseGuideView({ data, guide }: { data: PatientPortalData; guide
           <p>{es ? guide.subtitleEs : guide.subtitleEn}</p>
         </div>
       </section>
+
+      {previewReview ? (
+        <div className={styles.dataNotice}>
+          <InfoIcon />
+          <p>{fullGuide
+            ? (es ? 'Este es un resumen de tu fase. El PDF original está disponible abajo para revisión.' : 'This is a phase summary. The original Spanish PDF is available below for review.')
+            : (es ? 'Este es un resumen de tu fase. La guía completa todavía no está vinculada en tus materiales.' : 'This is a summary of your phase. The full guide has not been linked in your materials yet.')}</p>
+        </div>
+      ) : null}
 
       <section className={`${styles.panel} ${styles.phaseGuideLead}`}>
         <div className={styles.materialIcon}><MaterialsIcon /></div>
@@ -48,6 +58,9 @@ export function PhaseGuideView({ data, guide }: { data: PatientPortalData; guide
       </div>
 
       <div className={styles.planActions}>
+        {fullGuide ? <a href={fullGuide.url} target="_blank" rel="noreferrer" className={styles.outlineAction}>
+          {es ? 'Abrir guía completa · PDF' : 'Open full guide · Spanish PDF'} <ChevronIcon />
+        </a> : null}
         <Link href="/my-aqslim/materials" className={styles.outlineAction}>
           {es ? 'Volver a mis materiales' : 'Back to my materials'} <ChevronIcon />
         </Link>

@@ -1,3 +1,5 @@
+import { currentPlanAttachments } from '@/lib/clinic-plan-materials'
+import { getClinicMaterialEvents } from '@/lib/clinic-plan-materials-store'
 import 'server-only'
 
 import { cache } from 'react'
@@ -6,10 +8,12 @@ import { requireOwnPatient } from '@/lib/auth'
 import {
   normalizeKenkhoTier,
   visiblePlanMaterials,
+  reviewClinicMaterials,
   type PatientMaterialsData,
   type PlanMaterialAttachment,
 } from '@/lib/materials-policy'
-import { phaseGuideMaterial } from '@/lib/phase-materials'
+import { phaseGuideMaterial, phaseGuideDocument } from '@/lib/phase-materials'
+import { isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
 function validAttachment(value: AirtableAttachment): value is AirtableAttachment & PlanMaterialAttachment {
   return Boolean(value.id && value.url && value.filename)
@@ -29,11 +33,21 @@ export const getPatientPortalMaterials = cache(async (
   const attachments = Array.isArray(plan.fields['Materiales asignados'])
     ? plan.fields['Materiales asignados'].filter(validAttachment)
     : []
-  const assignedMaterials = visiblePlanMaterials({ attachments, kenkhoTier, weekInPhase })
+  const previewReview = isClinicRuntimeEnvironment({ VERCEL_ENV: process.env.VERCEL_ENV, MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF })
+  const currentAttachments = previewReview
+    ? currentPlanAttachments(plan, await getClinicMaterialEvents(patient.id))
+    : attachments
+  const assignedMaterials = visiblePlanMaterials({ attachments: currentAttachments, kenkhoTier, weekInPhase })
   const phaseMaterial = phaseGuideMaterial(plan.fields['Fase Actual'])
+  const fullGuide = previewReview ? phaseGuideDocument(plan.fields['Fase Actual']) : null
 
   return {
     kenkhoTier,
-    materials: phaseMaterial ? [phaseMaterial, ...assignedMaterials] : assignedMaterials,
+    materials: reviewClinicMaterials([
+      ...(phaseMaterial ? [phaseMaterial] : []),
+      ...(fullGuide ? [fullGuide] : []),
+      ...assignedMaterials,
+    ], previewReview),
+    previewReview,
   }
 })

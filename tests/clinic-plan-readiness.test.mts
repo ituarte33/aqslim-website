@@ -40,3 +40,8 @@ test('Clinic plan comparison identifies only changed delivery fields', () => {
   assert.deepEqual(comparison.filter(field => field.changed).map(field => field.key), ['phaseWeek', 'currentWeightKg'])
   assert.equal(comparison.find(field => field.key === 'currentWeightKg')?.draft, '97.5 kg')
 })
+
+test('Internal cadence is not falsely compared against published patient fields', () => {
+ const { visitCadenceDays, ...published } = complete
+ assert.deepEqual(compareClinicPlans(published, complete).filter(field => field.changed), [])
+})

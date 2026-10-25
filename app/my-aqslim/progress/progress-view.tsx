@@ -16,10 +16,10 @@ import { usePortalLanguage } from '../use-portal-language'
 import styles from '../portal.module.css'
 import { ProgressChart } from './progress-chart'
 
-function formatDate(value: string | null, language: 'es' | 'en', includeYear = true) {
+function formatDate(value: string | null, language: 'es' | 'en', includeYear = true, calendarDate = false) {
   if (!value) return language === 'es' ? 'Por confirmar' : 'To be confirmed'
   return new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : 'en-US', {
-    timeZone: 'America/Los_Angeles',
+    timeZone: calendarDate && /^\d{4}-\d{2}-\d{2}$/.test(value) ? 'UTC' : 'America/Los_Angeles',
     month: 'short',
     day: 'numeric',
     year: includeYear ? 'numeric' : undefined,
@@ -84,7 +84,7 @@ export function ProgressView({ data, demo = false, demoProfileId }: ProgressView
         <div className={styles.progressMetric}>
           <span>{es ? 'Peso actual' : 'Current weight'}</span>
           <strong>{formatWeight(data.currentWeight, data.unit)}</strong>
-          <small>{formatDate(latest?.date ?? null, language)}</small>
+          <small>{formatDate(latest?.date ?? null, language, true, latest?.calendarDate)}</small>
           <b>{percent}</b>
           <em>{es ? 'de tu peso inicial' : 'of starting weight'}</em>
         </div>
@@ -110,14 +110,16 @@ export function ProgressView({ data, demo = false, demoProfileId }: ProgressView
           <div className={styles.roundIcon}><BuildingIcon /></div>
           <div className={styles.measurementValue}>
             <strong>{formatWeight(data.currentWeight, data.unit)}</strong>
-            <span>{formatDate(latest?.date ?? null, language)}</span>
+            <span>{formatDate(latest?.date ?? null, language, true, latest?.calendarDate)}</span>
             <b>{formatSource(latest?.source, language, demo)}</b>
           </div>
           <div className={styles.sourceText}>
-            <span>{latest?.source === 'AQSLIM (FAST 36)'
+            <span>{latest?.calendarDate
+              ? (es ? 'Peso reportado por ti y registrado por el equipo en Clinic.' : 'Weight reported by you and recorded by the team in Clinic.')
+              : latest?.source === 'AQSLIM (FAST 36)'
               ? (es ? 'Registrado en tu seguimiento FAST 36.' : 'Recorded in your FAST 36 tracking.')
               : (es ? 'Registrado en tu consulta con el equipo AQSLIM.' : 'Recorded during your consultation with the AQSLIM team.')}</span>
-            <b><i />{es ? 'Dato verificado' : 'Verified data'}</b>
+            <b><i />{latest?.calendarDate ? (es ? 'Peso reportado' : 'Reported weight') : (es ? 'Dato verificado' : 'Verified data')}</b>
           </div>
         </div>
       </section>
@@ -150,7 +152,7 @@ export function ProgressView({ data, demo = false, demoProfileId }: ProgressView
           <div className={styles.historyRows}>
             {[...data.measurements].reverse().map(measurement => (
               <div key={measurement.id}>
-                <span>{measurement.label || formatDate(measurement.date, language)}</span>
+                <span>{measurement.label || formatDate(measurement.date, language, true, measurement.calendarDate)}</span>
                 <strong>{formatWeight(measurement.weight, data.unit)}</strong>
                 <small><BuildingIcon />{formatSource(measurement.source, language, demo)}</small>
               </div>

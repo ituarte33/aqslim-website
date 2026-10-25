@@ -1,23 +1,25 @@
+import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { resolveClinicAccessSnapshot } from '@/lib/clinic-access-snapshot'
 import { executeClinicAccessRestriction } from '@/lib/clinic-access-restriction-executor'
-import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
 function environment() {
   return {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    assertClinicSourceWriteAllowed()
     const currentEnvironment = environment()
-    if (!isClinicPreviewEnvironment(currentEnvironment)) throw new Error('NOT_FOUND')
+    if (!isClinicRuntimeEnvironment(currentEnvironment)) throw new Error('NOT_FOUND')
     const actor = await getActor()
     if (!actor) throw new Error('UNAUTHENTICATED')
-    if (!isClinicFounderIdentity({ email: actor.email, environment: currentEnvironment })) throw new Error('FORBIDDEN')
+    if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment: currentEnvironment })) throw new Error('FORBIDDEN')
 
     const body = await request.json() as Record<string, unknown>
     const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : ''

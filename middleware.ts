@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { clinicRuntimeEnvironment, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
 
 const isPublicRoute = createRouteMatcher([
@@ -16,7 +17,7 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 const isPatientPortalRoute = createRouteMatcher(['/my-aqslim(.*)'])
-const isClinicPreviewRoute = createRouteMatcher(['/clinic-preview(.*)'])
+const isClinicPreviewRoute = createRouteMatcher(['/clinic-preview(.*)', '/clinic'])
 
 function isOperationalRoute(pathname: string) {
   if (pathname === '/dashboard/plan-preview' || pathname.startsWith('/dashboard/plan-preview/')) {
@@ -56,7 +57,7 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  if (isClinicPreview && isClinicPreviewRoute(req) && !isPublicRoute(req)) {
+  if (isClinicRuntimeEnvironment(clinicRuntimeEnvironment()) && isClinicPreviewRoute(req) && !isPublicRoute(req)) {
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.redirect(new URL('/clinic-preview/login', req.url))

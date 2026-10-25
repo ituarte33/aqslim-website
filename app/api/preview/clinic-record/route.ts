@@ -1,22 +1,23 @@
+import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById, getConsultasByPatientId, getCuestionariosByCliente } from '@/lib/airtable'
 import { buildClinicRecordSnapshot } from '@/lib/clinic-record'
-import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
 function clinicEnvironment() {
   return {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 }
 
 async function requireFounder() {
   const environment = clinicEnvironment()
-  if (!isClinicPreviewEnvironment(environment)) throw new Error('NOT_FOUND')
+  if (!isClinicRuntimeEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
 }
 
 export async function GET(request: NextRequest) {
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }

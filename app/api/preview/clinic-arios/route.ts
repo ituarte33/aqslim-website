@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireActor } from '@/lib/auth'
-import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
 function clinicEnvironment() {
   return {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 }
 
@@ -22,10 +22,10 @@ function extractText(data: any): string {
 
 export async function POST(request: NextRequest) {
   const environment = clinicEnvironment()
-  if (!isClinicPreviewEnvironment(environment)) return NextResponse.json({ ok: false }, { status: 404 })
+  if (!isClinicRuntimeEnvironment(environment)) return NextResponse.json({ ok: false }, { status: 404 })
 
   const actor = await requireActor()
-  if (!isClinicFounderIdentity({ email: actor.email, environment })) {
+  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) {
     return NextResponse.json({ ok: false }, { status: 403 })
   }
 

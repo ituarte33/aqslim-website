@@ -57,7 +57,10 @@ export function MaterialsView({ data, materialsData, demo = false, demoProfileId
               <span>{es ? item.typeEs : item.typeEn}</span>
               <h2>{es ? item.titleEs : item.titleEn}</h2>
               <p>{es ? item.detailEs : item.detailEn}</p>
-              <small>{es ? 'Asignado a tu plan' : 'Assigned to your plan'}</small>
+              {materialsData.previewReview && item.kind === 'nutrition-plan'
+                ? <p>{item.filename}</p>
+                : null}
+              <small>{item.previous ? (es ? 'Referencia anterior · No vigente' : 'Previous reference · Not current') : (es ? 'Asignado a tu plan' : 'Assigned to your plan')}</small>
               <a
                 className={styles.materialAction}
                 href={item.url}

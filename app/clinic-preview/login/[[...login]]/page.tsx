@@ -1,14 +1,14 @@
 import { SignIn } from '@clerk/nextjs'
 import { redirect } from 'next/navigation'
-import { isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
 export default function ClinicPreviewLoginPage() {
   const environment = {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 
-  if (!isClinicPreviewEnvironment(environment)) redirect('/my-aqslim/login')
+  if (!isClinicRuntimeEnvironment(environment)) redirect('/my-aqslim/login')
 
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#0A0A0A', color: '#FAFAF8' }}>

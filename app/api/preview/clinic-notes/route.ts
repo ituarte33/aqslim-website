@@ -1,7 +1,11 @@
+import { clinicRecordFilter, clinicRecordKey, clinicRecordInScope, clinicUsesPreviewRecords } from '@/lib/clinic-runtime-policy'
+import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
+import { decodeClinicMaterialEvent } from '@/lib/clinic-plan-materials'
+import { decodeClinicFast36 } from '@/lib/clinic-fast36'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
-import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import {
   CLINIC_FOLLOWUP_PRIORITIES,
@@ -43,7 +47,7 @@ const F = {
 function clinicEnvironment() {
   return {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 }
 
@@ -60,10 +64,10 @@ function headers() {
 
 async function requireFounder() {
   const environment = clinicEnvironment()
-  if (!isClinicPreviewEnvironment(environment)) throw new Error('NOT_FOUND')
+  if (!isClinicRuntimeEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 
@@ -77,6 +81,7 @@ function escapeFormula(value: string) {
 
 function mapNote(record: any) {
   const rawNote = record?.fields?.[F.NOTE] ?? ''
+  const fast36 = decodeClinicFast36(rawNote, record?.id ?? '')
   const followup = decodeClinicFollowup(rawNote)
   const messageDraft = decodeClinicMessageDraft(rawNote)
   return {
@@ -85,7 +90,7 @@ function mapNote(record: any) {
     authorEmail: record?.fields?.[F.AUTHOR_EMAIL] ?? '',
     authorLabel: record?.fields?.[F.AUTHOR_LABEL] ?? '',
     noteType: record?.fields?.[F.NOTE_TYPE] ?? 'General',
-    note: followup?.action ?? messageDraft?.body ?? rawNote,
+    note: fast36 ? `FAST 36 · semana ${fast36.week} · inicio local ${fast36.localStart} (${fast36.timeZone}) · ${fast36.provisional ? 'horario provisional' : 'horario confirmado'} · resultado: ${fast36.status}` : followup?.action ?? messageDraft?.body ?? rawNote,
     followupRequired: record?.fields?.[F.FOLLOWUP_REQUIRED] === true,
     followupDate: record?.fields?.[F.FOLLOWUP_DATE] ?? null,
     followup,
@@ -101,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     const params = new URLSearchParams({
       pageSize: '100',
-      filterByFormula: `{Patient Record ID} = "${escapeFormula(patientId)}"`,
+      filterByFormula: clinicRecordFilter(patientId, 'Note Key'),
       returnFieldsByFieldId: 'true',
     })
     params.append('sort[0][field]', 'Note At')
@@ -111,18 +116,19 @@ export async function GET(request: NextRequest) {
     if (!response.ok) return NextResponse.json({ ok: false }, { status: 500 })
     const data = await response.json()
 
-    const notes = (data.records ?? []).map(mapNote)
+    const notes = (data.records ?? []).filter((record: any) => clinicRecordInScope(record.fields ?? {}, patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.NOTE_KEY})).filter((record: any) => !decodeClinicMaterialEvent(record.fields?.[F.NOTE])).map(mapNote)
 
     return NextResponse.json({ ok: true, notes })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    assertClinicSourceWriteAllowed()
     const actor = await requireFounder()
     const body = await request.json()
     const patientId = safeText(body.patientId, 100)
@@ -176,7 +182,7 @@ export async function POST(request: NextRequest) {
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
 
     const now = new Date().toISOString()
-    const noteKey = `${patientId}:${Date.now()}`
+    const noteKey = clinicRecordKey(`${patientId}:${Date.now()}`)
     const patientName = String(patient.fields['Nombre Completo'] ?? 'Paciente')
 
     const fields: Record<string, unknown> = {
@@ -190,7 +196,7 @@ export async function POST(request: NextRequest) {
       [F.NOTE_TYPE]: noteType,
       [F.NOTE]: note,
       [F.FOLLOWUP_REQUIRED]: followupRequired,
-      [F.PREVIEW_ONLY]: true,
+      [F.PREVIEW_ONLY]: clinicUsesPreviewRecords(),
     }
     if (followupDate) fields[F.FOLLOWUP_DATE] = followupDate
 
@@ -218,7 +224,9 @@ export async function POST(request: NextRequest) {
       console.error('clinic_notes_verify_failed', { status: verifyResponse.status })
       return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
     }
-    const savedNote = mapNote(await verifyResponse.json())
+    const rawSavedNote = await verifyResponse.json()
+    if (!clinicRecordInScope(rawSavedNote.fields ?? {}, patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.NOTE_KEY})) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+    const savedNote = mapNote(rawSavedNote)
     if (!savedNote.id || (followupDate && savedNote.followupDate !== followupDate)) {
       console.error('clinic_notes_verify_failed', { hasRecord: Boolean(savedNote.id), expectedDate: Boolean(followupDate) })
       return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
@@ -227,13 +235,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, saved: savedNote })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
+    assertClinicSourceWriteAllowed()
     await requireFounder()
     const body = await request.json()
     const patientId = safeText(body.patientId, 100)
@@ -248,7 +257,7 @@ export async function PATCH(request: NextRequest) {
     })
     if (!currentResponse.ok) return NextResponse.json({ ok: false, error: 'followup_not_found' }, { status: 404 })
     const current = await currentResponse.json()
-    if (current.fields?.[F.PATIENT_ID] !== patientId) {
+    if (!clinicRecordInScope(current.fields ?? {}, patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.NOTE_KEY})) {
       return NextResponse.json({ ok: false, error: 'patient_mismatch' }, { status: 403 })
     }
 
@@ -312,7 +321,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true, updated: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }

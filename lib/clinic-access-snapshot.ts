@@ -1,3 +1,4 @@
+import { clinicRuntimeMode } from './clinic-runtime-policy'
 import 'server-only'
 
 import { clerkClient } from '@clerk/nextjs/server'
@@ -13,7 +14,7 @@ import { isSyntheticPreviewEnvironment } from '@/lib/nutrition/synthetic-preview
 import { pendingPatientSubjectId } from '@/lib/p4-provisioning-policy'
 import { isP5FounderCanaryEnvironment } from '@/lib/p5-founder-canary-policy'
 import { pilotAccessFromMetadata } from '@/lib/pilot-policy'
-import { getPreviewEntitlementSourceRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
+import { getPortalAccessRecordByPatientRecordId, getPreviewEntitlementSourceRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
 
 function clinicEnvironment() {
   return {
@@ -44,7 +45,7 @@ export async function resolveClinicAccessSnapshot({
   const legacyPilotPolicyApplies = isSyntheticPreviewEnvironment(pilotPolicyEnvironment)
     || isP5FounderCanaryEnvironment(pilotPolicyEnvironment)
   const [sourceResult, accountResult] = await Promise.allSettled([
-    getPreviewEntitlementSourceRecordByPatientRecordId({
+    (clinicRuntimeMode() === 'preview' ? getPreviewEntitlementSourceRecordByPatientRecordId : getPortalAccessRecordByPatientRecordId)({
       patientRecordId: patientId,
       canonicalSubjectId: pendingSubject,
     }),

@@ -9,6 +9,7 @@ export type PlanMaterialAttachment = {
 }
 
 export type PortalMaterial = PlanMaterialAttachment & {
+  previous?: boolean
   kind: 'nutrition-plan' | 'quick-start' | 'cartography' | 'participant-manual' | 'guide' | 'document'
   titleEs: string
   titleEn: string
@@ -21,6 +22,33 @@ export type PortalMaterial = PlanMaterialAttachment & {
 export type PatientMaterialsData = {
   kenkhoTier: KenkhoTier | null
   materials: PortalMaterial[]
+  previewReview?: boolean
+}
+
+// An attachment alone does not establish a nutrition plan's effective dates.
+// Keep this clarification scoped to the Clinic candidate until physical review.
+export function reviewClinicMaterials(materials: PortalMaterial[], enabled: boolean, previousNutrition = false): PortalMaterial[] {
+  if (!enabled) return materials
+  return materials.map(material => {
+    if (material.id.startsWith('phase-guide-')) return {
+      ...material,
+      titleEs: material.titleEs.replace('Guía de fase', 'Resumen de fase'),
+      titleEn: material.titleEn.replace('phase guide', 'phase summary'),
+      detailEs: materials.some(item => item.id === material.id.replace('phase-guide-', 'phase-document-'))
+        ? 'Resumen dentro de la app. El documento completo aparece por separado en esta biblioteca.'
+        : 'Resumen dentro de la app. La guía completa de esta fase todavía no está vinculada.',
+      detailEn: materials.some(item => item.id === material.id.replace('phase-guide-', 'phase-document-'))
+        ? 'In-app summary. The full document is listed separately in this library.'
+        : 'In-app summary. The full guide for this phase has not been linked yet.',
+    }
+    if (material.kind !== 'nutrition-plan') return material
+    if (previousNutrition) return { ...material, previous: true, titleEs: 'Plan hipocalórico anterior', titleEn: 'Previous hypocaloric plan', typeEs: 'Material previo · No vigente', typeEn: 'Previous material · Not current', detailEs: 'Conservado como referencia del plan anterior. No corresponde a tu plan Jing actual.', detailEn: 'Kept as a reference from your previous plan. This is not your current Jing plan.' }
+    return {
+      ...material,
+      detailEs: 'Archivo adjunto a tu plan. Revisa sus fechas con AQSLIM antes de usarlo como plan vigente.',
+      detailEn: 'File attached to your plan. Confirm its dates with AQSLIM before using it as your current plan.',
+    }
+  })
 }
 
 const KENKHO_TIERS = new Set<KenkhoTier>(['Start', 'Plus', 'Elite'])

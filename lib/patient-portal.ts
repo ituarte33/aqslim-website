@@ -9,13 +9,15 @@ import {
   type Fast36MeasurementRecord,
 } from '@/lib/airtable'
 import { AuthorizationError, getOwnPatient, requireCapability } from '@/lib/auth'
+import { getClinicPortalWeights } from '@/lib/clinic-portal-weight-store'
 import { toCanonicalPhaseName } from '@/lib/phase-names'
 
 export type PortalMeasurement = {
   id: string
   date: string | null
   weight: number
-  source: 'AQSLIM (Consulta)' | 'AQSLIM (FAST 36)'
+  source: 'AQSLIM (Consulta)' | 'AQSLIM (FAST 36)' | 'AQSLIM (Peso reportado · Preview)' | 'AQSLIM (Peso reportado)'
+  calendarDate?: boolean
   label?: string
   sequence?: number
 }
@@ -142,7 +144,8 @@ export const getPatientPortalData = cache(async (): Promise<PatientPortalData | 
   const fastMeasurements = fast36Measurements
     .map(measurementFromFast36)
     .filter((measurement): measurement is PortalMeasurement => Boolean(measurement))
-  const measurements = [...consultationMeasurements, ...fastMeasurements].sort(compareMeasurements)
+  const clinicWeights = await getClinicPortalWeights(cliente.id, unit)
+  const measurements = [...consultationMeasurements, ...fastMeasurements, ...clinicWeights].sort(compareMeasurements)
 
   const first = measurements[0] ?? null
   const latest = measurements.at(-1) ?? null

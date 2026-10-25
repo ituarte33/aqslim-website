@@ -169,7 +169,7 @@ test('Clinic and patient credentials land in their separate applications', async
   assert.match(middleware, /isClinicPreviewRoute\(req\)[\s\S]*?new URL\('\/clinic-preview\/login'/)
   assert.match(clinicPage, /if \(!actor\) redirect\('\/clinic-preview\/login'\)/)
   assert.match(clinicLogin, /forceRedirectUrl="\/clinic-preview"/)
-  assert.match(clinicLogin, /isClinicPreviewEnvironment/)
+  assert.match(clinicLogin, /isClinicRuntimeEnvironment/)
   assert.match(patientLogin, /forceRedirectUrl="\/my-aqslim\/welcome"/)
 })
 

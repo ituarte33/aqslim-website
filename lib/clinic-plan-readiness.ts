@@ -59,7 +59,6 @@ const COMPARISON_FIELDS: Array<{ key: keyof ClinicPlanReadinessData; label: stri
   { key: 'calorieTarget', label: 'Calorías objetivo' },
   { key: 'specialInstructions', label: 'Instrucciones' },
   { key: 'kenkhoTier', label: 'Modalidad Kenkho' },
-  { key: 'visitCadenceDays', label: 'Cadencia', suffix: ' días' },
   { key: 'startingWeightKg', label: 'Peso inicial', suffix: ' kg' },
   { key: 'currentWeightKg', label: 'Peso actual', suffix: ' kg' },
   { key: 'goalWeightKg', label: 'Peso meta', suffix: ' kg' },

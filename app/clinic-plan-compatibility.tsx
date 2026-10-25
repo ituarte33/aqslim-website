@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ClinicPlanMaterialsPanel } from './clinic-preview/clinic-plan-materials-panel'
 import { usePathname } from 'next/navigation'
 import { normalizeClinicWeightKg } from '@/lib/clinic-plan-format'
 import { compareClinicPlans, getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
@@ -371,7 +372,7 @@ export function ClinicPlanCompatibility() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
               <div>{fieldLabel('Modalidad / Kenkho Tier')}<select value={draft.kenkhoTier || 'Clinic'} onChange={e => set('kenkhoTier', e.target.value)} style={field}><option>Clinic</option><option>Start</option><option>Plus</option><option>Elite</option></select></div>
-              <div>{fieldLabel('Cadencia de citas (días)')}<input type="number" min="1" value={numeric(draft.visitCadenceDays)} onChange={e => set('visitCadenceDays', e.target.value ? Number(e.target.value) : null)} style={field} /></div>
+              <div>{fieldLabel('Cadencia interna de Clinic (días)')}<input type="number" min="1" value={numeric(draft.visitCadenceDays)} onChange={e => set('visitCadenceDays', e.target.value ? Number(e.target.value) : null)} style={field} /><small style={{ display: 'block', color: '#aaa' }}>Se guarda en Clinic; no se publica como próxima cita en My AQSLIM.</small></div>
             </div>
             <div style={{ color: '#6F6A64', fontSize: 11, marginTop: 7, lineHeight: 1.5 }}>{cadenceNote}</div>
 
@@ -398,7 +399,7 @@ export function ClinicPlanCompatibility() {
             <div style={{ color: '#8E8881', fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>Publicar requiere una segunda confirmación explícita y después relee el plan del paciente antes de mostrar éxito.</div>
             {publishReviewOpen && <div style={{ marginTop: 12, padding: 14, borderRadius: 11, border: '1px solid rgba(226,142,142,.38)', background: 'rgba(226,142,142,.06)' }}>
               <div style={{ color: '#F0B1B1', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Confirmación final</div>
-              <div style={{ color: '#D9D5CF', fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>Vas a reemplazar el plan visible en My AQSLIM para <strong>{identity.name}</strong> con <strong>{draft.planLabel}</strong>. Se actualizarán {changedFields.length} campos.</div>
+              <div style={{ color: '#D9D5CF', fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>Vas a reemplazar el plan visible en My AQSLIM para <strong>{identity.name}</strong> con <strong>{draft.planLabel}</strong>. Se actualizarán {changedFields.length} campos. El plan anterior quedará en el historial de Clinic; sus materiales dejarán de compartirse si cambia el plan.</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
                 <button type="button" onClick={() => setPublishReviewOpen(false)} disabled={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: '#A9A49E', cursor: publishing ? 'not-allowed' : 'pointer' }}>Cancelar</button>
                 <button type="button" onClick={() => void publishPlan()} disabled={publishing} aria-busy={publishing} style={{ padding: '11px 12px', borderRadius: 9, border: '1px solid rgba(226,142,142,.55)', background: publishing ? 'rgba(226,142,142,.05)' : '#D88B8B', color: publishing ? '#9A7070' : '#0A0A0A', cursor: publishing ? 'wait' : 'pointer', fontWeight: 700 }}>{publishing ? 'Publicando y verificando…' : 'Confirmar publicación'}</button>
@@ -406,6 +407,8 @@ export function ClinicPlanCompatibility() {
             </div>}
             {message && <div role="status" aria-live="polite" style={{ marginTop: 12, color: message.startsWith('✓') ? '#9ED4A8' : '#CDBE8B', fontSize: 12, lineHeight: 1.5 }}>{message}</div>}
           </div>
+
+          <ClinicPlanMaterialsPanel key={`${patientId}-${livePlan?.phaseStart}-${livePlan?.dietName}-${livePlan?.phase}-${livePlan?.specialInstructions}-${livePlan?.planLabel}-${livePlan?.calorieTarget}`} patientId={patientId} />
 
           <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 20, background: 'rgba(255,255,255,.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -5,9 +5,55 @@ import {
   isPlanMaterialVisible,
   normalizeKenkhoTier,
   visiblePlanMaterials,
+  reviewClinicMaterials,
   type PlanMaterialAttachment,
 } from '../lib/materials-policy.ts'
-import { getPhaseGuide, phaseGuideMaterial } from '../lib/phase-materials.ts'
+import { getPhaseGuide, phaseGuideMaterial, phaseGuideDocument } from '../lib/phase-materials.ts'
+import { isClinicPreviewEnvironment } from '../lib/clinic-preview-policy.ts'
+
+test('Clinic candidate distinguishes summaries and unverified attachment dates without changing Production', () => {
+  const original = [phaseGuideMaterial('Jing')!, ...visiblePlanMaterials({
+    attachments: [attachment('Romulo_hipocaloric_plan_Aug17.pdf')], kenkhoTier: null, weekInPhase: 3,
+  })]
+  const production = reviewClinicMaterials(original, isClinicPreviewEnvironment({ VERCEL_ENV: 'production', VERCEL_GIT_COMMIT_REF: 'myaq-clinic-functional-v1' }))
+  assert.strictEqual(production, original)
+  const preview = reviewClinicMaterials(original, isClinicPreviewEnvironment({ VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'myaq-clinic-functional-v1' }))
+  assert.match(preview[0].titleEs, /Resumen/)
+  assert.match(preview[1].detailEs, /Revisa sus fechas/)
+  assert.equal(preview[1].url, original[1].url)
+  assert.match(original[0].titleEs, /Guía/)
+  assert.equal(isClinicPreviewEnvironment({ VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'main' }), false)
+})
+
+test('each published phase selects its own complete PDF and matching summary', () => {
+  const files = [
+    ['Jing', '1LKnUKnQy-7D7j5apKtnhtQfYJ0jmDkDS'],
+    ['Qi', '1VREBJrvan2fZp9IpdNeyojnlX-emR8ij'],
+    ['Xue', '1g0w3Ev1Ef3NSxzkrTnzX8XRCnSsRszLj'],
+    ['Yang Sheng', '1Et8W7aM6llJO3TE3D2bAusrfpjoU4L3n'],
+  ] as const
+  const documentIds = new Set<string>()
+  for (const [phase, fileId] of files) {
+    const document = phaseGuideDocument(phase)!
+    assert.equal(document.url, `https://drive.google.com/file/d/${fileId}/view`)
+    assert.match(document.titleEs, new RegExp(phase))
+    assert.ok(!documentIds.has(document.id))
+    documentIds.add(document.id)
+    const summary = phaseGuideMaterial(phase)!
+    assert.equal(summary.id.replace('phase-guide-', 'phase-document-'), document.id)
+    const reviewed = reviewClinicMaterials([summary, document], true)
+    assert.match(reviewed[0].detailEs, /por separado/)
+    assert.doesNotMatch(reviewed[0].detailEs, /no está vinculada/)
+    assert.match(reviewed[1].detailEs, /revisión clínica/)
+  }
+})
+
+test('an absent or unknown phase never falls back to another phase PDF', () => {
+  for (const phase of [null, undefined, '', 'Sin fase', 'Tao', 'not-a-phase']) {
+    assert.equal(phaseGuideDocument(phase), null)
+  }
+  assert.equal(phaseGuideDocument('Qi-Xue (Keto)')?.id, phaseGuideDocument('Jing')?.id)
+})
 
 const attachment = (filename: string): PlanMaterialAttachment => ({
   id: `att-${filename}`,
@@ -63,4 +109,14 @@ test('the published phase produces the matching governed phase guide', () => {
   assert.equal(getPhaseGuide('Sin fase'), null)
   assert.equal(phaseGuideMaterial('Jing')?.url, '/my-aqslim/materials/phase-guide')
   assert.match(phaseGuideMaterial('Jing')?.titleEs ?? '', /Jing/)
+})
+
+test('Previous nutrition is marked only in Preview and preserves the file', () => {
+ const materials = visiblePlanMaterials({attachments:[attachment('old_hipocaloric.pdf')],kenkhoTier:null,weekInPhase:1})
+ assert.strictEqual(reviewClinicMaterials(materials,false,true),materials)
+ const previous = reviewClinicMaterials(materials,true,true)[0]
+ assert.equal(previous.previous,true)
+ assert.equal(previous.url,materials[0].url)
+ assert.match(previous.typeEs,/No vigente/)
+ assert.equal(reviewClinicMaterials(materials,true)[0].previous,undefined)
 })

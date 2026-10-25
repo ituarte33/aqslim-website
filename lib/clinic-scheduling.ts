@@ -56,3 +56,22 @@ export function toClinicDateTimeLocal(value: string | null | undefined) {
   if (!Number.isFinite(date.getTime())) return ''
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+// Restore only future appointments; past entries remain in the clinical history.
+export function futureClinicAppointment(value: string | null | undefined, now = new Date()) {
+  if (!value || !Number.isFinite(Date.parse(value)) || Date.parse(value) <= now.getTime()) return ''
+  return toClinicDateTimeLocal(value)
+}
+
+export function clinicAppointmentHeading(value: string | null | undefined, now = new Date()) {
+  const timestamp = value ? Date.parse(value) : NaN
+  if (!Number.isFinite(timestamp)) return 'Fecha de cita por confirmar'
+  return timestamp > now.getTime() ? 'Próxima consulta preliminar' : 'Cita preliminar pasada · Historial'
+}
+
+export function selectClinicAppointment(values: Array<string | null | undefined>, now = new Date()) {
+  const valid = values.filter((value): value is string => Boolean(value) && Number.isFinite(Date.parse(value!)))
+  const future = valid.filter(value => Date.parse(value) > now.getTime())
+  if (future.length) return future.reduce((first, value) => Date.parse(value) < Date.parse(first) ? value : first)
+  return valid.length ? valid.reduce((latest, value) => Date.parse(value) > Date.parse(latest) ? value : latest) : null
+}

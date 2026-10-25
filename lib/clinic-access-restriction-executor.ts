@@ -1,9 +1,11 @@
+import { assertClinicSourceWriteAllowed, clinicRuntimeMode } from './clinic-runtime-policy'
 import 'server-only'
 
 import {
   PREVIEW_ENTITLEMENTS_TABLE,
   PREVIEW_ENTITLEMENT_FIELDS,
   getPreviewEntitlementSourceRecordByPatientRecordId,
+  getPortalAccessRecordByPatientRecordId,
 } from './preview-entitlement-store'
 
 export type ClinicAccessRestrictionAction = 'suspend' | 'restore'
@@ -36,7 +38,9 @@ export async function executeClinicAccessRestriction({
   actorEmail: string
   now?: Date
 }) {
-  const source = await getPreviewEntitlementSourceRecordByPatientRecordId({
+  assertClinicSourceWriteAllowed()
+  const readSource = clinicRuntimeMode() === 'preview' ? getPreviewEntitlementSourceRecordByPatientRecordId : getPortalAccessRecordByPatientRecordId
+  const source = await readSource({
     patientRecordId: patientId,
     canonicalSubjectId: clerkUserId,
   })
@@ -77,7 +81,7 @@ export async function executeClinicAccessRestriction({
   })
   if (!response.ok) throw new Error('ENTITLEMENT_WRITE_FAILED')
 
-  const verified = await getPreviewEntitlementSourceRecordByPatientRecordId({
+  const verified = await readSource({
     patientRecordId: patientId,
     canonicalSubjectId: clerkUserId,
   })

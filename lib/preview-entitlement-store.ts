@@ -1,3 +1,4 @@
+import { CLINIC_RELEASE_BRANCH } from './clinic-runtime-policy'
 import 'server-only'
 
 import {
@@ -89,7 +90,7 @@ function isPreviewStoreEnabled(): boolean {
 function isPortalAccessStoreEnabled(): boolean {
   const supportedEnvironment = process.env.VERCEL_ENV === 'production'
     || (process.env.VERCEL_ENV === 'preview'
-      && process.env.VERCEL_GIT_COMMIT_REF === CLINIC_PREVIEW_BRANCH)
+      && [CLINIC_PREVIEW_BRANCH, CLINIC_RELEASE_BRANCH].includes(process.env.VERCEL_GIT_COMMIT_REF ?? ''))
 
   return supportedEnvironment
     && process.env.AIRTABLE_BASE_ID === SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID

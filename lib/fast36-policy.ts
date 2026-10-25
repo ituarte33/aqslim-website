@@ -21,6 +21,7 @@ export type Fast36Session = {
   plannedEndAt: string
   actualEndAt: string | null
   status: Fast36Status
+  provisional?: boolean
   timeZone?: string
 }
 
@@ -90,6 +91,7 @@ export function canConfirmFast36Outcome(
   outcome: Fast36ConfirmationOutcome,
   nowMs = Date.now(),
 ): boolean {
+  if (session.provisional) return false
   if (
     session.status === 'completed'
     || session.status === 'ended_early'

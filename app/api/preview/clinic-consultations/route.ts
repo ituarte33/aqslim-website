@@ -1,3 +1,5 @@
+import { clinicRecordFilter, clinicRecordKey, clinicRecordInScope, clinicUsesPreviewRecords } from '@/lib/clinic-runtime-policy'
+import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import {
@@ -18,7 +20,7 @@ import {
   isLiveClinicConsultationType,
 } from '@/lib/clinic-consultation-publication'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
-import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { CLINIC_WEIGHT_UPDATE_TYPE, normalizeClinicWeightEntry } from '@/lib/clinic-weight-entry'
 import { provisionClinicEntitlementForCompletedVisit } from '@/lib/p4-preview-entitlement-provisioning'
 
@@ -55,7 +57,7 @@ const F = {
 function clinicEnvironment() {
   return {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 }
 
@@ -69,10 +71,10 @@ function headers() {
 
 async function requireFounder() {
   const environment = clinicEnvironment()
-  if (!isClinicPreviewEnvironment(environment)) throw new Error('NOT_FOUND')
+  if (!isClinicRuntimeEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 
@@ -162,8 +164,7 @@ async function publishPreviewConsultation(input: {
   const preview = await getPreviewConsultation(input.previewRecordId)
   const previewFields = preview?.fields ?? {}
   if (!preview?.id
-    || previewFields[F.PATIENT_ID] !== input.patientId
-    || previewFields[F.PREVIEW_ONLY] !== true) {
+    || !clinicRecordInScope(previewFields, input.patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.KEY})) {
     return NextResponse.json({ ok: false, error: 'consultation_not_found' }, { status: 404 })
   }
 
@@ -280,7 +281,7 @@ export async function GET(request: NextRequest) {
 
     const params = new URLSearchParams({
       pageSize: '100',
-      filterByFormula: `{Patient Record ID} = "${escapeFormula(patientId)}"`,
+      filterByFormula: clinicRecordFilter(patientId, 'Consultation Key'),
       returnFieldsByFieldId: 'true',
     })
     params.append('sort[0][field]', 'Consultation At')
@@ -289,7 +290,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(`${baseUrl()}?${params}`, { headers: headers(), cache: 'no-store' })
     if (!response.ok) return NextResponse.json({ ok: false }, { status: 500 })
     const data = await response.json()
-    const consultations = (data.records ?? []).map((record: any) => ({
+    const consultations = (data.records ?? []).filter((record: any) => clinicRecordInScope(record.fields ?? {}, patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.KEY})).map((record: any) => ({
       id: record.id,
       consultationAt: record.fields?.[F.CONSULTATION_AT] ?? null,
       consultationDate: record.fields?.[F.CONSULTATION_DATE] ?? null,
@@ -310,19 +311,21 @@ export async function GET(request: NextRequest) {
       amountCollected: record.fields?.[F.AMOUNT_COLLECTED] ?? null,
       paymentMethod: record.fields?.[F.PAYMENT_METHOD] ?? '',
       authorLabel: record.fields?.[F.AUTHOR_LABEL] ?? '',
+      weightCorrectedInPreview: String(record.fields?.[F.RECOMMENDATIONS] ?? '').includes('Corrección de peso sólo en Preview ·'),
       publishedToClinic: Boolean(clinicPublishedConsultationId(record.fields?.[F.KEY])),
       liveConsultationId: clinicPublishedConsultationId(record.fields?.[F.KEY]),
     }))
     return NextResponse.json({ ok: true, consultations })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    assertClinicSourceWriteAllowed()
     const actor = await requireFounder()
     const body = await request.json()
     const patientId = safeText(body.patientId, 100)
@@ -330,6 +333,49 @@ export async function POST(request: NextRequest) {
 
     const patient = await getClienteById(patientId)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
+
+    if (body.action === 'correctWeight') {
+      const recordId = safeText(body.previewRecordId, 100)
+      const reason = safeText(body.reason, 500)
+      const normalized = normalizeClinicWeightEntry(body.weight, body.weightUnit)
+      if (!/^rec[A-Za-z0-9]{14}$/.test(recordId) || !normalized.ok || reason.length < 10) {
+        return NextResponse.json({ ok: false, error: 'invalid_correction' }, { status: 400 })
+      }
+      const previous = await getPreviewConsultation(recordId)
+      const before = previous?.fields ?? {}
+      if (!clinicRecordInScope(before, patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.KEY})) {
+        return NextResponse.json({ ok: false, error: 'preview_record_not_found' }, { status: 404 })
+      }
+      const oldUnit = selectName(before[F.WEIGHT_UNIT])
+      const oldNotes = String(before[F.RECOMMENDATIONS] ?? '')
+      // A retry after a successful write must not append a second correction.
+      if (before[F.WEIGHT] === normalized.weight && oldUnit === normalized.unit) {
+        return NextResponse.json({ ok: true, verified: true, recordId })
+      }
+      if (before[F.WEIGHT] !== body.expectedWeight || oldUnit !== body.expectedUnit
+        || oldNotes !== body.expectedRecommendations) {
+        return NextResponse.json({ ok: false, error: 'record_changed' }, { status: 409 })
+      }
+      const audit = `Corrección de peso sólo en Preview · ${new Date().toISOString()} · ${actor.email}: ${before[F.WEIGHT]} ${oldUnit} → ${normalized.weight} ${normalized.unit}. Motivo: ${reason}`
+      const notes = [oldNotes, audit].filter(Boolean).join('\n')
+      const response = await fetch(`${baseUrl()}/${recordId}?returnFieldsByFieldId=true`, {
+        method: 'PATCH', headers: headers(), cache: 'no-store',
+        body: JSON.stringify({ fields: {
+          [F.WEIGHT]: normalized.weight,
+          [F.WEIGHT_UNIT]: normalized.unit,
+          [F.RECOMMENDATIONS]: notes,
+        } }),
+      })
+      if (!response.ok) return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+      const verified = await getPreviewConsultation(recordId)
+      const after = verified?.fields ?? {}
+      if (!clinicRecordInScope(after, patientId, {patientId: F.PATIENT_ID, preview: F.PREVIEW_ONLY, key: F.KEY})
+        || after[F.WEIGHT] !== normalized.weight || selectName(after[F.WEIGHT_UNIT]) !== normalized.unit
+        || after[F.RECOMMENDATIONS] !== notes) {
+        return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, verified: true, recordId })
+    }
 
     if (body.action === 'publish') {
       return publishPreviewConsultation({
@@ -383,7 +429,7 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString()
     const fields: Record<string, unknown> = {
-      [F.KEY]: `${patientId}:${Date.now()}`,
+      [F.KEY]: clinicRecordKey(`${patientId}:${Date.now()}`),
       [F.PATIENT]: [patientId],
       [F.PATIENT_ID]: patientId,
       [F.PATIENT_NAME]: String(patient.fields['Nombre Completo'] ?? 'Paciente'),
@@ -394,7 +440,7 @@ export async function POST(request: NextRequest) {
       [F.PAYMENT_METHOD]: paymentMethod,
       [F.AUTHOR_EMAIL]: actor.email,
       [F.AUTHOR_LABEL]: 'Rom / Founder',
-      [F.PREVIEW_ONLY]: true,
+      [F.PREVIEW_ONLY]: clinicUsesPreviewRecords(),
     }
 
     if (consultationDate) fields[F.CONSULTATION_DATE] = consultationDate
@@ -430,13 +476,13 @@ export async function POST(request: NextRequest) {
         && selectName(savedFields[F.TYPE]) === CLINIC_WEIGHT_UPDATE_TYPE
         && Number(savedFields[F.WEIGHT]) === weight
         && selectName(savedFields[F.WEIGHT_UNIT]) === normalizedWeight?.unit
-        && savedFields[F.PREVIEW_ONLY] === true
+        && savedFields[F.PREVIEW_ONLY] === clinicUsesPreviewRecords()
       if (!verified) return NextResponse.json({ ok: false, error: 'verify_failed' }, { status: 500 })
     }
     return NextResponse.json({ ok: true, saved: true, recordId: savedRecord.id })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }

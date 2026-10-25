@@ -1,3 +1,7 @@
+import { clinicPlanDraftKey, clinicUsesPreviewRecords, clinicRecordFilter } from '@/lib/clinic-runtime-policy'
+import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
+import { materialPlanRevision, planAttachments } from '@/lib/clinic-plan-materials'
+import { saveClinicMaterialEvent } from '@/lib/clinic-plan-materials-store'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import {
@@ -8,7 +12,7 @@ import {
   getPlanById,
   updatePlan,
 } from '@/lib/airtable'
-import { isClinicFounderIdentity, isClinicPreviewEnvironment } from '@/lib/clinic-preview-policy'
+import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import { clinicWeightInKg, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
@@ -51,7 +55,7 @@ const F = {
 function clinicEnvironment() {
   return {
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
+    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
   }
 }
 
@@ -65,10 +69,10 @@ function headers() {
 
 async function requireFounder() {
   const environment = clinicEnvironment()
-  if (!isClinicPreviewEnvironment(environment)) throw new Error('NOT_FOUND')
+  if (!isClinicRuntimeEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 
@@ -90,7 +94,7 @@ async function getLatestWeightSuggestion(patientId: string) {
   try {
     const params = new URLSearchParams({
       pageSize: '100',
-      filterByFormula: `{Patient Record ID} = "${escapeFormula(patientId)}"`,
+      filterByFormula: clinicRecordFilter(patientId, 'Consultation Key'),
       returnFieldsByFieldId: 'true',
     })
     params.append('sort[0][field]', 'Consultation At')
@@ -144,6 +148,13 @@ async function resolvePatient(request: NextRequest, body?: Record<string, unknow
   }
 
   return null
+}
+
+function draftInScope(record: any, patientId: string) {
+  const f = record?.fields ?? {}
+  return f[F.KEY] === clinicPlanDraftKey(patientId) && f[F.PATIENT_ID] === patientId
+    && Array.isArray(f[F.PATIENT]) && f[F.PATIENT].includes(patientId)
+    && (clinicUsesPreviewRecords() ? f[F.PREVIEW_ONLY] === true : f[F.PREVIEW_ONLY] !== true)
 }
 
 function mapDraft(record: any) {
@@ -221,7 +232,7 @@ export async function GET(request: NextRequest) {
     const patient = await resolvePatient(request)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found_or_ambiguous' }, { status: 404 })
 
-    const key = `${patient.id}:v1`
+    const key = clinicPlanDraftKey(patient.id)
     const params = new URLSearchParams({
       maxRecords: '1',
       filterByFormula: `{Plan Key} = "${escapeFormula(key)}"`,
@@ -241,19 +252,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       patient: { id: patient.id, name: patient.fields['Nombre Completo'] ?? 'Paciente' },
-      draft: draftRecord ? mapDraft(draftRecord) : null,
+      draft: draftRecord && draftInScope(draftRecord, patient.id) ? mapDraft(draftRecord) : null,
       livePlan,
       latestWeight,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    assertClinicSourceWriteAllowed()
     const actor = await requireFounder()
     const body = await request.json() as Record<string, unknown>
     const patient = await resolvePatient(request, body)
@@ -288,7 +300,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
     const now = new Date().toISOString()
-    const key = `${patient.id}:v1`
+    const key = clinicPlanDraftKey(patient.id)
 
     const fields: Record<string, unknown> = {
       [F.KEY]: key,
@@ -301,7 +313,7 @@ export async function POST(request: NextRequest) {
       [F.AUTHOR_EMAIL]: actor.email,
       [F.AUTHOR_LABEL]: 'Rom / Founder',
       [F.UPDATED_AT]: now,
-      [F.PREVIEW_ONLY]: true,
+      [F.PREVIEW_ONLY]: clinicUsesPreviewRecords(),
     }
 
     const stringFields: Array<[string, unknown, number]> = [
@@ -344,6 +356,7 @@ export async function POST(request: NextRequest) {
     if (!existingResponse.ok) return NextResponse.json({ ok: false, error: 'lookup_failed' }, { status: 500 })
     const existingData = await existingResponse.json()
     const existing = existingData.records?.[0]
+    if (existing && !draftInScope(existing, patient.id)) return NextResponse.json({ ok: false, error: 'draft_scope_mismatch' }, { status: 409 })
 
     const response = await fetch(`${baseUrl()}?returnFieldsByFieldId=true`, {
       method: existing ? 'PATCH' : 'POST',
@@ -380,13 +393,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, draft: mapDraft(verified) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'FORBIDDEN'
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : 403
     return NextResponse.json({ ok: false }, { status })
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
+    assertClinicSourceWriteAllowed()
     const actor = await requireFounder()
     const body = await request.json() as Record<string, unknown>
     if (body.confirmation !== 'PUBLICAR PLAN PREVIEW') {
@@ -396,7 +410,7 @@ export async function PUT(request: NextRequest) {
     const patient = await resolvePatient(request, body)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found_or_ambiguous' }, { status: 404 })
 
-    const key = `${patient.id}:v1`
+    const key = clinicPlanDraftKey(patient.id)
     const params = new URLSearchParams({
       maxRecords: '1',
       filterByFormula: `{Plan Key} = "${escapeFormula(key)}"`,
@@ -406,7 +420,7 @@ export async function PUT(request: NextRequest) {
     if (!draftResponse.ok) return NextResponse.json({ ok: false, error: 'draft_load_failed' }, { status: 500 })
     const draftData = await draftResponse.json()
     const draftRecord = draftData.records?.[0]
-    if (!draftRecord) return NextResponse.json({ ok: false, error: 'draft_not_found' }, { status: 404 })
+    if (!draftRecord || !draftInScope(draftRecord, patient.id)) return NextResponse.json({ ok: false, error: 'draft_not_found' }, { status: 404 })
 
     const draft = mapDraft(draftRecord)
     if (draft.status !== 'Ready for Review') {
@@ -425,6 +439,22 @@ export async function PUT(request: NextRequest) {
     const linkedPlanIds = patient.fields['Plan AQSLIM']
     const linkedPlanId = Array.isArray(linkedPlanIds) && linkedPlanIds[0] ? String(linkedPlanIds[0]) : null
     const fields = livePlanFields(draft, patientName)
+    if (linkedPlanId) {
+      const previous = await getPlanById(linkedPlanId)
+      const nextRevision = materialPlanRevision({ id: previous.id, fields: {
+        'Notas del Plan': draft.planLabel, 'Dieta en Nutrimind': draft.dietName,
+        'Fase Actual': draft.phase, 'Fecha Inicio Tratamiento': draft.treatmentStart,
+        'Fecha Inicio Fase Actual': draft.phaseStart, 'Instrucciones Especiales': draft.specialInstructions,
+        'Calorías Objetivo': draft.calorieTarget ?? '',
+      } })
+      // Archive and verify before replacing a plan. A failed archive aborts publication.
+      if (nextRevision !== materialPlanRevision(previous)) await saveClinicMaterialEvent(patient.id, {
+        kind: 'clinic-plan-materials-v1', action: 'archive', planId: previous.id,
+        revision: materialPlanRevision(previous), at: new Date().toISOString(),
+        label: String(previous.fields['Notas del Plan'] ?? previous.fields['Dieta en Nutrimind'] ?? 'Plan anterior'),
+        attachments: planAttachments(previous), planFields: previous.fields,
+      }, actor.email)
+    }
     const published = linkedPlanId
       ? await updatePlan(linkedPlanId, fields, { typecast: true })
       : await createPlanForPatient(patient.id, fields, { typecast: true })
@@ -489,7 +519,7 @@ export async function PUT(request: NextRequest) {
     if (!['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(message)) {
       console.error('clinic_plan_publication_failed', { reason: message })
     }
-    const status = message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : message === 'FORBIDDEN' ? 403 : 500
+    const status = message === 'CLINIC_CANDIDATE_READ_ONLY' ? 409 : message === 'NOT_FOUND' ? 404 : message === 'UNAUTHENTICATED' ? 401 : message === 'FORBIDDEN' ? 403 : 500
     return NextResponse.json({ ok: false, error: status === 500 ? 'publication_failed' : undefined }, { status })
   }
 }

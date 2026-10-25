@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toCanonicalPhaseName } from '@/lib/phase-names'
 import { normalizeClinicSearch } from '@/lib/clinic-search'
 import { buildClinicAccessInvitationDraft } from '@/lib/clinic-access-invitation'
 import { assessClinicConsultationReadiness, type ClinicConsultationReadinessCheck } from '@/lib/clinic-consultation-readiness'
-import { resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
+import { clinicAppointmentHeading, selectClinicAppointment, futureClinicAppointment, resolveClinicCadence, sameClinicAppointment, suggestClinicAppointment, toClinicDateTimeLocal } from '@/lib/clinic-scheduling'
 import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@/lib/clinic-submit-guard'
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
+import { ClinicFast36Panel } from './clinic-fast36-panel'
 import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
 
 type Patient = {
@@ -77,6 +79,7 @@ type ClinicConsultation = {
   amountCollected: number | null
   paymentMethod: string
   authorLabel: string
+  weightCorrectedInPreview: boolean
   publishedToClinic: boolean
   liveConsultationId: string | null
 }
@@ -309,7 +312,7 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
   </div>
 }
 
-export function ClinicPreviewClient({ patients, initialPatientId }: { patients: Patient[]; initialPatientId: string | null }) {
+export function ClinicPreviewClient({ patients, initialPatientId, mode = 'preview' }: { patients: Patient[]; initialPatientId: string | null; mode?: 'preview' | 'candidate' | 'production' }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
   const [activeTab, setActiveTab] = useState<Tab>('Resumen')
@@ -340,6 +343,11 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
 
   const [consultations, setConsultations] = useState<ClinicConsultation[]>([])
   const [consultationsLoading, setConsultationsLoading] = useState(false)
+  const [weightCorrection, setWeightCorrection] = useState<{ patientId: string; item: ClinicConsultation; weight: string; unit: ClinicWeightUnit; reason: string } | null>(null)
+  const [weightCorrectionBusy, setWeightCorrectionBusy] = useState(false)
+  const weightCorrectionGuard = useRef(false)
+  const [weightCorrectionMessage, setWeightCorrectionMessage] = useState('')
+
   const [clinicRecord, setClinicRecord] = useState<ClinicRecord | null>(null)
   const [clinicRecordLoading, setClinicRecordLoading] = useState(false)
   const [clinicRecordError, setClinicRecordError] = useState('')
@@ -353,12 +361,13 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const [armsCm, setArmsCm] = useState('')
   const [thighsCm, setThighsCm] = useState('')
   const [chestCm, setChestCm] = useState('')
+  const consultationPhaseEdited = useRef(false)
   const [phase, setPhase] = useState('Sin fase')
   const [phaseWeek, setPhaseWeek] = useState('')
   const [recommendations, setRecommendations] = useState('')
   const [nextAppointment, setNextAppointment] = useState('')
   const [consultationFee, setConsultationFee] = useState('30')
-  const [amountCollected, setAmountCollected] = useState('30')
+  const [amountCollected, setAmountCollected] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('Sin especificar')
   const [consultationSaving, setConsultationSaving] = useState(false)
   const [consultationMessage, setConsultationMessage] = useState('')
@@ -416,18 +425,25 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   const accessInvitationDrafts = messageDrafts.filter(note => note.messageDraft?.purpose === 'Acceso')
   const cadence = useMemo(() => resolveClinicCadence(visitCadenceDays), [visitCadenceDays])
   const cadenceOptions = useMemo(() => [...new Set([cadence.days, 10, 14])], [cadence.days])
-  const latestScheduledAppointment = consultations.find(item => item.nextAppointment)?.nextAppointment ?? null
+  const latestScheduledAppointment = selectClinicAppointment(consultations.map(item => item.nextAppointment))
   const completeWeightEntries = useMemo(() => {
     const liveIds = new Set(clinicRecord?.consultations.map(item => item.id) ?? [])
+    // A verified Preview correction overrides only its linked live weight here.
+    // The live clinical record itself remains unchanged.
+    const correctedLiveIds = new Set(consultations
+      .filter(item => item.weightCorrectedInPreview && item.liveConsultationId)
+      .map(item => item.liveConsultationId))
     const previewEntries = consultations
-      .filter(item => !item.liveConsultationId || !liveIds.has(item.liveConsultationId))
+      .filter(item => item.weightCorrectedInPreview || !item.liveConsultationId || !liveIds.has(item.liveConsultationId))
       .map(item => ({
         weight: item.weight,
         weightUnit: item.weightUnit,
         consultationDate: item.consultationDate,
         consultationAt: item.consultationAt,
       }))
-    const liveEntries = (clinicRecord?.consultations ?? []).map(item => ({
+    const liveEntries = (clinicRecord?.consultations ?? [])
+      .filter(item => !correctedLiveIds.has(item.id))
+      .map(item => ({
       weight: item.weightKg,
       weightUnit: 'kg',
       consultationDate: item.consultationDate,
@@ -508,11 +524,17 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     }
   }
 
-  async function loadPlanSnapshot(patientId: string) {
+  async function loadPlanSnapshot(patientId: string, signal?: AbortSignal) {
     try {
-      const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store' })
+      const response = await fetch(`/api/preview/clinic-plans?patientId=${encodeURIComponent(patientId)}`, { cache: 'no-store', signal })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error('load_failed')
+      if (signal?.aborted) return
+      if (!consultationPhaseEdited.current) {
+        const livePhase = toCanonicalPhaseName(data.livePlan?.phase ?? null) ?? 'Sin fase'
+        setPhase(['Jing', 'Qi', 'Xue', 'Yang Sheng'].includes(livePhase) ? livePhase : 'Sin fase')
+        setPhaseWeek(data.livePlan?.phaseWeek == null ? '' : String(data.livePlan.phaseWeek))
+      }
       const snapshot: ClinicPlanSnapshot = {
         draftStatus: typeof data.draft?.status === 'string' ? data.draft.status : null,
         hasDraft: Boolean(data.draft),
@@ -523,6 +545,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       setVisitCadenceDays(snapshot.visitCadenceDays)
       return snapshot
     } catch {
+      if (signal?.aborted) return
       const snapshot: ClinicPlanSnapshot = {
         draftStatus: null,
         hasDraft: false,
@@ -563,14 +586,13 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       void loadClinicRecord(selectedId, clinicRecordController.signal)
       void loadConsultations(selectedId).then(loaded => {
         if (cancelled || !loaded) return
-        const persistedAppointment = loaded.find(item => item.nextAppointment)?.nextAppointment
-        const localAppointment = toClinicDateTimeLocal(persistedAppointment)
+        const localAppointment = loaded.map(item => futureClinicAppointment(item.nextAppointment)).find(Boolean)
         if (localAppointment) {
           setNextAppointment(localAppointment)
           setNextAppointmentEdited(true)
         }
       })
-      void loadPlanSnapshot(selectedId)
+      void loadPlanSnapshot(selectedId, clinicRecordController.signal)
       void loadAccessReadiness(selectedId, accessController.signal)
     } else {
       setNotes([])
@@ -957,7 +979,8 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       setArmsCm('')
       setThighsCm('')
       setChestCm('')
-      setPhaseWeek('')
+      setAmountCollected('')
+      setPaymentMethod('Sin especificar')
       setRecommendations('')
       const refreshed = await loadConsultations(selected.id)
       if (!refreshed || (appointmentIso && !refreshed.some(item => sameClinicAppointment(item.nextAppointment, appointmentIso)))) {
@@ -1013,6 +1036,35 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     }
   }
 
+  async function correctPreviewWeight() {
+    const correction = weightCorrection
+    if (!selected || !correction || correction.patientId !== selected.id || weightCorrectionGuard.current) return
+    weightCorrectionGuard.current = true
+    setWeightCorrectionBusy(true)
+    setWeightCorrectionMessage('')
+    try {
+      const response = await fetch('/api/preview/clinic-consultations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'correctWeight', patientId: correction.patientId,
+          previewRecordId: correction.item.id, weight: correction.weight, weightUnit: correction.unit,
+          reason: correction.reason, expectedWeight: correction.item.weight,
+          expectedUnit: correction.item.weightUnit, expectedRecommendations: correction.item.recommendations }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.verified) throw new Error('correction_failed')
+      const refreshed = await loadConsultations(correction.patientId)
+      if (!refreshed?.some(item => item.id === correction.item.id
+        && item.weight === Number(correction.weight) && item.weightUnit === correction.unit)) throw new Error('verify_failed')
+      setWeightCorrection(null)
+      setWeightCorrectionMessage('✓ Peso corregido y verificado en Preview. El expediente real no fue modificado.')
+    } catch {
+      setWeightCorrectionMessage('No se pudo verificar la corrección. Actualiza el expediente y revisa el registro antes de intentarlo de nuevo.')
+    } finally {
+      weightCorrectionGuard.current = false
+      setWeightCorrectionBusy(false)
+    }
+  }
+
   async function publishConsultation(item: ClinicConsultation) {
     if (!selected || item.publishedToClinic || item.consultationType === CLINIC_WEIGHT_UPDATE_TYPE) return
     if (!consultationPublicationConfirmed) {
@@ -1054,6 +1106,11 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
   }
 
   function choosePatient(id: string) {
+    consultationPhaseEdited.current = false
+    setPhase('Sin fase')
+    setPhaseWeek('')
+    setAmountCollected('')
+    setPaymentMethod('Sin especificar')
     setSelectedId(id)
     setShowPatientPicker(false)
     const clinicUrl = new URL(window.location.href)
@@ -1106,7 +1163,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
     setConsultationType(type)
     const fee = feeForType(type)
     setConsultationFee(fee)
-    setAmountCollected(fee)
+    setAmountCollected('')
   }
 
   const inputStyle = { width: '100%', boxSizing: 'border-box' as const, padding: '11px 12px', borderRadius: 9, background: '#111', color: '#FAFAF8', border: '1px solid rgba(201,168,76,.25)' }
@@ -1119,7 +1176,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
       <header className="clinic-preview-header" style={{ position: 'relative', zIndex: 20, background: '#0A0A0A', borderBottom: '1px solid rgba(201,168,76,.28)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 24, letterSpacing: '.08em' }}>AQ<span style={{ color: '#C9A84C' }}>SLIM</span> Clinic</div>
-          <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>FUNCIONAL V1 · PREVIEW SEGURO · Sólo Rom</div>
+          <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>{mode === 'preview' ? 'FUNCIONAL V1 · PREVIEW SEGURO · Sólo Rom' : mode === 'candidate' ? 'CANDIDATA · SÓLO LECTURA · Sólo Rom' : 'CLINIC · ACCESO PRIVADO · Sólo Rom'}</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {selected && <button type="button" className="clinic-preview-patient-picker-button" onClick={() => setShowPatientPicker(value => !value)} style={{ cursor: 'pointer', border: '1px solid rgba(201,168,76,.35)', borderRadius: 9, padding: '9px 12px', background: 'rgba(201,168,76,.08)', color: '#E2C87A', fontSize: 12 }}>{showPatientPicker ? 'Cerrar pacientes' : 'Cambiar paciente'}</button>}
@@ -1190,6 +1247,20 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                       <h3 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 400 }}>Resumen clínico</h3>
                       <span style={{ color: '#9ED4A8', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase' }}>Sólo lectura</span>
                     </div>
+                    <section aria-label="Seguimientos guardados" style={{ marginTop: 18, padding: 16, border: '1px solid rgba(201,168,76,.24)', borderRadius: 12, background: 'rgba(201,168,76,.035)' }}>
+                      <h4 style={{ margin: 0, color: '#E2C87A', fontSize: 16 }}>Seguimiento clínico</h4>
+                      {notesLoading ? <p style={{ color: '#9A9590', fontSize: 12 }}>Cargando seguimientos…</p> : structuredFollowups.length === 0 ? <p style={{ color: '#9A9590', fontSize: 12 }}>Sin seguimientos estructurados registrados.</p> : <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                        {structuredFollowups.map(note => {
+                          const item = note.followup!
+                          return <div key={note.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 9, padding: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', fontSize: 11 }}><span style={{ color: '#E2C87A' }}>Prioridad {item.priority}</span><span style={{ color: item.status === 'Completado' ? '#9ED4A8' : '#E2C87A' }}>{item.status}</span></div>
+                            <div style={{ color: '#D9D5CF', marginTop: 8, fontSize: 13, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.action}</div>
+                            <div style={{ color: '#9A9590', marginTop: 7, fontSize: 11 }}>{note.followupDate ? `Fecha objetivo: ${note.followupDate}` : 'Sin fecha objetivo'}</div>
+                          </div>
+                        })}
+                      </div>}
+                      <button type="button" onClick={() => setActiveTab('Seguimiento')} style={{ marginTop: 12, padding: 0, border: 0, background: 'transparent', color: '#C9A84C', cursor: 'pointer', fontSize: 12 }}>Abrir Seguimiento →</button>
+                    </section>
                     <ClinicWeightHistory history={weightHistory} loading={consultationsLoading || clinicRecordLoading} />
                     <div style={{ marginTop: 18 }}><ClinicRecordView record={clinicRecord} loading={clinicRecordLoading} error={clinicRecordError} /></div>
                   </div>
@@ -1260,17 +1331,29 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                     <ClinicWeightHistory history={weightHistory} loading={consultationsLoading || clinicRecordLoading} />
                     <div style={{ marginTop: 18 }}><ClinicRecordView record={clinicRecord} loading={clinicRecordLoading} error={clinicRecordError} /></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap', borderTop: '1px solid rgba(201,168,76,.18)', marginTop: 20, paddingTop: 18 }}><div><h4 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 400 }}>Borradores y registros Preview</h4><div style={{ color: '#77716A', fontSize: 10, marginTop: 4 }}>Separados del expediente real hasta su publicación controlada.</div></div><span style={{ color: '#6F6A64', fontSize: 11 }}>{consultations.length} registros</span></div>
+                    {weightCorrectionMessage && <p role="status" style={{ color: '#E2C87A' }}>{weightCorrectionMessage}</p>}
                     {consultationPublicationMessage && <div style={{ marginTop: 14, padding: 12, border: `1px solid ${consultationPublicationMessage.startsWith('✓') ? 'rgba(158,212,168,.28)' : 'rgba(224,160,160,.32)'}`, borderRadius: 10, color: consultationPublicationMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.55 }}>{consultationPublicationMessage}</div>}
                     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-                      {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>Próxima consulta preliminar</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
+                      {!consultationsLoading && latestScheduledAppointment && <div style={{ border: '1px solid rgba(201,168,76,.28)', borderRadius: 12, padding: 14, background: 'rgba(201,168,76,.05)' }}><div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em' }}>{clinicAppointmentHeading(latestScheduledAppointment)}</div><div style={{ marginTop: 7, color: '#FAFAF8' }}>{new Date(latestScheduledAppointment).toLocaleString('es-US')}</div><div style={{ marginTop: 6, color: '#8E8881', fontSize: 11 }}>Guardada en Clinic Preview. No representa una cita confirmada en Square.</div></div>}
                       {consultationsLoading ? <div style={{ color: '#9A9590' }}>Cargando…</div> : consultations.length === 0 ? <div style={{ color: '#9A9590' }}>Todavía no hay consultas registradas en Clinic Preview.</div> : consultations.map(item => <div key={item.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, background: 'rgba(255,255,255,.02)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><strong style={{ color: '#C9A84C', fontSize: 12 }}>{item.consultationType}</strong><span style={{ color: '#6F6A64', fontSize: 11 }}>{item.consultationDate || (item.consultationAt ? new Date(item.consultationAt).toLocaleDateString('es-US') : '')}</span></div>
                         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', color: '#D9D5CF', fontSize: 12, marginTop: 10 }}>
                           {item.weight !== null && <span>Peso: {item.weight} {item.weightUnit}</span>}{item.bodyFat !== null && <span>Grasa: {item.bodyFat}%</span>}{item.waistCm !== null && <span>Cintura: {item.waistCm} cm</span>}{item.hipsCm !== null && <span>Cadera: {item.hipsCm} cm</span>}
                         </div>
+                        {item.weight !== null && <div style={{ marginTop: 12 }}>
+                          <button type="button" disabled={weightCorrectionBusy} onClick={() => { setWeightCorrection({ patientId: selected.id, item, weight: String(item.weight), unit: item.weightUnit === 'kg' ? 'kg' : 'lb', reason: '' }); setWeightCorrectionMessage('') }} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>Corregir peso en Preview</button>
+                          {weightCorrection?.patientId === selected.id && weightCorrection.item.id === item.id && <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+                            <p style={{ color: '#E2C87A', fontSize: 12 }}>Corrige únicamente el peso de este registro en Preview. Se conservarán la fecha y el motivo del ajuste; el expediente real permanece sin cambios.</p>
+                            <label style={labelStyle}>Peso corregido<input aria-label="Peso corregido" type="number" step="0.1" value={weightCorrection.weight} disabled={weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, weight: e.target.value })} style={inputStyle} /></label>
+                            <label style={labelStyle}>Unidad<select value={weightCorrection.unit} disabled={weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, unit: e.target.value as ClinicWeightUnit })} style={inputStyle}><option value="lb">lb</option><option value="kg">kg</option></select></label>
+                            <label style={labelStyle}>Motivo de la corrección<textarea value={weightCorrection.reason} maxLength={500} disabled={weightCorrectionBusy} onChange={e => setWeightCorrection({ ...weightCorrection, reason: e.target.value })} style={inputStyle} /></label>
+                            <button type="button" disabled={weightCorrectionBusy || weightCorrection.reason.trim().length < 10 || !normalizeClinicWeightEntry(weightCorrection.weight, weightCorrection.unit).ok} onClick={() => void correctPreviewWeight()} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>{weightCorrectionBusy ? 'Verificando…' : 'Guardar corrección Preview'}</button>
+                            <button type="button" disabled={weightCorrectionBusy} onClick={() => setWeightCorrection(null)} style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #C9A84C', background: 'transparent', color: '#E2C87A', cursor: 'pointer' }}>Cancelar</button>
+                          </div>}
+                        </div>}
                         {item.phase && <div style={{ marginTop: 8, color: '#8E8881', fontSize: 11 }}>Fase: {item.phase}{item.phaseWeek !== null ? ` · semana ${item.phaseWeek}` : ''}</div>}
                         {item.recommendations && <div style={{ marginTop: 8, color: '#B8B3AD', fontSize: 12, lineHeight: 1.5 }}>{item.recommendations}</div>}
-                        {item.nextAppointment && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 11 }}>Próxima consulta preliminar: {new Date(item.nextAppointment).toLocaleString('es-US')}</div>}
+                        {item.nextAppointment && <div style={{ marginTop: 8, color: '#E2C87A', fontSize: 11 }}>{clinicAppointmentHeading(item.nextAppointment)}: {new Date(item.nextAppointment).toLocaleString('es-US')}</div>}
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8, color: '#6F6A64', fontSize: 11 }}>
                           {item.amountCollected !== null && <span>Cobrado: ${Number(item.amountCollected).toFixed(2)}</span>}{item.paymentMethod && <span>{item.paymentMethod}</span>}{item.authorLabel && <span>{item.authorLabel}</span>}
                         </div>
@@ -1310,7 +1393,7 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                     </div>
 
                     <div style={sectionTitle}>Plan actual</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8 }}><select value={phase} onChange={e => setPhase(e.target.value)} style={inputStyle}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select><input inputMode="numeric" value={phaseWeek} onChange={e => setPhaseWeek(e.target.value)} placeholder="Semana" style={inputStyle} /></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8 }}><select value={phase} onChange={e => { consultationPhaseEdited.current = true; setPhase(e.target.value) }} style={inputStyle}><option>Sin fase</option><option>Jing</option><option>Qi</option><option>Xue</option><option>Yang Sheng</option></select><input inputMode="numeric" value={phaseWeek} onChange={e => { consultationPhaseEdited.current = true; setPhaseWeek(e.target.value) }} placeholder="Semana" style={inputStyle} /></div>
 
                     <div style={sectionTitle}>Recomendaciones</div>
                     <textarea value={recommendations} onChange={e => setRecommendations(e.target.value)} placeholder="Instrucciones, observaciones o recomendaciones para esta consulta…" rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
@@ -1429,12 +1512,13 @@ export function ClinicPreviewClient({ patients, initialPatientId }: { patients: 
                 </div>
               ) : activeTab === 'My AQSLIM' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(340px,.8fr)', gap: 16, alignItems: 'start' }}>
+                  <ClinicFast36Panel key={selected.id} patientId={selected.id} />
                   <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.28)', borderRadius: 14, padding: 22, background: 'rgba(201,168,76,.045)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ color: '#C9A84C', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.13em' }}>Respuesta del cliente</div>
                         <h3 style={{ margin: '8px 0 0', fontFamily: 'Georgia, serif', fontSize: 25, fontWeight: 400 }}>Registrar peso recibido</h3>
-                        <p style={{ color: '#9A9590', lineHeight: 1.55, fontSize: 12, margin: '9px 0 0' }}>Captura manualmente el peso que el cliente envió. Se guardará en su historial clínico Preview, sin enviar mensajes ni modificar Producción.</p>
+                        <p style={{ color: '#9A9590', lineHeight: 1.55, fontSize: 12, margin: '9px 0 0' }}>Captura manualmente el peso que el cliente envió, con su fecha y unidad. Se conservará como peso reportado; no registra una consulta ni envía mensajes.</p>
                       </div>
                       <div style={{ minWidth: 190, padding: '10px 12px', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, background: 'rgba(255,255,255,.02)' }}>
                         <div style={{ color: '#6F6A64', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Peso actual registrado</div>
