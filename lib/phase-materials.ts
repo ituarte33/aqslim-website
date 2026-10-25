@@ -111,7 +111,7 @@ export function phaseGuideDocument(value: string | null | undefined): PortalMate
   const document = PHASE_DOCUMENTS[guide.phase]
   return {
     id: `phase-document-${guide.phase.toLowerCase().replace(/\s+/g, '-')}`,
-    url: `https://drive.google.com/file/d/${document.fileId}/view`,
+    url: guide.phase === 'Jing' ? '/my-aqslim/materials/phase-document?phase=jing' : `https://drive.google.com/file/d/${document.fileId}/view`,
     filename: document.filename,
     type: 'application/pdf',
     kind: 'guide',

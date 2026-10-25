@@ -35,7 +35,7 @@ test('each published phase selects its own complete PDF and matching summary', (
   const documentIds = new Set<string>()
   for (const [phase, fileId] of files) {
     const document = phaseGuideDocument(phase)!
-    assert.equal(document.url, `https://drive.google.com/file/d/${fileId}/view`)
+    assert.equal(document.url, phase === 'Jing' ? '/my-aqslim/materials/phase-document?phase=jing' : `https://drive.google.com/file/d/${fileId}/view`)
     assert.match(document.titleEs, new RegExp(phase))
     assert.ok(!documentIds.has(document.id))
     documentIds.add(document.id)
