@@ -1,16 +1,16 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { get, put } from '@vercel/blob'
-import { PRIVATE_JING_GUIDE } from './private-phase-guide-policy.ts'
+import { PRIVATE_GUIDE_MAX_BYTES, type PrivatePhaseGuide } from './private-phase-guide-policy.ts'
 
 // An unconnected project has no access, even with this non-secret resource ID.
 const STORE_ID = 'store_kTNpZ9VqPWx4ByUt'
 const blobOptions = { access: 'private' as const, storeId: STORE_ID }
 
-export function isApprovedJingPdf(bytes: Uint8Array) {
-  return bytes.length > 5 && bytes.length <= PRIVATE_JING_GUIDE.maxBytes
+export function isApprovedGuidePdf(guide: PrivatePhaseGuide, bytes: Uint8Array) {
+  return bytes.length > 5 && bytes.length <= PRIVATE_GUIDE_MAX_BYTES
     && Buffer.from(bytes.subarray(0, 5)).toString('ascii') === '%PDF-'
-    && createHash('sha256').update(bytes).digest('hex') === PRIVATE_JING_GUIDE.sha256
+    && createHash('sha256').update(bytes).digest('hex') === guide.sha256
 }
 
 export async function readBoundedGuideBody(body: ReadableStream<Uint8Array> | null) {
@@ -23,7 +23,7 @@ export async function readBoundedGuideBody(body: ReadableStream<Uint8Array> | nu
       const { done, value } = await reader.read()
       if (done) break
       size += value.byteLength
-      if (size > PRIVATE_JING_GUIDE.maxBytes) {
+      if (size > PRIVATE_GUIDE_MAX_BYTES) {
         await reader.cancel()
         throw new Error('INVALID_GUIDE')
       }
@@ -33,21 +33,21 @@ export async function readBoundedGuideBody(body: ReadableStream<Uint8Array> | nu
   return Buffer.concat(chunks)
 }
 
-export async function readPrivateJingPdf(): Promise<Buffer | null> {
-  const result = await get(PRIVATE_JING_GUIDE.pathname, blobOptions)
+export async function readPrivatePhasePdf(guide: PrivatePhaseGuide): Promise<Buffer | null> {
+  const result = await get(guide.pathname, blobOptions)
   if (!result) return null
   if (result.statusCode !== 200) throw new Error('GUIDE_UNAVAILABLE')
   const bytes = await readBoundedGuideBody(result.stream)
-  if (!isApprovedJingPdf(bytes)) throw new Error('GUIDE_UNAVAILABLE')
+  if (!isApprovedGuidePdf(guide, bytes)) throw new Error('GUIDE_UNAVAILABLE')
   return bytes
 }
 
-export async function importPrivateJingPdf(bytes: Uint8Array) {
-  if (!isApprovedJingPdf(bytes)) throw new Error('INVALID_GUIDE')
-  if (await readPrivateJingPdf()) return
-  await put(PRIVATE_JING_GUIDE.pathname, Buffer.from(bytes), {
+export async function importPrivatePhasePdf(guide: PrivatePhaseGuide, bytes: Uint8Array) {
+  if (!isApprovedGuidePdf(guide, bytes)) throw new Error('INVALID_GUIDE')
+  if (await readPrivatePhasePdf(guide)) return
+  await put(guide.pathname, Buffer.from(bytes), {
     ...blobOptions, addRandomSuffix: false, allowOverwrite: false, contentType: 'application/pdf',
   })
-  const verified = await readPrivateJingPdf()
+  const verified = await readPrivatePhasePdf(guide)
   if (!verified) throw new Error('GUIDE_UNAVAILABLE')
 }

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { createHash } from 'node:crypto'
 import { AuthorizationError } from '../lib/authorization-policy.ts'
+import * as guidePolicy from '../lib/private-phase-guide-policy.ts'
 import { privateGuideAccessAllowed } from '../lib/private-phase-guide-policy.ts'
 import { createCanonicalEntitlementRecord } from '../lib/entitlement-record.ts'
 
@@ -34,7 +36,7 @@ async function loadRoute(file: string, mocks: Record<string, unknown>) {
   const source = await readFile(new URL(file, import.meta.url), 'utf8')
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports: Record<string, Function> = {}
-  vm.runInNewContext(code, { exports, require: (id: string) => { assert.ok(id in mocks, `Missing mock: ${id}`); return mocks[id] }, Response, URL, Uint8Array, Error })
+  vm.runInNewContext(code, { exports, require: (id: string) => { assert.ok(id in mocks, `Missing mock: ${id}`); return mocks[id] }, Response, URL, Uint8Array, Error, Buffer, ReadableStream })
   return exports
 }
 
@@ -51,9 +53,9 @@ test('PDF delivery checks session, ownership, access and current phase before re
     '@/lib/airtable': { getPlanById: async (id: string) => { assert.equal(id, planId); return { id, fields: { 'Fase Actual': phase, 'ID Cliente': linked ? [patientId] : ['rec33333333333333'] } } } },
     '@/lib/preview-entitlement-store': { getPortalAccessRecordByPatientRecordId: async (input: {patientRecordId: string; canonicalSubjectId: string}) => { assert.equal(input.patientRecordId, patientId); assert.equal(input.canonicalSubjectId, 'synthetic-user'); if (storeFailure) throw new Error('backend detail'); return allowed ? { record: activeRecord() } : null } },
     '@/lib/clinic-runtime-policy': { clinicRuntimeEnvironment: () => ({}), isClinicRuntimeEnvironment: () => enabled },
-    '@/lib/phase-materials': { getPhaseGuide: (value: string) => ['Jing','Qi'].includes(value) ? { phase: value } : null },
-    '@/lib/private-phase-guide-policy': { PRIVATE_JING_GUIDE: { slug: 'jing', phase: 'Jing' }, privateGuideAccessAllowed: (record: unknown) => Boolean(record) },
-    '@/lib/private-phase-guide-store': { readPrivateJingPdf: async () => { reads++; return missingPdf ? null : new TextEncoder().encode('%PDF-synthetic') } },
+    '@/lib/phase-materials': { getPhaseGuide: (value: string) => ['Jing','Qi','Xue','Yang Sheng'].includes(value) ? { phase: value } : null },
+    '@/lib/private-phase-guide-policy': { ...guidePolicy, privateGuideAccessAllowed: (record: unknown) => Boolean(record) },
+    '@/lib/private-phase-guide-store': { readPrivatePhasePdf: async (guide: { phase: string }) => { assert.equal(guide.phase, phase); reads++; return missingPdf ? null : new TextEncoder().encode('%PDF-synthetic') } },
   })
   const request = (query = 'phase=jing') => new Request(`https://example.test/my-aqslim/materials/phase-document?${query}`)
   enabled = false; assert.equal((await route.GET(request())).status, 404); enabled = true
@@ -75,6 +77,18 @@ test('PDF delivery checks session, ownership, access and current phase before re
   assert.equal(await success.text(), '%PDF-synthetic')
   allowed = false; assert.equal((await route.GET(request())).status, 403); assert.equal(reads, 1)
   allowed = true; missingPdf = true; assert.equal((await route.GET(request())).status, 503)
+  missingPdf = false
+  for (const current of Object.values(guidePolicy.PRIVATE_PHASE_GUIDES)) {
+    phase = current.phase
+    for (const requested of Object.values(guidePolicy.PRIVATE_PHASE_GUIDES)) {
+      const before = reads
+      const result = await route.GET(request(`phase=${requested.slug}`))
+      assert.equal(result.status, current.slug === requested.slug ? 200 : 404)
+      assert.equal(reads, before + (current.slug === requested.slug ? 1 : 0))
+      if (result.ok) assert.equal(result.headers.get('content-disposition'), `inline; filename="${current.filename}"`)
+    }
+  }
+  for (const slug of ['__proto__', 'constructor', '', 'Jing', '../qi']) assert.equal((await route.GET(request(`phase=${slug}`))).status, 404)
 })
 
 test('guide import rejects other identities, cross-origin requests and unapproved files without changing clinical data', async () => {
@@ -82,10 +96,11 @@ test('guide import rejects other identities, cross-origin requests and unapprove
   const route = await loadRoute('../app/api/preview/clinic-private-guide/route.ts', {
     '@/lib/auth': { getActor: async () => ({ email: 'synthetic@test.invalid' }) },
     '@/lib/clinic-runtime-policy': { clinicRuntimeEnvironment: () => ({}), isClinicRuntimeFounderIdentity: () => founder },
+    '@/lib/private-phase-guide-policy': guidePolicy,
     '@/lib/private-phase-guide-store': {
-      readPrivateJingPdf: async () => null,
+      readPrivatePhasePdf: async () => null,
       readBoundedGuideBody: async () => new Uint8Array([1,2,3]),
-      importPrivateJingPdf: async () => { if (!valid) throw new Error('INVALID_GUIDE'); imports++ },
+      importPrivatePhasePdf: async () => { if (!valid) throw new Error('INVALID_GUIDE'); imports++ },
     },
   })
   const request = (origin = 'https://example.test', type = 'application/pdf') => new Request('https://example.test/api/preview/clinic-private-guide', { method: 'POST', headers: { origin, 'content-type': type }, body: '%PDF-synthetic' })
@@ -97,4 +112,51 @@ test('guide import rejects other identities, cross-origin requests and unapprove
   assert.equal(imports, 0)
   valid = true; const response = await route.POST(request()); assert.equal(response.status, 200); assert.equal((await response.json()).verified, true)
   assert.equal(imports, 1)
+  for (const guide of Object.values(guidePolicy.PRIVATE_PHASE_GUIDES)) {
+    assert.equal((await route.POST(new Request(`https://example.test/api/preview/clinic-private-guide?phase=${guide.slug}`, { method: 'POST', headers: { origin: 'https://example.test', 'content-type': 'application/pdf' }, body: '%PDF-synthetic' }))).status, 200)
+  }
+  assert.equal((await route.POST(new Request('https://example.test/api/preview/clinic-private-guide?phase=constructor', { method: 'POST', headers: { origin: 'https://example.test', 'content-type': 'application/pdf' }, body: '%PDF-synthetic' }))).status, 400)
+  const status = await route.GET()
+  assert.equal(status.status, 200)
+  const body = await status.json()
+  assert.equal(body.guides.length, 4)
+  assert.ok(body.guides.every((entry: { ready: boolean; available: boolean }) => entry.available && !entry.ready))
+  founder = false; assert.equal((await route.GET()).status, 403)
+})
+
+test('private storage validates per-phase bytes, bounds the body, never overwrites and verifies persistence', async () => {
+  const stored = new Map<string, Buffer>()
+  let puts = 0, corrupt = false, cancelled = false
+  const store = await loadRoute('../lib/private-phase-guide-store.ts', {
+    'server-only': {}, 'node:crypto': { createHash }, './private-phase-guide-policy.ts': guidePolicy,
+    '@vercel/blob': {
+      get: async (path: string, options: {access: string}) => {
+        assert.equal(options.access, 'private')
+        const bytes = stored.get(path)
+        return bytes ? { statusCode: 200, stream: new ReadableStream({ start(controller) { controller.enqueue(corrupt ? Buffer.from('%PDF-corrupt') : bytes); controller.close() } }) } : null
+      },
+      put: async (path: string, bytes: Buffer, options: {access: string; allowOverwrite: boolean; addRandomSuffix: boolean}) => {
+        assert.equal(options.access, 'private'); assert.equal(options.allowOverwrite, false); assert.equal(options.addRandomSuffix, false)
+        assert.ok(!stored.has(path)); stored.set(path, bytes); puts++
+      },
+    },
+  })
+  for (const entry of Object.values(guidePolicy.PRIVATE_PHASE_GUIDES)) {
+    const bytes = Buffer.from(`%PDF-synthetic-${entry.slug}`)
+    const guide = { ...entry, sha256: createHash('sha256').update(bytes).digest('hex') }
+    assert.equal(store.isApprovedGuidePdf(guide, bytes), true)
+    assert.equal(store.isApprovedGuidePdf(guide, Buffer.from('%PDF-other-phase')), false)
+    await assert.rejects(() => store.importPrivatePhasePdf(guide, Buffer.from('%PDF-other-phase')), /INVALID_GUIDE/)
+    assert.equal(await store.readPrivatePhasePdf(guide), null)
+    await store.importPrivatePhasePdf(guide, bytes)
+    assert.deepEqual(await store.readPrivatePhasePdf(guide), bytes)
+    const before = puts
+    await store.importPrivatePhasePdf(guide, bytes)
+    assert.equal(puts, before)
+    corrupt = true; await assert.rejects(() => store.readPrivatePhasePdf(guide), /GUIDE_UNAVAILABLE/); corrupt = false
+  }
+  assert.equal(puts, 4)
+  const oversized = new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(guidePolicy.PRIVATE_GUIDE_MAX_BYTES + 1)) }, cancel() { cancelled = true } })
+  await assert.rejects(() => store.readBoundedGuideBody(oversized), /INVALID_GUIDE/)
+  assert.equal(cancelled, true)
 })

@@ -3,8 +3,8 @@ import { getPlanById } from '@/lib/airtable'
 import { getPortalAccessRecordByPatientRecordId } from '@/lib/preview-entitlement-store'
 import { clinicRuntimeEnvironment, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { getPhaseGuide } from '@/lib/phase-materials'
-import { PRIVATE_JING_GUIDE, privateGuideAccessAllowed } from '@/lib/private-phase-guide-policy'
-import { readPrivateJingPdf } from '@/lib/private-phase-guide-store'
+import { getPrivatePhaseGuide, privateGuideAccessAllowed } from '@/lib/private-phase-guide-policy'
+import { readPrivatePhasePdf } from '@/lib/private-phase-guide-store'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,8 @@ function denied(status: number) { return new Response('Material no disponible.',
 export async function GET(request: Request) {
   try {
     if (!isClinicRuntimeEnvironment(clinicRuntimeEnvironment())) return denied(404)
-    if (new URL(request.url).searchParams.get('phase') !== PRIVATE_JING_GUIDE.slug) return denied(404)
+    const guide = getPrivatePhaseGuide(new URL(request.url).searchParams.get('phase'))
+    if (!guide) return denied(404)
     const actor = await getActor()
     if (!actor) return denied(401)
     const patient = await requireOwnPatient('portal:read:self')
@@ -35,12 +36,12 @@ export async function GET(request: Request) {
     ])
     if (!privateGuideAccessAllowed(entitlement?.record)) return denied(403)
     if (plan.id !== planId || !plan.fields['ID Cliente']?.includes(patient.id)
-      || getPhaseGuide(plan.fields['Fase Actual'])?.phase !== PRIVATE_JING_GUIDE.phase) return denied(404)
-    const pdf = await readPrivateJingPdf()
+      || getPhaseGuide(plan.fields['Fase Actual'])?.phase !== guide.phase) return denied(404)
+    const pdf = await readPrivatePhasePdf(guide)
     if (!pdf) return denied(503)
     return new Response(new Uint8Array(pdf), { headers: {
       ...headers, 'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline; filename="Guia_Jing.pdf"',
+      'Content-Disposition': `inline; filename="${guide.filename}"`,
       'Content-Length': String(pdf.byteLength),
     } })
   } catch (error) {
