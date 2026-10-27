@@ -321,7 +321,7 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
   </div>
 }
 
-export function ClinicPreviewClient({ patients, initialPatientId, mode = 'preview' }: { patients: Patient[]; initialPatientId: string | null; mode?: 'preview' | 'candidate' | 'production' }) {
+export function ClinicPreviewClient({ patients, initialPatientId, mode = 'preview', writesPaused = false }: { patients: Patient[]; initialPatientId: string | null; mode?: 'preview' | 'candidate' | 'production'; writesPaused?: boolean }) {
   const [showArchived, setShowArchived] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
@@ -429,7 +429,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
 
   const selected = patients.find(patient => patient.id === selectedId) ?? null
   const patientArchived = Boolean(selected && selected.administrationState !== 'active')
-  const candidateReadOnly = mode === 'candidate' || patientArchived
+  const candidateReadOnly = mode === 'candidate' || writesPaused || patientArchived
   const latestNote = notes[0] ?? null
   const pendingFollowups = notes.filter(note => note.followupRequired)
   const structuredFollowups = notes.filter(note => note.noteType === 'Seguimiento' && note.followup)
@@ -1262,7 +1262,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', color: '#9A9590', fontSize: 13 }}>
                   {selected.phone && <span>{selected.phone}</span>}{selected.email && <span>{selected.email}</span>}{selected.status && <span>Estado: {patientArchived ? 'Archivado / en revisión' : selected.status}</span>}{selected.language && <span>Idioma: {selected.language}</span>}
                 </div>
-                {mode !== 'preview' ? <ClinicPatientAdministration key={selected.id} patientId={selected.id} patients={patients} readOnly={mode === 'candidate'} /> : null}
+                {mode !== 'preview' ? <ClinicPatientAdministration key={selected.id} patientId={selected.id} patients={patients} readOnly={mode === 'candidate' || writesPaused} /> : null}
                 {patientArchived ? <p role="status" style={{color:'#E2C87A'}}>Expediente archivado o en revisión. Historial disponible sólo para consulta.</p> : null}
                 <div className="clinic-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 20 }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px', background: 'rgba(0,0,0,.14)' }}>

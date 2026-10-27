@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { clerkClient } from '@clerk/nextjs/server'
 import { getClienteById, updateCliente } from './airtable'
 import { getPortalAccessRecordByPatientRecordId } from './preview-entitlement-store'
-import { clinicRuntimeMode } from './clinic-runtime-policy'
+import { clinicRuntimeMode, clinicWritesPaused, assertClinicSourceWriteAllowed } from './clinic-runtime-policy'
 import { SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID } from './nutrition/synthetic-preview-policy'
 import { administeredNotes, patientAdministration, planPatientMerge, type PatientAdminEvent, type AdminPatient } from './clinic-patient-administration-policy'
 const NOTES_FIELD = 'fldpU1kw9F3aTArWQ'
@@ -37,7 +37,7 @@ export async function reviewPatientAdministration({patientId,targetId,action}: {
   if (action !== 'merge') {
     const blockers = state.state === 'invalid' || state.state === 'merging' || state.state === 'merged'
       ? ['Este expediente requiere revisión de administración antes de modificarlo.'] : []
-    return {source,target:null,accounts:[],fields:{},review:{action,source:patientSummary(source),target:null,blockers,conflicts:[],additions:[],fingerprint:hash({action,source}),executionEnabled:clinicRuntimeMode()==='production',alreadyDone:action==='archive'?state.state==='archived':state.state==='active'}}
+    return {source,target:null,accounts:[],fields:{},review:{action,source:patientSummary(source),target:null,blockers,conflicts:[],additions:[],fingerprint:hash({action,source}),executionEnabled:clinicRuntimeMode()==='production' && !clinicWritesPaused(),alreadyDone:action==='archive'?state.state==='archived':state.state==='active'}}
   }
   if (!targetId || targetId === patientId) throw new Error('INVALID_PATIENT')
   const target = await getClienteById(targetId)
@@ -53,7 +53,7 @@ export async function reviewPatientAdministration({patientId,targetId,action}: {
   const accounts = [...unique.values()].map(u=>({id:u.id,boundPatientId:typeof u.privateMetadata.aqslimPatientId==='string'?u.privateMetadata.aqslimPatientId.trim()||null:null,verified:u.emailAddresses.some(a=>emails.includes(a.emailAddress.trim().toLowerCase())&&a.verification?.status==='verified')}))
   const plan = planPatientMerge({source,target,protectedReferences:references,accounts})
   if (targetEntitlement && targetEntitlement.storedSubjectId!==`patient:${target.id}` && (accounts.length!==1||targetEntitlement.storedSubjectId!==accounts[0].id)) plan.blockers.push('El acceso del expediente principal pertenece a otra cuenta o no se pudo verificar.')
-  return {source,target,accounts,fields:plan.fields,review:{action,source:patientSummary(source),target:patientSummary(target),blockers:plan.blockers,conflicts:plan.conflicts,additions:plan.additions,fingerprint:hash({source,target,references,accounts,targetEntitlement,fields:plan.fields}),executionEnabled:clinicRuntimeMode()==='production',alreadyDone:false}}
+  return {source,target,accounts,fields:plan.fields,review:{action,source:patientSummary(source),target:patientSummary(target),blockers:plan.blockers,conflicts:plan.conflicts,additions:plan.additions,fingerprint:hash({source,target,references,accounts,targetEntitlement,fields:plan.fields}),executionEnabled:clinicRuntimeMode()==='production' && !clinicWritesPaused(),alreadyDone:false}}
 }
 async function saveNotes(patient: AdminPatient, notes: string) {
   const current = await getClienteById(patient.id)
@@ -65,6 +65,7 @@ async function saveNotes(patient: AdminPatient, notes: string) {
 }
 export async function executePatientAdministration(input: {patientId:string;targetId?:string;action:'archive'|'restore'|'merge';fingerprint:string;reason:string;actor:string;samePerson:boolean}) {
   if (clinicRuntimeMode()!=='production') throw new Error('PATIENT_ADMIN_READ_ONLY')
+  assertClinicSourceWriteAllowed()
   const snapshot = await reviewPatientAdministration(input)
   if (snapshot.review.fingerprint!==input.fingerprint) throw new Error('REVIEW_CHANGED')
   if (snapshot.review.blockers.length) throw new Error('PATIENT_ADMIN_BLOCKED')

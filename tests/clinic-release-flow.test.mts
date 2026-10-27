@@ -16,7 +16,7 @@ async function load(path:string,mocks:Record<string,unknown>,fetcher?:typeof fet
  return {exports,source}
 }
 test('production plan publication archives before update, returns only current phase materials, and candidate mode never writes',async()=>{
- const keys=['VERCEL_ENV','VERCEL_GIT_COMMIT_REF','MYAQ_CLINIC_ENABLED'];const saved=keys.map(key=>process.env[key])
+ const keys=['VERCEL_ENV','VERCEL_GIT_COMMIT_REF','MYAQ_CLINIC_ENABLED','MYAQ_CLINIC_WRITES_PAUSED'];const saved=keys.map(key=>process.env[key])
  const patientId='rec12345678901234',planId='rec22345678901234'
  let current={id:planId,fields:{'Notas del Plan':'Jing','Dieta en Nutrimind':'Plan Jing','Fase Actual':'Jing','Fecha Inicio Tratamiento':'2026-10-01','Fecha Inicio Fase Actual':'2026-10-01','Instrucciones Especiales':'Jing actual','Semana en Fase Actual':1,'Materiales asignados':[{id:'attOld',filename:'old_hipocaloric.pdf',url:'https://example.test/old.pdf'}]} as Record<string,unknown>}
  const calls:string[]=[];const events:materials.ClinicMaterialEvent[]=[];let failArchive=false
@@ -58,6 +58,9 @@ test('production plan publication archives before update, returns only current p
   const result=await portal.getPatientPortalMaterials(1)
   assert.deepEqual(Array.from(result.materials,(item:any)=>item.id),['phase-guide-qi','phase-document-qi'])
   assert.ok(!JSON.stringify(result).includes('old.pdf'));assert.ok(!JSON.stringify(result).includes('phase-document-jing'))
+  calls.length=0;process.env.MYAQ_CLINIC_WRITES_PAUSED='true'
+  assert.notEqual((await route.PUT(request)).status,200);assert.equal(calls.length,0);assert.equal(current.fields['Fase Actual'],'Qi')
+  delete process.env.MYAQ_CLINIC_WRITES_PAUSED
   calls.length=0;fields[F.STATUS]='Ready for Review';fields[F.PHASE]='Xue';fields[F.LABEL]='Xue';failArchive=true
   assert.notEqual((await route.PUT(request)).status,200);assert.equal(calls.length,0);assert.equal(current.fields['Fase Actual'],'Qi')
   failArchive=false;process.env.VERCEL_ENV='preview';process.env.VERCEL_GIT_COMMIT_REF=runtime.CLINIC_RELEASE_BRANCH

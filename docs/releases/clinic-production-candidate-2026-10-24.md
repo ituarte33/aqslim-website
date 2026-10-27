@@ -24,6 +24,8 @@ Existing portal access restrictions retain their approved storage contract. Rest
 
 ## Checks and outstanding release gates
 
+Historical checklist below; the October 27 release audit in `clinic-release-runbook-2026-10-27.md` is the current status and supersedes completed gates.
+
 - Full authorization suite must pass using the existing Production tsx runner.
 - Clinic tests include production environment gating, exact Founder identity, wrong-patient exclusion, Preview exclusion, read-only candidate behavior, archive-before-publication failure handling and phase-specific client materials.
 - TypeScript and Vercel build must pass.
@@ -106,3 +108,13 @@ The writer is Production-runtime and Founder gated. It updates an existing opera
 The My AQSLIM tab adds “Vigencia del acceso por consulta.” Founder can review a real consultation in the candidate without writing. In enabled Production, a fresh fingerprint and explicit ACTUALIZAR ACCESO confirmation support recovering access without republishing the consultation. The recovery endpoint checks exact Founder identity and same-origin requests and returns private/no-store responses. Archived patients also cannot submit new consultations through the two updated write entry points.
 
 Validation: all 538 tests passed and TypeScript passed, including synthetic renewal windows, trial replay, protected grants, archive and ownership denial, raw readback failures, changed restrictions, candidate write blocking, publication retry without duplicate visits and post-commit access failure. No real consultation or entitlement was changed. The recovered local source replaces the transient copy removed by automated workspace maintenance; the prior published candidate remained intact throughout. Rendered interaction of the new panel remains for Founder verification because the Browser plugin and local browser runtime are unavailable. Production enablement, private-storage connection and final staged-production validation remain pending explicit release approval.
+
+## October 27 — final candidate review and release procedure
+
+The Founder screenshots now verify duplicate-unification review (retained patient plus one symptom questionnaire), onboarding blocked by a shared patient email, and real-consultation review returning `onboarding_required`. These are read-only checks: no real merge, archive, onboarding or access renewal has occurred. The four private PDF imports and separate client Jing delivery were already verified.
+
+A fresh run passed all 538 tests. The exact Preview deployment `dpl_9gARzbB2hC92NawJGhqvvPxsz6Sp`, source `69005ed1c85453465652a7a5a4c98746eb96adeb`, was rechecked as READY with target null. Production release approval is still outstanding.
+
+Rollback review found an important boundary: the original pre-Clinic deployment does not interpret patient-administration markers or operational onboarding grants. After the first such write, reverting to that build or simply disabling the Clinic flag is not an approved recovery procedure. The release runbook requires a tested compatible recovery build before clinical administration is enabled. Code rollback never reverses a clinical write.
+
+The candidate now implements `MYAQ_CLINIC_WRITES_PAUSED=true` as an independent write pause. The Clinic runtime remains enabled so operational readers, account ownership, archived-patient denial and guide access keep their current policy. Shared Clinic writes and the three administration/access executors reject before provider writes; subsequent consultation submission also checks the pause before creating its source visit. Review execution flags and the Clinic UI become read-only. The flag requires a fresh deployment and cannot cancel an already running request. It does not pause unrelated legacy dashboard/client actions. Synthetic checks cover early provider denial, retained runtime/archived-patient policy and plan-publication blocking. A compatible paused Production build still must be staged and verified under release authorization before live administration.

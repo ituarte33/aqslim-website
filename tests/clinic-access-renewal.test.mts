@@ -63,7 +63,7 @@ async function harness(){
   const persisted:any={id:accessId,fields:{PATIENT_RECORD_ID:patientId,SUBJECT_ID:'user_synthetic',PREVIEW_ONLY:false}}
   const service=await load('../lib/clinic-access-renewal.ts',{
     'server-only':{},'node:crypto':{createHash},'./airtable':{getClienteById:async()=>({id:patientId,fields:{'Notas Generales':notes}})},
-    './clinic-runtime-policy':{clinicRuntimeMode:()=>mode},'./clinic-preview-policy':{CLINIC_FOUNDER_EMAIL:'founder@example.test'},
+    './clinic-runtime-policy':{clinicRuntimeMode:()=>mode,clinicWritesPaused:()=>false,assertClinicSourceWriteAllowed:()=>{}},'./clinic-preview-policy':{CLINIC_FOUNDER_EMAIL:'founder@example.test'},
     './nutrition/synthetic-preview-policy':{SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID:'synthetic-base'},
     './clinic-patient-administration-policy':{patientIsUnavailable},'./clinic-consultation-source':{getLinkedClinicConsultationsByPatientId:async()=>visits},
     './clinic-access-renewal-policy':{planClinicAccessRenewal},'./preview-entitlement-store':{PREVIEW_ENTITLEMENT_FIELDS:F,PREVIEW_ENTITLEMENTS_TABLE:'synthetic-access',getPortalAccessRecordByPatientRecordId:async()=>{
@@ -125,7 +125,7 @@ test('recovery route requires Founder, same origin, exact confirmation and enabl
 test('live and legacy Preview provisioning dispatch remain separate',async()=>{
   let mode='candidate',live=0,preview=0
   const service=await load('../lib/clinic-access-after-consultation.ts',{
-    'server-only':{},'./clinic-runtime-policy':{clinicRuntimeMode:()=>mode},'./clinic-access-renewal':{executeClinicAccessRenewal:async()=>{live++;return{state:'updated',message:'verified',verified:true}}},
+    'server-only':{},'./clinic-runtime-policy':{clinicRuntimeMode:()=>mode,clinicWritesPaused:()=>false,assertClinicSourceWriteAllowed:()=>{}},'./clinic-access-renewal':{executeClinicAccessRenewal:async()=>{live++;return{state:'updated',message:'verified',verified:true}}},
     './p4-preview-entitlement-provisioning':{provisionClinicEntitlementForCompletedVisit:async()=>{preview++;return{action:'none',write:'none',reason:'P4_PROVISIONING_DISABLED'}}},
   })
   const input={patientRecordId:patientId,consultationId:visitId,visitType:'Cliente Nuevo',visitDate:'2026-10-20',actorEmail:'synthetic'}

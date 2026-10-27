@@ -16,10 +16,14 @@ export function isClinicRuntimeEnvironment(environment: ClinicRuntimeEnvironment
 export function isClinicRuntimeFounderIdentity({email, environment}: {email: string; environment: ClinicRuntimeEnvironment}) {
   return isClinicRuntimeEnvironment(environment) && email.trim().toLowerCase() === CLINIC_FOUNDER_EMAIL
 }
+// Keep the runtime and operational readers enabled during incident recovery.
+// Changing this server environment variable requires a fresh Vercel deployment.
+export function clinicWritesPaused() { return process.env.MYAQ_CLINIC_WRITES_PAUSED === 'true' }
 export function assertClinicSourceWriteAllowed() {
   const mode = clinicRuntimeMode()
   if (mode === null) throw new Error('CLINIC_DISABLED')
   if (mode === 'candidate') throw new Error('CLINIC_CANDIDATE_READ_ONLY')
+  if (clinicWritesPaused()) throw new Error('CLINIC_WRITES_PAUSED')
 }
 export function clinicUsesPreviewRecords() { return clinicRuntimeMode() === 'preview' }
 export function clinicRecordKey(value: string) { return clinicUsesPreviewRecords() ? value : `live:${value}` }

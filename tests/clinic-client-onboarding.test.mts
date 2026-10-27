@@ -67,7 +67,7 @@ async function harness(trial = false) {
       {fields: { 'ID Cliente': [patientId], 'Tipo de Consulta': 'Actualización de peso', 'Fecha Consulta': '2026-10-26' }},
       {fields: { 'ID Cliente': [other], 'Tipo de Consulta': 'Cliente Nuevo', 'Fecha Consulta': '2026-10-27' }},
     ] },
-    './clinic-ai-trial-policy': { isEligibleClinicAiTrialVisitType }, './clinic-visit-policy': { lastCompletedVisitFromConsultations }, './clinic-runtime-policy': { clinicRuntimeMode: () => mode },
+    './clinic-ai-trial-policy': { isEligibleClinicAiTrialVisitType }, './clinic-visit-policy': { lastCompletedVisitFromConsultations }, './clinic-runtime-policy': { clinicRuntimeMode: () => mode, clinicWritesPaused: () => false, assertClinicSourceWriteAllowed: () => {} },
     './clinic-client-onboarding-policy': { planClinicClientOnboarding }, './entitlement-record': { ENTITLEMENT_RECORD_VERSION },
     './nutrition/synthetic-preview-policy': { SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID: 'synthetic-base' },
     './preview-entitlement-store': { PREVIEW_ENTITLEMENT_FIELDS: F, PREVIEW_ENTITLEMENTS_TABLE: 'synthetic-access', getPortalAccessRecordByPatientRecordId: async () => source },

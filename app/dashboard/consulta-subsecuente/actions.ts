@@ -6,6 +6,7 @@ import {
   type Consulta, type CuestionarioSintoma,
 } from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
+import { clinicWritesPaused } from '@/lib/clinic-runtime-policy'
 import { updateAccessAfterCompletedConsultation } from '@/lib/clinic-access-after-consultation'
 import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 import { getClienteById } from '@/lib/airtable'
@@ -24,6 +25,7 @@ export async function fetchPatientCuestionarios(nombreCliente: string): Promise<
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
   const actor = await requireCapability('consultations:write:any')
+  if (clinicWritesPaused()) throw new Error('CLINIC_WRITES_PAUSED')
 
   const clienteRecordId = (formData.get('clienteRecordId') as string).trim()
   const patient = await getClienteById(clienteRecordId)

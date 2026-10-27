@@ -2,7 +2,7 @@ import { patientAdministration } from '@/lib/clinic-patient-administration-polic
 import { redirect } from 'next/navigation'
 import { getActor } from '@/lib/auth'
 import { getClientes } from '@/lib/airtable'
-import { clinicRuntimeMode, isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
+import { clinicWritesPaused, clinicRuntimeMode, isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { ClinicPreviewClient } from './clinic-preview-client'
 
 function clinicEnvironment() {
@@ -55,5 +55,6 @@ export default async function ClinicPreviewPage({ searchParams }: ClinicPreviewP
   const requestedPatientId = typeof requestedPatient === 'string' ? requestedPatient : null
   const initialPatientId = items.some(patient => patient.id === requestedPatientId) ? requestedPatientId : null
 
-  return <>{clinicRuntimeMode(environment) === 'candidate' ? <div role="status" style={{padding:16,background:'#211d12',color:'#e2c87a',textAlign:'center'}}>Candidata de publicación · Sólo lectura. Los registros de prueba están separados y no se guardarán cambios.</div> : null}<ClinicPreviewClient patients={items} initialPatientId={initialPatientId} mode={clinicRuntimeMode(environment) ?? 'preview'} /></>
+  const writesPaused = clinicWritesPaused()
+  return <>{writesPaused ? <div role="status" style={{padding:16,background:'#211d12',color:'#e2c87a',textAlign:'center'}}>Clinic en pausa · Puedes revisar expedientes. Los cambios están deshabilitados.</div> : null}{clinicRuntimeMode(environment) === 'candidate' ? <div role="status" style={{padding:16,background:'#211d12',color:'#e2c87a',textAlign:'center'}}>Candidata de publicación · Sólo lectura. Los registros de prueba están separados y no se guardarán cambios.</div> : null}<ClinicPreviewClient writesPaused={writesPaused} patients={items} initialPatientId={initialPatientId} mode={clinicRuntimeMode(environment) ?? 'preview'} /></>
 }

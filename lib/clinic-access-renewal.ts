@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { getClienteById } from './airtable'
-import { clinicRuntimeMode } from './clinic-runtime-policy'
+import { clinicRuntimeMode, clinicWritesPaused, assertClinicSourceWriteAllowed } from './clinic-runtime-policy'
 import { CLINIC_FOUNDER_EMAIL } from './clinic-preview-policy'
 import { SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID } from './nutrition/synthetic-preview-policy'
 import { patientIsUnavailable } from './clinic-patient-administration-policy'
@@ -26,10 +26,11 @@ export async function reviewClinicAccessRenewal({ patientId, consultationId, now
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(now)
   const plan = planClinicAccessRenewal({ patientId, consultationId, visits, record: source?.record ?? null, isOperational: source?.isOperational === true, patientAvailable: !patientIsUnavailable(patient), today })
   const fingerprint = hash({ patient, source, visits, consultationId, today, plan })
-  return { source, review: { ...plan, fingerprint, executionEnabled: clinicRuntimeMode() === 'production' } }
+  return { source, review: { ...plan, fingerprint, executionEnabled: clinicRuntimeMode() === 'production' && !clinicWritesPaused() } }
 }
 export async function executeClinicAccessRenewal(input: { patientId: string; consultationId: string; actorEmail: string; fingerprint?: string; now?: Date }) {
   if (clinicRuntimeMode() !== 'production') throw new Error('ACCESS_RENEWAL_READ_ONLY')
+  assertClinicSourceWriteAllowed()
   if (input.actorEmail.trim().toLowerCase() !== CLINIC_FOUNDER_EMAIL) throw new Error('FORBIDDEN')
   const snapshot = await reviewClinicAccessRenewal(input)
   if (input.fingerprint && input.fingerprint !== snapshot.review.fingerprint) throw new Error('REVIEW_CHANGED')

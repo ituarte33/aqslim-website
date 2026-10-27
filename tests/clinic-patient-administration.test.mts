@@ -84,7 +84,7 @@ async function harness(){
       for(const [key,value]of Object.entries(fields))records[id].fields[key===noteField?'Notas Generales':key]=clone(value)
       return clone(records[id])
     }},
-    './clinic-runtime-policy':{clinicRuntimeMode:()=>mode},
+    './clinic-runtime-policy':{clinicRuntimeMode:()=>mode,clinicWritesPaused:()=>false,assertClinicSourceWriteAllowed:()=>{}},
     './nutrition/synthetic-preview-policy':{SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID:'synthetic-base'},
     './clinic-patient-administration-policy':policy,
     './preview-entitlement-store':{getPortalAccessRecordByPatientRecordId:async()=>targetGrant},

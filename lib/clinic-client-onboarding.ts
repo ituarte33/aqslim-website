@@ -6,7 +6,7 @@ import { getClienteById, getClientesByEmail } from './airtable'
 import { getLinkedClinicConsultationsByPatientId } from './clinic-consultation-source'
 import { isEligibleClinicAiTrialVisitType } from './clinic-ai-trial-policy'
 import { lastCompletedVisitFromConsultations } from './clinic-visit-policy'
-import { clinicRuntimeMode } from './clinic-runtime-policy'
+import { clinicRuntimeMode, clinicWritesPaused, assertClinicSourceWriteAllowed } from './clinic-runtime-policy'
 import { planClinicClientOnboarding, type OnboardingEvidence } from './clinic-client-onboarding-policy'
 import { SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID } from './nutrition/synthetic-preview-policy'
 import { ENTITLEMENT_RECORD_VERSION } from './entitlement-record'
@@ -45,7 +45,7 @@ export async function resolveClinicClientOnboarding(patientId: string, now = new
   }
   const plan = planClinicClientOnboarding(evidence)
   const fingerprint = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
-  return { evidence, review: { ...plan, email, fingerprint, executionEnabled: clinicRuntimeMode() === 'production' } }
+  return { evidence, review: { ...plan, email, fingerprint, executionEnabled: clinicRuntimeMode() === 'production' && !clinicWritesPaused() } }
 }
 
 export async function executeClinicClientOnboarding({ patientId, fingerprint, actorEmail, now = new Date() }: {
@@ -53,6 +53,7 @@ export async function executeClinicClientOnboarding({ patientId, fingerprint, ac
 }) {
   // General client provisioning is deliberately unavailable on the internal pilot branch.
   if (clinicRuntimeMode() !== 'production') throw new Error('CLIENT_ONBOARDING_READ_ONLY')
+  assertClinicSourceWriteAllowed()
   const snapshot = await resolveClinicClientOnboarding(patientId, now)
   if (snapshot.review.fingerprint !== fingerprint) throw new Error('REVIEW_CHANGED')
   if (snapshot.review.operation === 'blocked') throw new Error('ONBOARDING_BLOCKED')
