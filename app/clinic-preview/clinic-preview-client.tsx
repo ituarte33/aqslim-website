@@ -1,3 +1,4 @@
+import { ClinicPatientAdministration } from './clinic-patient-administration'
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -15,6 +16,7 @@ import { ClinicFast36Panel } from './clinic-fast36-panel'
 import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
 
 type Patient = {
+  administrationState: string
   id: string
   name: string
   email: string
@@ -184,6 +186,7 @@ type ClinicPlanSnapshot = {
   visitCadenceDays: number | null
 }
 
+const patientAdministrationLabels: Record<string,string> = {archived:'Archivado',merged:'Duplicado unificado',merging:'Revisión pendiente',invalid:'Revisión pendiente'}
 const tabs = ['Resumen','Consultas','Notas','Plan','My AQSLIM','Mensajes','Seguimiento'] as const
 type Tab = typeof tabs[number]
 const SQUARE_BOOKING_URL = 'https://square.site/appointments/buyer/widget/46af1166-2cd2-4127-b94f-531a768d54c9/8PN49DRQ1C6TC'
@@ -317,7 +320,7 @@ function ClinicConsultationReadinessPanel({ ready, checks }: { ready: boolean; c
 }
 
 export function ClinicPreviewClient({ patients, initialPatientId, mode = 'preview' }: { patients: Patient[]; initialPatientId: string | null; mode?: 'preview' | 'candidate' | 'production' }) {
-  const candidateReadOnly = mode === 'candidate'
+  const [showArchived, setShowArchived] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(initialPatientId)
   const [activeTab, setActiveTab] = useState<Tab>('Resumen')
@@ -418,13 +421,13 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
 
   const filtered = useMemo(() => {
     const q = normalizeClinicSearch(query)
-    if (!q) return patients
-    return patients.filter(patient =>
-      [patient.name, patient.email, patient.phone].some(value => normalizeClinicSearch(value).includes(q))
-    )
-  }, [patients, query])
+    return patients.filter(patient => (showArchived || patient.administrationState === 'active')
+      && (!q || [patient.name, patient.email, patient.phone].some(value => normalizeClinicSearch(value).includes(q))))
+  }, [patients, query, showArchived])
 
   const selected = patients.find(patient => patient.id === selectedId) ?? null
+  const patientArchived = Boolean(selected && selected.administrationState !== 'active')
+  const candidateReadOnly = mode === 'candidate' || patientArchived
   const latestNote = notes[0] ?? null
   const pendingFollowups = notes.filter(note => note.followupRequired)
   const structuredFollowups = notes.filter(note => note.noteType === 'Seguimiento' && note.followup)
@@ -1222,12 +1225,13 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
           <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase' }}>Pacientes</div>
           <h1 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 30, margin: '6px 0 16px' }}>Atención clínica</h1>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar nombre, email o teléfono…" style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(201,168,76,.28)', color: '#FAFAF8', padding: '12px 14px', borderRadius: 10, outline: 'none', marginBottom: 14 }} />
+          <label style={{display:'flex',gap:8,fontSize:12,color:'#C9A84C',marginBottom:12}}><input type="checkbox" checked={showArchived} onChange={event=>setShowArchived(event.target.checked)} />Mostrar archivados y duplicados unificados</label>
           <div style={{ color: '#6F6A64', fontSize: 12, marginBottom: 10 }}>{filtered.length} pacientes</div>
           <div className="clinic-preview-patient-list" style={{ display: 'grid', gap: 8, maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', paddingRight: 4 }}>
             {filtered.map(patient => {
               const active = selectedId === patient.id
               return <button key={patient.id} onClick={() => choosePatient(patient.id)} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 10, padding: '13px 14px', border: active ? '1px solid #C9A84C' : '1px solid rgba(255,255,255,.08)', background: active ? 'rgba(201,168,76,.11)' : 'rgba(255,255,255,.025)', color: '#FAFAF8' }}>
-                <div style={{ fontSize: 14, marginBottom: 5 }}>{patient.name}</div>
+                <div style={{ fontSize: 14, marginBottom: 5 }}>{patient.name}{patient.administrationState !== 'active' ? ` · ${patientAdministrationLabels[patient.administrationState] || 'Revisión pendiente'}` : ''}</div>
                 <div style={{ fontSize: 11, color: '#8E8881' }}>{patient.phone || patient.email || 'Sin contacto registrado'}</div>
               </button>
             })}
@@ -1250,8 +1254,10 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                 </div>
                 <h2 style={{ fontFamily: 'Georgia, serif', fontWeight: 400, fontSize: 38, margin: '8px 0 10px' }}>{selected.name}</h2>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', color: '#9A9590', fontSize: 13 }}>
-                  {selected.phone && <span>{selected.phone}</span>}{selected.email && <span>{selected.email}</span>}{selected.status && <span>Estado: {selected.status}</span>}{selected.language && <span>Idioma: {selected.language}</span>}
+                  {selected.phone && <span>{selected.phone}</span>}{selected.email && <span>{selected.email}</span>}{selected.status && <span>Estado: {patientArchived ? 'Archivado / en revisión' : selected.status}</span>}{selected.language && <span>Idioma: {selected.language}</span>}
                 </div>
+                {mode !== 'preview' ? <ClinicPatientAdministration key={selected.id} patientId={selected.id} patients={patients} readOnly={mode === 'candidate'} /> : null}
+                {patientArchived ? <p role="status" style={{color:'#E2C87A'}}>Expediente archivado o en revisión. Historial disponible sólo para consulta.</p> : null}
                 <div className="clinic-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 20 }}>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px', background: 'rgba(0,0,0,.14)' }}>
                     <div style={{ color: '#77716A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em' }}>Peso actual</div>

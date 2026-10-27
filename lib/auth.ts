@@ -1,4 +1,5 @@
 import 'server-only'
+import { patientIsUnavailable } from './clinic-patient-administration-policy'
 
 import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
@@ -151,6 +152,7 @@ export const getOwnPatient = cache(async (): Promise<Cliente> => {
     ? await getClienteById(patientId)
     : matches[0]
   if (!patient) throw new AuthorizationError('PATIENT_NOT_FOUND')
+  if (patientIsUnavailable(patient)) throw new AuthorizationError('FORBIDDEN')
   return patient
 })
 

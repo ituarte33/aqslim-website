@@ -1,3 +1,4 @@
+import { patientAdministration } from './clinic-patient-administration-policy'
 import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
 import { filterConsultationsForPatient } from './patient-portal-policy'
@@ -381,8 +382,19 @@ export async function deleteSyntheticPublicationLedgerEntries(scopeKey: string):
 export async function getClientesByEmail(email: string): Promise<Cliente[]> {
   const normalizedEmail = escapeAirtableString(email.trim().toLowerCase())
   const formula = encodeURIComponent(`LOWER({Email}) = "${normalizedEmail}"`)
-  const data = await airtableFetch(`/${CLIENTES_TABLE}?filterByFormula=${formula}&maxRecords=2`)
-  return data.records ?? []
+  const matches: Cliente[] = []
+  let offset: string | undefined
+  do {
+    const params = new URLSearchParams({filterByFormula: decodeURIComponent(formula), pageSize: '100'})
+    if (offset) params.set('offset', offset)
+    const data = await airtableFetch(`/${CLIENTES_TABLE}?${params}`)
+    // Only a completed, audited merge removes an identity duplicate. An archived
+    // patient still participates in ambiguity checks and never falls onto someone else.
+    matches.push(...(data.records ?? []).filter((p: Cliente) => patientAdministration(p.fields['Notas Generales']).state !== 'merged'))
+    if (matches.length >= 2) return matches.slice(0, 2)
+    offset = data.offset
+  } while (offset)
+  return matches
 }
 
 export async function getClienteByEmail(email: string): Promise<Cliente | null> {

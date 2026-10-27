@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { createHash } from 'node:crypto'
+import { administeredNotes, patientIsUnavailable } from '../lib/clinic-patient-administration-policy.ts'
 import { planClinicClientOnboarding, type OnboardingEvidence } from '../lib/clinic-client-onboarding-policy.ts'
 import { createCanonicalEntitlementRecord, ENTITLEMENT_RECORD_VERSION } from '../lib/entitlement-record.ts'
 import { resolveCapabilityEntitlement } from '../lib/entitlement-resolver.ts'
@@ -59,7 +60,7 @@ async function harness(trial = false) {
     updateUserMetadata: async (_id: string, input: any) => { metadataWrites++; if(failAccount) throw new Error('uncertain clerk response'); Object.assign(user.privateMetadata, input.privateMetadata) },
   }
   const service = await load('../lib/clinic-client-onboarding.ts', {
-    'server-only': {}, 'node:crypto': { createHash }, '@clerk/nextjs/server': { clerkClient: async () => ({ users }) },
+    './clinic-patient-administration-policy': { patientIsUnavailable }, 'server-only': {}, 'node:crypto': { createHash }, '@clerk/nextjs/server': { clerkClient: async () => ({ users }) },
     './airtable': { getClienteById: async () => ({ id: patientId, fields: { Email: evidence().email } }), getClientesByEmail: async () => [{ id: patientId }] },
     './clinic-consultation-source': { getLinkedClinicConsultationsByPatientId: async () => [
       {fields: { 'ID Cliente': [patientId], 'Tipo de Consulta': trial ? 'Cliente Nuevo' : 'Cliente subsecuente', 'Fecha Consulta': '2026-10-20' }},
@@ -150,14 +151,14 @@ test('alta endpoint requires Founder, same origin, explicit confirmation and pro
 })
 
 async function storeHarness() {
-  let mode = 'candidate', rows: any[] = [], visits: any[] = [], consultationReads = 0
+  let mode = 'candidate', rows: any[] = [], visits: any[] = [], consultationReads = 0, patientNotes = ''
   const names = ['SUBJECT_ID','PATIENT_RECORD_ID','TIER','STATUS','SOURCE','TRIAL_STARTS','TRIAL_ENDS','PAID_THROUGH','LAST_COMPLETED_VISIT','GRACE_ENDS','ACCESS_EXPIRES','SQUARE_SUBSCRIPTION_ID','REASON','LAST_ACCESS_CHANGE','OVERRIDE','OVERRIDE_REASON','RECORD_VERSION','PREVIEW_ONLY']
   const sourceText = await readFile(new URL('../lib/preview-entitlement-store.ts', import.meta.url), 'utf8')
   const fieldIds = Object.fromEntries(names.map(name => [name, new RegExp(`${name}: '(fld[^']+)'`).exec(sourceText)![1]]))
   const fields: any = { [fieldIds.SUBJECT_ID]: accountId, [fieldIds.PATIENT_RECORD_ID]: patientId, [fieldIds.TIER]: 'portal_basic', [fieldIds.STATUS]: 'active', [fieldIds.SOURCE]: 'clinic_visit', [fieldIds.RECORD_VERSION]: ENTITLEMENT_RECORD_VERSION, [fieldIds.LAST_ACCESS_CHANGE]: now.toISOString(), [fieldIds.LAST_COMPLETED_VISIT]: '2099-01-01' }
   rows = [{id:other,fields}]
   const store = await load('../lib/preview-entitlement-store.ts', {
-    'server-only': {}, './clinic-runtime-policy': { CLINIC_RELEASE_BRANCH: 'release-synthetic', clinicRuntimeMode: () => mode },
+    './airtable': {getClienteById:async()=>({id:patientId,fields:{'Notas Generales':patientNotes}})}, './clinic-patient-administration-policy': { patientIsUnavailable }, 'server-only': {}, './clinic-runtime-policy': { CLINIC_RELEASE_BRANCH: 'release-synthetic', clinicRuntimeMode: () => mode },
     './clinic-consultation-source': { getLinkedClinicConsultationsByPatientId: async () => { consultationReads++; return visits } },
     './clinic-visit-policy': { lastCompletedVisitFromConsultations }, './entitlement-windows': { clinicGraceEndDate },
     './nutrition/synthetic-preview-policy': { SYNTHETIC_PREVIEW_AIRTABLE_BASE_ID: 'synthetic-base', isEntitlementEnforcementPreviewBranch: () => false },
@@ -168,7 +169,7 @@ async function storeHarness() {
     const result = filter.includes('TRUE()') ? rows.filter(row => row.fields[fieldIds.PREVIEW_ONLY] === true) : rows
     return new Response(JSON.stringify({records:result}), {status:200})
   } })
-  return { store, fields, fieldIds, setRows:(value:any[])=>{rows=value}, setMode:(value:string)=>{mode=value}, setVisits:(value:any[])=>{visits=value}, reads:()=>consultationReads }
+  return { store, fields, fieldIds, setPatientNotes:(value:string)=>{patientNotes=value}, setRows:(value:any[])=>{rows=value}, setMode:(value:string)=>{mode=value}, setVisits:(value:any[])=>{visits=value}, reads:()=>consultationReads }
 }
 test('live access reader refreshes lifecycle from linked consultations, never onboarding snapshot or another patient', async () => {
   const h = await storeHarness()
@@ -226,4 +227,12 @@ test('eligible client execution stores only the original visit trial window and 
   assert.equal(snapshot.review.newGrant.tier,'clinic_ai')
   const result = await h.service.executeClinicClientOnboarding({patientId,fingerprint:snapshot.review.fingerprint,actorEmail:'founder@example.test',now})
   assert.equal(result.verified,true); assert.deepEqual(h.counts(),[1,1])
+})
+
+test('archive revokes portal-source access on the next read while Founder review retains visibility',async()=>{
+  const h=await storeHarness()
+  h.setPatientNotes(administeredNotes('','archived',{action:'archive',at:now.toISOString(),actor:'founder@example.test',reason:'Synthetic archive'}))
+  await assert.rejects(h.store.getPortalAccessRecordByPatientRecordId({patientRecordId:patientId,canonicalSubjectId:accountId}),/PATIENT_ARCHIVED/)
+  const reviewed=await h.store.getPortalAccessRecordByPatientRecordId({patientRecordId:patientId,canonicalSubjectId:accountId,reviewOnly:true})
+  assert.equal(reviewed.storedSubjectId,accountId)
 })

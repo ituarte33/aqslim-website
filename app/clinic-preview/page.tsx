@@ -1,3 +1,4 @@
+import { patientAdministration } from '@/lib/clinic-patient-administration-policy'
 import { redirect } from 'next/navigation'
 import { getActor } from '@/lib/auth'
 import { getClientes } from '@/lib/airtable'
@@ -27,6 +28,7 @@ export default async function ClinicPreviewPage({ searchParams }: ClinicPreviewP
   const items = patients
     .map(patient => ({
       id: patient.id,
+      administrationState: patientAdministration(patient.fields['Notas Generales']).state,
       name: String(patient.fields['Nombre Completo'] ?? 'Sin nombre'),
       email: String(patient.fields['Email'] ?? ''),
       phone: String(patient.fields['Teléfono'] ?? ''),

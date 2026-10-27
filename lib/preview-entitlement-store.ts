@@ -1,3 +1,5 @@
+import { getClienteById } from './airtable'
+import { patientIsUnavailable } from './clinic-patient-administration-policy'
 import { CLINIC_RELEASE_BRANCH, clinicRuntimeMode } from './clinic-runtime-policy'
 import { getLinkedClinicConsultationsByPatientId } from './clinic-consultation-source'
 import { lastCompletedVisitFromConsultations } from './clinic-visit-policy'
@@ -276,6 +278,10 @@ export async function getPortalAccessRecordByPatientRecordId({
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientRecordId)) return null
   if (!canonicalSubjectId.trim()) return null
 
+  if (!reviewOnly) {
+    const patient = await getClienteById(patientRecordId)
+    if (!patient || patientIsUnavailable(patient)) throw new Error('PATIENT_ARCHIVED')
+  }
   const mode = clinicRuntimeMode()
   const allowOperational = mode === 'candidate' || mode === 'production'
   const records = await queryPreviewEntitlementRecords(

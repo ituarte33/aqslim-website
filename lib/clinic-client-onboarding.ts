@@ -1,4 +1,5 @@
 import 'server-only'
+import { patientIsUnavailable } from './clinic-patient-administration-policy'
 import { createHash } from 'node:crypto'
 import { clerkClient } from '@clerk/nextjs/server'
 import { getClienteById, getClientesByEmail } from './airtable'
@@ -16,6 +17,7 @@ export async function resolveClinicClientOnboarding(patientId: string, now = new
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) throw new Error('INVALID_PATIENT')
   const patient = await getClienteById(patientId)
   if (!patient) throw new Error('PATIENT_NOT_FOUND')
+  if (patientIsUnavailable(patient)) throw new Error('PATIENT_ARCHIVED')
   const email = String(patient.fields['Email'] ?? '').trim().toLowerCase()
   const clerk = await clerkClient()
   // Provider errors are errors, never interpreted as "no existing access/account".
