@@ -22,7 +22,8 @@ import {
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { CLINIC_WEIGHT_UPDATE_TYPE, normalizeClinicWeightEntry } from '@/lib/clinic-weight-entry'
-import { provisionClinicEntitlementForCompletedVisit } from '@/lib/p4-preview-entitlement-provisioning'
+import { updateAccessAfterCompletedConsultation } from '@/lib/clinic-access-after-consultation'
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 
 const TABLE_ID = 'tbl0cTWsYqv4R5n3u'
 
@@ -148,11 +149,21 @@ function liveConsultationMatches(input: {
     && String(fields['Notas del Terapeuta'] ?? '').includes(input.marker)
 }
 
+async function refreshPublishedAccess(input: {patientId:string;consultationId:string;consultationType:string;consultationDate:string;actorEmail:string}) {
+  try {
+    const accessUpdate = await updateAccessAfterCompletedConsultation({patientRecordId:input.patientId,consultationId:input.consultationId,visitType:input.consultationType,visitDate:input.consultationDate,actorEmail:input.actorEmail})
+    return {accessUpdate,warnings:[] as string[]}
+  } catch {
+    return {accessUpdate:{state:'review_required',verified:false},warnings:['clinic_access_requires_review']}
+  }
+}
+
 async function publishPreviewConsultation(input: {
   patientId: string
   patientName: string
   previewRecordId: string
   confirmation: unknown
+  actorEmail: string
 }) {
   if (!/^rec[A-Za-z0-9]{14}$/.test(input.previewRecordId)) {
     return NextResponse.json({ ok: false, error: 'invalid_consultation' }, { status: 400 })
@@ -188,7 +199,9 @@ async function publishPreviewConsultation(input: {
         weightKg,
         marker,
       })
+      const access = auditVerified ? await refreshPublishedAccess({patientId:input.patientId,consultationId:existingPublishedId,consultationType,consultationDate,actorEmail:input.actorEmail}) : {}
       return NextResponse.json({
+        ...access,
         ok: true,
         published: true,
         alreadyPublished: true,
@@ -202,10 +215,15 @@ async function publishPreviewConsultation(input: {
   }
 
   const existingLiveConsultations = await getConsultasByPatientId(input.patientId, input.patientName)
-  const recovered = existingLiveConsultations.find(item => String(item.fields['Notas del Terapeuta'] ?? '').includes(marker))
+  const recoveredMatches = existingLiveConsultations.filter(item => String(item.fields['Notas del Terapeuta'] ?? '').includes(marker))
+  if (recoveredMatches.length > 1) return NextResponse.json({ok:false,error:'publication_requires_review'},{status:409})
+  const recovered = recoveredMatches[0]
   if (recovered) {
+    const valid = liveConsultationMatches({record:recovered,patientId:input.patientId,consultationDate,consultationType,weightKg,marker})
+    if (!valid) return NextResponse.json({ok:false,error:'publication_requires_review'},{status:409})
     const auditVerified = await markPreviewConsultationPublished(input.previewRecordId, previewFields[F.KEY], recovered.id)
-    return NextResponse.json({ ok: true, published: true, alreadyPublished: true, recovered: true, liveConsultationId: recovered.id, auditVerified })
+    const access = auditVerified ? await refreshPublishedAccess({patientId:input.patientId,consultationId:recovered.id,consultationType,consultationDate,actorEmail:input.actorEmail}) : {}
+    return NextResponse.json({ ...access, ok: true, published: true, alreadyPublished: true, recovered: true, liveConsultationId: recovered.id, auditVerified })
   }
 
   const { fields: liveFields } = buildClinicLiveConsultationFields({
@@ -246,20 +264,8 @@ async function publishPreviewConsultation(input: {
     }
   }
 
-  try {
-    await provisionClinicEntitlementForCompletedVisit({
-      patientRecordId: input.patientId,
-      visitType: consultationType,
-      visitDate: consultationDate,
-    })
-  } catch (error) {
-    console.error('clinic_consultation_publication_entitlement_failed_after_commit', {
-      previewRecordId: input.previewRecordId,
-      liveConsultationId: live.id,
-      error: error instanceof Error ? error.message : 'unknown',
-    })
-    warnings.push('preview_entitlement_requires_review')
-  }
+  const access = await refreshPublishedAccess({patientId:input.patientId,consultationId:live.id,consultationType,consultationDate,actorEmail:input.actorEmail})
+  warnings.push(...access.warnings)
 
   const auditVerified = await markPreviewConsultationPublished(input.previewRecordId, previewFields[F.KEY], live.id)
   if (!auditVerified) warnings.push('preview_audit_requires_review')
@@ -269,6 +275,7 @@ async function publishPreviewConsultation(input: {
     published: true,
     liveConsultationId: live.id,
     auditVerified,
+    accessUpdate: access.accessUpdate,
     warnings,
   })
 }
@@ -327,12 +334,14 @@ export async function POST(request: NextRequest) {
   try {
     assertClinicSourceWriteAllowed()
     const actor = await requireFounder()
+    if(request.headers.get('origin')!==request.nextUrl.origin) throw new Error('FORBIDDEN')
     const body = await request.json()
     const patientId = safeText(body.patientId, 100)
     if (!patientId.startsWith('rec')) return NextResponse.json({ ok: false, error: 'invalid_patient' }, { status: 400 })
 
     const patient = await getClienteById(patientId)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found' }, { status: 404 })
+    if(patientIsUnavailable(patient)) return NextResponse.json({ok:false,error:'patient_archived'},{status:409})
 
     if (body.action === 'correctWeight') {
       const recordId = safeText(body.previewRecordId, 100)
@@ -383,6 +392,7 @@ export async function POST(request: NextRequest) {
         patientName: String(patient.fields['Nombre Completo'] ?? 'Paciente'),
         previewRecordId: safeText(body.previewRecordId, 100),
         confirmation: body.confirmation,
+        actorEmail: actor.email,
       })
     }
 

@@ -6,7 +6,9 @@ import {
   type Consulta, type CuestionarioSintoma,
 } from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
-import { provisionClinicEntitlementForCompletedVisit } from '@/lib/p4-preview-entitlement-provisioning'
+import { updateAccessAfterCompletedConsultation } from '@/lib/clinic-access-after-consultation'
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
+import { getClienteById } from '@/lib/airtable'
 
 export async function fetchPatientConsultations(nombreCliente: string): Promise<Consulta[]> {
   await requireCapability('consultations:read:any')
@@ -21,9 +23,11 @@ export async function fetchPatientCuestionarios(nombreCliente: string): Promise<
 }
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
-  await requireCapability('consultations:write:any')
+  const actor = await requireCapability('consultations:write:any')
 
   const clienteRecordId = (formData.get('clienteRecordId') as string).trim()
+  const patient = await getClienteById(clienteRecordId)
+  if (!patient || patientIsUnavailable(patient)) throw new Error('PATIENT_ARCHIVED')
   const fechaConsulta   = (formData.get('fechaConsulta')   as string).trim()
   const nivelEnergia    = (formData.get('nivelEnergia')    as string | null) ?? ''
   const calidadSueno    = (formData.get('calidadSueno')    as string | null) ?? ''
@@ -94,8 +98,10 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
   const consulta = await createConsulta(fields)
 
   try {
-    const provisioning = await provisionClinicEntitlementForCompletedVisit({
+    const provisioning = await updateAccessAfterCompletedConsultation({
       patientRecordId: clienteRecordId,
+      consultationId: consulta.id,
+      actorEmail: actor.email,
       visitType: tipoConsulta,
       visitDate: fechaConsulta,
     })
@@ -109,7 +115,7 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
     })
   } catch (error) {
     // Do not turn a successfully committed consultation into a false save failure.
-    // The entitlement write is Preview-only and separately auditable/recoverable.
+    // Access recovery is separate from the already committed clinical visit.
     console.error('[p4-entitlement-provisioning] failed_after_consultation_commit', {
       consultationId: consulta.id,
       patientRecordId: clienteRecordId,

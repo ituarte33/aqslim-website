@@ -12,6 +12,7 @@ import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
 import { activePlanIncludesFast36 } from '@/lib/clinic-plan-materials'
+import { ClinicConsultationAccess } from './clinic-consultation-access'
 import { ClinicClientOnboarding } from './clinic-client-onboarding'
 import { ClinicFast36Panel } from './clinic-fast36-panel'
 import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
@@ -1126,7 +1127,11 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
       await loadConsultations(selected.id)
       setConsultationPublicationTargetId('')
       setConsultationPublicationConfirmed(false)
-      if (data.auditVerified === false || data.warning || (Array.isArray(data.warnings) && data.warnings.length > 0)) {
+      if (Array.isArray(data.warnings) && data.warnings.includes('clinic_access_requires_review')) {
+        setConsultationPublicationMessage('✓ Consulta publicada. El acceso requiere revisión: usa Vigencia del acceso por consulta, sin volver a publicar la consulta.')
+      } else if (data.accessUpdate?.state === 'onboarding_required') {
+        setConsultationPublicationMessage('✓ Consulta publicada. Completa el alta del cliente para vincular su cuenta y asignar acceso.')
+      } else if (data.auditVerified === false || data.warning || (Array.isArray(data.warnings) && data.warnings.length > 0)) {
         setConsultationPublicationMessage('✓ La consulta fue publicada en el expediente clínico real. Una parte de la auditoría requiere revisión; no vuelvas a publicarla.')
       } else if (data.alreadyPublished) {
         setConsultationPublicationMessage('✓ Esta consulta ya estaba publicada y fue verificada; no se creó un duplicado.')
@@ -1719,7 +1724,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                     </div>}
                   </div>
 
-                  </> : <ClinicClientOnboarding key={selected.id} patientId={selected.id} readOnly={candidateReadOnly} />}
+                  </> : <><ClinicClientOnboarding key={selected.id} patientId={selected.id} readOnly={candidateReadOnly} /><ClinicConsultationAccess key={`${selected.id}:access-visits`} patientId={selected.id} consultations={clinicRecord?.consultations ?? []} readOnly={candidateReadOnly} /></>}
 
                   {accessInvitationBody && <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>

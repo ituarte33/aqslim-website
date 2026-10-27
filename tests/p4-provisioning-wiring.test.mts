@@ -17,7 +17,7 @@ test('P4 provisioning is hard-gated to exact Preview branch and AQSLIM Preview b
 test('consultation commit occurs before P4 entitlement provisioning and provisioning failures do not fake a consultation failure', async () => {
   const action = await source('app/dashboard/consulta-subsecuente/actions.ts')
   const createIndex = action.indexOf('const consulta = await createConsulta(fields)')
-  const provisionIndex = action.indexOf('await provisionClinicEntitlementForCompletedVisit({')
+  const provisionIndex = action.indexOf('await updateAccessAfterCompletedConsultation({')
   const returnIndex = action.indexOf('return { id: consulta.id }')
 
   assert.ok(createIndex >= 0, 'consultation commit must exist')
