@@ -10,6 +10,7 @@ import { beginClinicSubmit, finishClinicSubmit, type ClinicSubmitGuard } from '@
 import { CLINIC_WEIGHT_UPDATE_TYPE, buildClinicWeightHistory, clinicWeightEntryMatches, normalizeClinicWeightEntry, summarizeClinicWeights, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
 import { isLiveClinicConsultationType } from '@/lib/clinic-consultation-publication'
 import { activePlanIncludesFast36 } from '@/lib/clinic-plan-materials'
+import { ClinicClientOnboarding } from './clinic-client-onboarding'
 import { ClinicFast36Panel } from './clinic-fast36-panel'
 import { ClinicRecordView, type ClinicRecord } from './clinic-record-view'
 
@@ -1566,6 +1567,7 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                     </div>
                     {reportedWeightMessage && <div style={{ marginTop: 12, color: reportedWeightMessage.startsWith('✓') ? '#9ED4A8' : '#E0A0A0', fontSize: 12, lineHeight: 1.5 }}>{reportedWeightMessage}</div>}
                   </div>
+                  {mode === 'preview' ? <>
                   <div style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                       <div>
@@ -1709,6 +1711,8 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
                       <div style={{ color: '#77716A', fontSize: 10, marginTop: 5 }}>{accessInvitationDrafts[0].noteAt ? new Date(accessInvitationDrafts[0].noteAt).toLocaleString('es-US') : ''} · {accessInvitationDrafts[0].messageDraft?.status}</div>
                     </div>}
                   </div>
+
+                  </> : <ClinicClientOnboarding key={selected.id} patientId={selected.id} readOnly={candidateReadOnly} />}
 
                   {accessInvitationBody && <div style={{ gridColumn: '1 / -1', border: '1px solid rgba(201,168,76,.22)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>

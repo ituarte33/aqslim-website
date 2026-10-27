@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     if (!actor) throw new Error('UNAUTHENTICATED')
     if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment: currentEnvironment })) throw new Error('FORBIDDEN')
 
+    if (request.headers.get('origin') !== request.nextUrl.origin) throw new Error('FORBIDDEN')
     const body = await request.json() as Record<string, unknown>
     const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : ''
     const action = body.action === 'suspend' || body.action === 'restore' ? body.action : null
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
     if (body.confirmation !== expectedConfirmation) throw new Error('CONFIRMATION_REQUIRED')
 
     const snapshot = await resolveClinicAccessSnapshot({ actor, patientId })
+    if (snapshot.readiness.reconciliation.binding.state !== 'matched') throw new Error('ACCOUNT_NOT_RESOLVED')
     if (!snapshot.accountUserId) throw new Error('ACCOUNT_NOT_RESOLVED')
     if (!snapshot.existingEntitlement) throw new Error('ENTITLEMENT_NOT_FOUND')
 

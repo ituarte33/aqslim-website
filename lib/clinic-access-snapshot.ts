@@ -48,6 +48,7 @@ export async function resolveClinicAccessSnapshot({
     (clinicRuntimeMode() === 'preview' ? getPreviewEntitlementSourceRecordByPatientRecordId : getPortalAccessRecordByPatientRecordId)({
       patientRecordId: patientId,
       canonicalSubjectId: pendingSubject,
+      reviewOnly: true,
     }),
     email
       ? clerkClient().then(async clerk => {

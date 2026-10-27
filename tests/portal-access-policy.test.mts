@@ -35,6 +35,7 @@ test('governed deny override restricts access', () => {
 test('the official My AQSLIM portal reads access status without enabling production mutations', () => {
   assert.match(layoutSource, /getPortalAccessRecordByPatientRecordId/)
   assert.match(storeSource, /process\.env\.VERCEL_ENV === 'production'/)
-  assert.match(storeSource, /all provisioning and mutation paths remain Preview-only/)
+  assert.match(storeSource, /mode === 'candidate' \|\| mode === 'production'/)
+  assert.match(storeSource, /Duplicate portal access records/)
   assert.match(storeSource, /enabled = isPreviewStoreEnabled\(\)/)
 })

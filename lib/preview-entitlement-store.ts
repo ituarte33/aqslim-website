@@ -1,4 +1,7 @@
-import { CLINIC_RELEASE_BRANCH } from './clinic-runtime-policy'
+import { CLINIC_RELEASE_BRANCH, clinicRuntimeMode } from './clinic-runtime-policy'
+import { getLinkedClinicConsultationsByPatientId } from './clinic-consultation-source'
+import { lastCompletedVisitFromConsultations } from './clinic-visit-policy'
+import { clinicGraceEndDate } from './entitlement-windows'
 import 'server-only'
 
 import {
@@ -68,6 +71,7 @@ const SOURCES = new Set<EntitlementSource>([
 ])
 
 export type PreviewEntitlementSourceRecord = {
+  isOperational?: boolean
   record: CanonicalEntitlementRecord
   patientRecordId: string | null
   airtableRecordId: string
@@ -155,11 +159,13 @@ function parsePreviewEntitlementRecord({
   canonicalSubjectId,
   expectedStoredSubjectId,
   expectedPatientRecordId,
+  allowOperational = false,
 }: {
   airtableRecord: AirtableEntitlementRecord
   canonicalSubjectId: string
   expectedStoredSubjectId?: string
   expectedPatientRecordId?: string
+  allowOperational?: boolean
 }): PreviewEntitlementSourceRecord {
   const fields = airtableRecord.fields
   const storedSubjectId = text(fields, PREVIEW_ENTITLEMENT_FIELDS.SUBJECT_ID)
@@ -177,7 +183,7 @@ function parsePreviewEntitlementRecord({
     || !storedStatus
     || !storedSource
     || recordVersion !== ENTITLEMENT_RECORD_VERSION
-    || fields[PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY] !== true
+    || (!allowOperational && fields[PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY] !== true)
   ) {
     throw new Error('Invalid Preview entitlement source record')
   }
@@ -186,6 +192,7 @@ function parsePreviewEntitlementRecord({
   if (!lastAccessChange) throw new Error('Preview entitlement source missing Last Access Change')
 
   return {
+    isOperational: fields[PREVIEW_ENTITLEMENT_FIELDS.PREVIEW_ONLY] !== true,
     airtableRecordId: airtableRecord.id,
     storedSubjectId,
     patientRecordId,
@@ -253,29 +260,46 @@ export async function getPreviewEntitlementSourceRecordByPatientRecordId({
 }
 
 // My AQSLIM must honor a Clinic access restriction on the official production
-// domain. This narrowly scoped reader is the only production path into the
-// entitlement table; all provisioning and mutation paths remain Preview-only.
+// domain. Live records are visible only in the release candidate or explicitly
+// enabled Clinic production runtime. Legacy restrictions remain in the same query;
+// duplicate legacy/live rows fail closed rather than silently selecting a grant.
 export async function getPortalAccessRecordByPatientRecordId({
   patientRecordId,
   canonicalSubjectId,
+  reviewOnly = false,
 }: {
   patientRecordId: string
   canonicalSubjectId: string
+  reviewOnly?: boolean
 }): Promise<PreviewEntitlementSourceRecord | null> {
   if (!isPortalAccessStoreEnabled()) return null
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientRecordId)) return null
   if (!canonicalSubjectId.trim()) return null
 
+  const mode = clinicRuntimeMode()
+  const allowOperational = mode === 'candidate' || mode === 'production'
   const records = await queryPreviewEntitlementRecords(
-    `AND({Patient Record ID} = "${escapeFormulaString(patientRecordId)}", {Preview Only} = TRUE())`,
+    allowOperational
+      ? `{Patient Record ID} = "${escapeFormulaString(patientRecordId)}"`
+      : `AND({Patient Record ID} = "${escapeFormulaString(patientRecordId)}", {Preview Only} = TRUE())`,
     true,
   )
   if (records.length === 0) return null
   if (records.length > 1) throw new Error('Duplicate portal access records')
 
-  return parsePreviewEntitlementRecord({
+  const parsed = parsePreviewEntitlementRecord({
     airtableRecord: records[0],
     canonicalSubjectId,
     expectedPatientRecordId: patientRecordId,
+    allowOperational,
   })
+  if (parsed.isOperational && !reviewOnly && parsed.storedSubjectId !== canonicalSubjectId) throw new Error('PORTAL_SUBJECT_MISMATCH')
+  if (parsed.isOperational && (parsed.record.tier === 'portal_basic' || parsed.record.tier === 'clinic_ai')) {
+    const visits = await getLinkedClinicConsultationsByPatientId(patientRecordId)
+    // Never extend access using an onboarding timestamp or a weight-only entry.
+    const lastCompletedVisit = lastCompletedVisitFromConsultations(visits.filter(visit => visit.fields['ID Cliente']?.includes(patientRecordId)))
+    parsed.record.lastCompletedVisit = lastCompletedVisit
+    parsed.record.graceEnds = lastCompletedVisit ? clinicGraceEndDate(lastCompletedVisit) : null
+  }
+  return parsed
 }

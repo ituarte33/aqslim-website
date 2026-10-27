@@ -16,14 +16,15 @@ export const metadata: Metadata = {
 
 export default async function MyAqslimLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor()
+  let verificationFailed = false
   const entitlement = actor?.boundPatientId
     ? await getPortalAccessRecordByPatientRecordId({
         patientRecordId: actor.boundPatientId,
         canonicalSubjectId: actor.clerkUserId,
-      }).catch(() => null)
+      }).catch(() => { verificationFailed = true; return null })
     : null
 
-  if (!portalAccessIsRestricted(entitlement?.record)) return children
+  if (!verificationFailed && !portalAccessIsRestricted(entitlement?.record)) return children
 
   return <main style={{ minHeight: '100svh', display: 'grid', placeItems: 'center', padding: 24, color: '#F5F2EB', background: 'radial-gradient(circle at 50% 18%, rgba(201,168,76,.12), transparent 24rem), #070807', fontFamily: 'Montserrat, sans-serif' }}>
     <section style={{ width: 'min(100%, 520px)', padding: '36px 28px', border: '1px solid rgba(201,168,76,.42)', borderRadius: 22, background: 'linear-gradient(145deg, rgba(25,26,23,.98), rgba(11,12,11,.98))', textAlign: 'center' }}>
