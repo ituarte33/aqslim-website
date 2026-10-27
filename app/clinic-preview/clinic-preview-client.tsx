@@ -1,5 +1,6 @@
-import { ClinicPatientAdministration } from './clinic-patient-administration'
 'use client'
+
+import { ClinicPatientAdministration } from './clinic-patient-administration'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toCanonicalPhaseName } from '@/lib/phase-names'
