@@ -692,6 +692,29 @@ export async function getCuestionariosByCliente(nombreCliente: string, limit = 6
   return data.records ?? []
 }
 
+// Use the patient's reciprocal links, including questionnaires incorporated by
+// a merge. The original questionnaire may still contain its original name.
+export async function getCuestionariosForPatient(patient: Cliente): Promise<CuestionarioSintoma[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patient.id)) throw new Error('Invalid patient record')
+  const links = patient.fields['Cuestionario Sintomas']
+  if (links === undefined) return []
+  if (!Array.isArray(links) || links.some(id => typeof id !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(id))) {
+    throw new Error('Invalid questionnaire links')
+  }
+  const records: CuestionarioSintoma[] = []
+  const ids = [...new Set(links as string[])]
+  // Bound concurrent provider requests without truncating linked history.
+  for (let start = 0; start < ids.length; start += 10) {
+    const batch = ids.slice(start, start + 10)
+    const readback = await Promise.all(batch.map(id => airtableFetch(`/${CUESTIONARIO_TABLE}/${id}`)))
+    readback.forEach((record, index) => {
+      if (record.id !== batch[index] || !record.fields) throw new Error('Invalid questionnaire record')
+      records.push(record)
+    })
+  }
+  return records.sort((a, b) => b.createdTime.localeCompare(a.createdTime))
+}
+
 export async function hasCuestionario(nombreCliente: string): Promise<boolean> {
   const formula = encodeURIComponent(`{${CUESTIONARIO_FIELDS.NOMBRE}} = "${nombreCliente}"`)
   const data = await airtableFetch(`/${CUESTIONARIO_TABLE}?filterByFormula=${formula}&maxRecords=1`)

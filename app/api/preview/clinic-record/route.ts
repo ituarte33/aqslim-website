@@ -1,7 +1,7 @@
 import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
-import { getClienteById, getConsultasByPatientId, getCuestionariosByCliente } from '@/lib/airtable'
+import { getClienteById, getConsultasByPatientId, getCuestionariosForPatient } from '@/lib/airtable'
 import { buildClinicRecordSnapshot } from '@/lib/clinic-record'
 import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const [consultations, questionnaires] = await Promise.all([
       getConsultasByPatientId(patientId, patientName),
-      getCuestionariosByCliente(patientName, 100),
+      getCuestionariosForPatient(patient),
     ])
 
     return NextResponse.json({

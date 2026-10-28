@@ -67,7 +67,7 @@ test('Clinic Preview wires the complete read-only record separately from Preview
   ])
   assert.match(route, /await requireFounder\(\)/)
   assert.match(route, /getConsultasByPatientId/)
-  assert.match(route, /getCuestionariosByCliente/)
+  assert.match(route, /getCuestionariosForPatient\(patient\)/)
   assert.match(route, /readOnly: true/)
   assert.match(preview, /\/api\/preview\/clinic-record\?patientId=/)
   assert.match(preview, /Expediente clínico completo/)
