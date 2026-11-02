@@ -164,7 +164,7 @@ test('administration endpoint requires Founder, same origin, production, and act
   let mode='candidate',actor:any=null,founder=true,writes=0
   const route=await load('../app/api/preview/clinic-patient-administration/route.ts',{
     'next/server':{NextRequest,NextResponse},'@/lib/auth':{getActor:async()=>actor},
-    '@/lib/clinic-runtime-policy':{clinicRuntimeEnvironment:()=>({}),clinicRuntimeMode:()=>mode,isClinicRuntimeFounderIdentity:()=>founder},
+    '@/lib/clinic-runtime-policy':{clinicRuntimeEnvironment:()=>({}),clinicRuntimeMode:()=>mode,isClinicRuntimeOperatorIdentity:()=>founder},
     '@/lib/clinic-patient-administration':{reviewPatientAdministration:async()=>({review:{action:'archive'}}),executePatientAdministration:async()=>{writes++;return{verified:true}}},
   })
   const request=(origin='https://synthetic.test',confirmation='ARCHIVAR')=>new NextRequest('https://synthetic.test/api/preview/clinic-patient-administration',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({patientId:sourceId,action:'archive',fingerprint:'x',reason:'Reviewed action',confirmation})})

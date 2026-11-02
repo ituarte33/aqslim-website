@@ -2,14 +2,14 @@ import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
 import { getClienteById } from '@/lib/airtable'
-import { isClinicRuntimeFounderIdentity } from '@/lib/clinic-runtime-policy'
+import { isClinicRuntimeOperatorIdentity } from '@/lib/clinic-runtime-policy'
 import { buildClinicFast36 } from '@/lib/clinic-fast36'
 import { clinicFast36StoreEnabled, getClinicFast36Sessions, saveClinicFast36Session } from '@/lib/clinic-fast36-store'
 
 async function founder() {
   if (!clinicFast36StoreEnabled()) throw new Error('NOT_FOUND')
   const actor = await getActor()
-  if (!actor || !isClinicRuntimeFounderIdentity({ email: actor.email, environment: { VERCEL_ENV: process.env.VERCEL_ENV, MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF } })) throw new Error('FORBIDDEN')
+  if (!actor || !isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment: { VERCEL_ENV: process.env.VERCEL_ENV, MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF } })) throw new Error('FORBIDDEN')
   return actor
 }
 function failure(error: unknown) {

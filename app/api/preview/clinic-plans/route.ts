@@ -12,7 +12,7 @@ import {
   getPlanById,
   updatePlan,
 } from '@/lib/airtable'
-import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
+import { isClinicRuntimeOperatorIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { getClinicPlanReadiness } from '@/lib/clinic-plan-readiness'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
 import { clinicWeightInKg, type ClinicWeightUnit } from '@/lib/clinic-weight-entry'
@@ -72,7 +72,7 @@ async function requireFounder() {
   if (!isClinicRuntimeEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 

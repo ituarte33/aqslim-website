@@ -13,7 +13,7 @@ test('Clinic functional V1 stays bound to its isolated Preview branch and Rom', 
 test('Clinic functional V1 provides a guided, refreshable patient workflow', async () => {
   const client = await readFile(new URL('../app/clinic-preview/clinic-preview-client.tsx', import.meta.url), 'utf8')
 
-  assert.match(client, /FUNCIONAL V1 · PREVIEW SEGURO · Sólo Rom/)
+  assert.match(client, /FUNCIONAL V1 · PREVIEW SEGURO · Personal autorizado/)
   assert.match(client, /Flujo funcional V1/)
   assert.match(client, /1\. Revisar expediente/)
   assert.match(client, /2\. Registrar consulta/)

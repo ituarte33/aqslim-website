@@ -134,7 +134,7 @@ test('alta endpoint requires Founder, same origin, explicit confirmation and pro
   const { NextRequest, NextResponse } = await import('next/server')
   const route = await load('../app/api/preview/clinic-client-onboarding/route.ts', {
     'next/server': { NextRequest, NextResponse }, '@/lib/auth': { getActor: async () => actor },
-    '@/lib/clinic-runtime-policy': { clinicRuntimeEnvironment: () => ({}), clinicRuntimeMode: () => mode, isClinicRuntimeFounderIdentity: () => founder },
+    '@/lib/clinic-runtime-policy': { clinicRuntimeEnvironment: () => ({}), clinicRuntimeMode: () => mode, isClinicRuntimeOperatorIdentity: () => founder },
     '@/lib/clinic-client-onboarding': { resolveClinicClientOnboarding: async () => ({review: {operation:'create_basic'}}), executeClinicClientOnboarding: async () => { writes++; return {verified:true} } },
   })
   const request = (origin = 'https://synthetic.test', confirmation = 'ALTA') => new NextRequest('https://synthetic.test/api/preview/clinic-client-onboarding', {method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({patientId,fingerprint:'x',confirmation})})

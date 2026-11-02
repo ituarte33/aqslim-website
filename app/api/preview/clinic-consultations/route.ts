@@ -20,7 +20,7 @@ import {
   isLiveClinicConsultationType,
 } from '@/lib/clinic-consultation-publication'
 import { normalizeClinicIsoDate } from '@/lib/clinic-date'
-import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
+import { isClinicRuntimeOperatorIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { CLINIC_WEIGHT_UPDATE_TYPE, normalizeClinicWeightEntry } from '@/lib/clinic-weight-entry'
 import { updateAccessAfterCompletedConsultation } from '@/lib/clinic-access-after-consultation'
 import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
@@ -75,7 +75,7 @@ async function requireFounder() {
   if (!isClinicRuntimeEnvironment(environment)) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 

@@ -16,6 +16,18 @@ export function isClinicRuntimeEnvironment(environment: ClinicRuntimeEnvironment
 export function isClinicRuntimeFounderIdentity({email, environment}: {email: string; environment: ClinicRuntimeEnvironment}) {
   return isClinicRuntimeEnvironment(environment) && email.trim().toLowerCase() === CLINIC_FOUNDER_EMAIL
 }
+// Server-only deployment configuration. Clinic collaboration grants no global
+// admin role, personal-portal ownership override, or executive access.
+export function isClinicCollaboratorEmail(email: string, configured = process.env.MYAQ_CLINIC_COLLABORATOR_EMAILS): boolean {
+  const normalized = email.trim().toLowerCase()
+  return Boolean(normalized) && (configured ?? '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean).includes(normalized)
+}
+export function isClinicRuntimeOperatorIdentity({ email, emailVerified, environment }: {
+  email: string; emailVerified?: boolean; environment: ClinicRuntimeEnvironment
+}) {
+  return isClinicRuntimeFounderIdentity({ email, environment })
+    || (isClinicRuntimeEnvironment(environment) && emailVerified === true && isClinicCollaboratorEmail(email))
+}
 // Keep the runtime and operational readers enabled during incident recovery.
 // Changing this server environment variable requires a fresh Vercel deployment.
 export function clinicWritesPaused() { return process.env.MYAQ_CLINIC_WRITES_PAUSED === 'true' }

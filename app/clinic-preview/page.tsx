@@ -2,7 +2,7 @@ import { patientAdministration } from '@/lib/clinic-patient-administration-polic
 import { redirect } from 'next/navigation'
 import { getActor } from '@/lib/auth'
 import { getClientes } from '@/lib/airtable'
-import { clinicWritesPaused, clinicRuntimeMode, isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
+import { clinicWritesPaused, clinicRuntimeMode, isClinicRuntimeOperatorIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 import { ClinicPreviewClient } from './clinic-preview-client'
 
 function clinicEnvironment() {
@@ -22,7 +22,7 @@ export default async function ClinicPreviewPage({ searchParams }: ClinicPreviewP
 
   const actor = await getActor()
   if (!actor) redirect('/clinic-preview/login')
-  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) redirect('/my-aqslim')
+  if (!isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment })) redirect('/my-aqslim')
 
   const patients = await getClientes()
   const items = patients

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActor } from '@/lib/auth'
-import { clinicRuntimeEnvironment, clinicRuntimeMode, isClinicRuntimeFounderIdentity } from '@/lib/clinic-runtime-policy'
+import { clinicRuntimeEnvironment, clinicRuntimeMode, isClinicRuntimeOperatorIdentity } from '@/lib/clinic-runtime-policy'
 import { reviewClinicAccessRenewal, executeClinicAccessRenewal } from '@/lib/clinic-access-renewal'
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization' }
@@ -9,7 +9,7 @@ async function founder() {
   if (!['candidate', 'production'].includes(clinicRuntimeMode(environment) ?? '')) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment })) throw new Error('FORBIDDEN')
   return actor
 }
 function failure(error: unknown) {

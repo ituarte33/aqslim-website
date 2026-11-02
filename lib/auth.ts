@@ -30,6 +30,7 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
 export type AuthenticatedActor = {
   clerkUserId: string
   email: string
+  emailVerified?: boolean
   role: AppRole
   capabilities: ReadonlySet<Capability>
   boundPatientId: string | null
@@ -106,6 +107,8 @@ export const getActor = cache(async (): Promise<AuthenticatedActor | null> => {
   return {
     clerkUserId: user.id,
     email,
+    emailVerified: user.emailAddresses.some(address => address.id === user.primaryEmailAddressId
+      && address.emailAddress.trim().toLowerCase() === email && address.verification?.status === 'verified'),
     role,
     capabilities: capabilitiesForRole(role),
     boundPatientId,

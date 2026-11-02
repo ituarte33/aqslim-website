@@ -1218,11 +1218,12 @@ export function ClinicPreviewClient({ patients, initialPatientId, mode = 'previe
       <header className="clinic-preview-header" style={{ position: 'relative', zIndex: 20, background: '#0A0A0A', borderBottom: '1px solid rgba(201,168,76,.28)', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 24, letterSpacing: '.08em' }}>AQ<span style={{ color: '#C9A84C' }}>SLIM</span> Clinic</div>
-          <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>{mode === 'preview' ? 'FUNCIONAL V1 · PREVIEW SEGURO · Sólo Rom' : mode === 'candidate' ? 'CANDIDATA · SÓLO LECTURA · Sólo Rom' : 'CLINIC · ACCESO PRIVADO · Sólo Rom'}</div>
+          <div style={{ color: '#8E8881', fontSize: 12, marginTop: 4 }}>{mode === 'preview' ? 'FUNCIONAL V1 · PREVIEW SEGURO · Personal autorizado' : mode === 'candidate' ? 'CANDIDATA · SÓLO LECTURA · Personal autorizado' : 'CLINIC · ACCESO PRIVADO · Personal autorizado'}</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {selected && <button type="button" className="clinic-preview-patient-picker-button" onClick={() => setShowPatientPicker(value => !value)} style={{ cursor: 'pointer', border: '1px solid rgba(201,168,76,.35)', borderRadius: 9, padding: '9px 12px', background: 'rgba(201,168,76,.08)', color: '#E2C87A', fontSize: 12 }}>{showPatientPicker ? 'Cerrar pacientes' : 'Cambiar paciente'}</button>}
           <a href="/my-aqslim" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Abrir mi My AQSLIM ↗</a>
+          <a href="https://github.com/ituarte33/aqslim-website" target="_blank" rel="noopener noreferrer" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: 13 }}>Proponer mejoras de la aplicación ↗</a>
         </div>
       </header>
 

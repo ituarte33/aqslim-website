@@ -8,7 +8,7 @@ import {
   isClinicAccessExecutionEnabled,
 } from '@/lib/clinic-access-execution-policy'
 import { resolveClinicAccessSnapshot } from '@/lib/clinic-access-snapshot'
-import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
+import { isClinicRuntimeOperatorIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
 function environment() {
   return {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     if (!isClinicPreviewEnvironment(currentEnvironment)) throw new Error('NOT_FOUND')
     const actor = await getActor()
     if (!actor) throw new Error('UNAUTHENTICATED')
-    if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment: currentEnvironment })) throw new Error('FORBIDDEN')
+    if (!isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment: currentEnvironment })) throw new Error('FORBIDDEN')
 
     const body = await request.json() as Record<string, unknown>
     const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : ''

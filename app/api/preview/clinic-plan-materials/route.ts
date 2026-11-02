@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getActor } from '@/lib/auth'
 import { getClienteById, getPlanById } from '@/lib/airtable'
-import { isClinicRuntimeFounderIdentity } from '@/lib/clinic-runtime-policy'
+import { isClinicRuntimeOperatorIdentity } from '@/lib/clinic-runtime-policy'
 import { clinicMaterialStoreEnabled, getClinicMaterialEvents, saveClinicMaterialEvent } from '@/lib/clinic-plan-materials-store'
 import { currentPlanAttachments, materialPlanRevision, planAttachments } from '@/lib/clinic-plan-materials'
 
@@ -11,7 +11,7 @@ async function context(request: NextRequest, body?: Record<string, unknown>) {
   if (!clinicMaterialStoreEnabled()) throw new Error('NOT_FOUND')
   const actor = await getActor()
   if (!actor) throw new Error('UNAUTHENTICATED')
-  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment: { VERCEL_ENV: process.env.VERCEL_ENV, MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF } })) throw new Error('FORBIDDEN')
+  if (!isClinicRuntimeOperatorIdentity({ email: actor.email, emailVerified: actor.emailVerified, environment: { VERCEL_ENV: process.env.VERCEL_ENV, MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF } })) throw new Error('FORBIDDEN')
   const patientId = String(body?.patientId ?? request.nextUrl.searchParams.get('patientId') ?? '')
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) throw new Error('NOT_FOUND')
   const patient = await getClienteById(patientId)
