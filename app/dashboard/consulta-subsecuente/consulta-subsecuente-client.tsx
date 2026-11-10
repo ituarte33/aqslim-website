@@ -9,6 +9,7 @@ import type { Cliente, Consulta, CuestionarioSintoma, Suplemento } from '@/lib/a
 import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
+import styles from './consulta-subsecuente.module.css'
 
 // One week from now as a datetime-local string (YYYY-MM-DDTHH:MM) in local time
 function nextWeekDatetimeLocal(): string {
@@ -761,7 +762,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
         {es ? 'Consulta Subsecuente' : 'Follow-up Consultation'}
       </h1>
       <p style={{ fontSize: pt.base, color: '#6A6560', marginBottom: 32, marginTop: 0 }}>
-        {es ? 'Registra el seguimiento de un paciente.' : 'Record a follow-up for an existing patient.'}
+        {es ? 'Selecciona al paciente, registra su consulta y guarda al terminar.' : 'Select a patient, record the consultation, then save.'}
       </p>
 
       {/* Patient selector (only when not pre-filled from expediente) */}
@@ -825,7 +826,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
       {/* Form — only show once patient is identified */}
       {patient && (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 620 }}>
+        <form onSubmit={handleSubmit} className={styles.form}>
 
           <SectionDivider label={es ? 'Tipo de Consulta' : 'Consultation Type'} />
 
@@ -895,7 +896,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
           <SectionDivider label={es ? 'Mediciones' : 'Measurements'} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className={styles.twoColumns}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ ...labelStyle, display: 'inline', marginBottom: 0 }}>{es ? 'Peso' : 'Weight'}</span>
@@ -931,7 +932,9 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <details className={styles.optional}>
+            <summary>{es ? 'Más medidas corporales · opcional' : 'More body measurements · optional'}</summary>
+          <div className={styles.measurements}>
             {[
               { id: 'cs-cintura', name: 'cintura',  label: es ? 'Cintura (cm)' : 'Waist (cm)'  },
               { id: 'cs-cadera',  name: 'cadera',   label: es ? 'Cadera (cm)'  : 'Hips (cm)'   },
@@ -946,7 +949,11 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             ))}
           </div>
 
-          <SectionDivider label={es ? 'Bienestar' : 'Wellness'} />
+          </details>
+
+          <details className={styles.optional}>
+            <summary>{es ? 'Bienestar y cumplimiento · opcional' : 'Wellness and adherence · optional'}</summary>
+            <div className={styles.optionalContent}>
 
           <ScoreInput
             label={es ? 'Cumplimiento de Dieta (1-10)' : 'Diet Compliance (1-10)'}
@@ -983,7 +990,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             onChange={setCalidadSueno}
           />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className={styles.twoColumns}>
             <ToggleGroup
               label={es ? '¿Ansiedad?' : 'Anxiety?'}
               options={[
@@ -1006,6 +1013,9 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
               onChange={setTuvoHambre}
             />
           </div>
+
+            </div>
+          </details>
 
           <SectionDivider label={es ? 'Suplementos' : 'Supplements'} />
 
@@ -1289,6 +1299,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             onChange={setMetodoPago}
           />
 
+          {tipoConsulta === 'Cliente Re-Inicio' && <>
           <SectionDivider label={es ? 'Email de Re-Inicio' : 'Re-Start Email'} />
 
           <div>
@@ -1347,9 +1358,12 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             </button>
           </div>
 
-          {error && <p style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>}
+          </>}
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+          {error && <p role="alert" style={{ fontSize: pt.sm, color: '#ff6b6b', margin: 0 }}>{error}</p>}
+
+          <div className={styles.actions}>
+            <span className={styles.total}>{es ? 'Total de esta consulta' : 'Consultation total'}: <strong>${montoCobradoTotal.toFixed(2)}</strong></span>
             <button
               type="submit" disabled={isPending}
               style={{

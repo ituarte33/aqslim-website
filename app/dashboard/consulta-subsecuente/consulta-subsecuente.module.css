@@ -1,0 +1,52 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 920px;
+  padding-bottom: 24px;
+}
+.twoColumns, .measurements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.measurements { padding-top: 20px; }
+.optional {
+  border: 1px solid rgba(201, 168, 76, .25);
+  padding: 16px 20px;
+}
+.optional summary {
+  color: #d9c078;
+  cursor: pointer;
+  line-height: 1.5;
+}
+.optional summary:focus-visible {
+  outline: 2px solid #c9a84c;
+  outline-offset: 5px;
+}
+.optionalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 20px;
+}
+.actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: #11100c;
+  border: 1px solid rgba(201, 168, 76, .4);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, .25);
+}
+.total { margin-right: auto; color: #d9c078; font-size: 14px; }
+@media (max-width: 600px) {
+  .twoColumns, .measurements { grid-template-columns: 1fr; }
+  .optional { padding: 14px; }
+  .total { flex-basis: 100%; }
+  .actions button { padding: 12px 16px !important; }
+}
