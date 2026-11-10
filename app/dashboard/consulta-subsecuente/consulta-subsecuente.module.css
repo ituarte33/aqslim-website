@@ -24,12 +24,6 @@
   outline: 2px solid #c9a84c;
   outline-offset: 5px;
 }
-.optionalContent {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding-top: 20px;
-}
 .actions {
   position: sticky;
   bottom: 0;

@@ -68,35 +68,6 @@ function SectionDivider({ label }: { label: string }) {
   )
 }
 
-// ── Score selector (1-10) ─────────────────────────────────────────────────────
-
-function ScoreInput({
-  label, value, onChange,
-}: { label: string; value: number | null; onChange: (v: number) => void }) {
-  return (
-    <div>
-      <span style={labelStyle}>{label}</span>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-          <button
-            key={n} type="button" onClick={() => onChange(n)}
-            style={{
-              width: 38, height: 38,
-              border: value === n ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.25)',
-              background: value === n ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.03)',
-              color: value === n ? '#C9A84C' : '#9A9590',
-              cursor: 'pointer', fontSize: pt.sm, fontFamily: pt.sans,
-              transition: 'all 0.12s',
-            }}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Toggle group ──────────────────────────────────────────────────────────────
 
 function ToggleGroup<T extends string>({
@@ -580,14 +551,8 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
   // Form state
   const [tipoConsulta,    setTipoConsulta]    = useState<string | null>(null)
-  const [nivelEnergia,    setNivelEnergia]    = useState<string | null>(null)
-  const [calidadSueno,    setCalidadSueno]    = useState<string | null>(null)
   const [metodoPago,      setMetodoPago]      = useState<string | null>(null)
   const [responsableReactivacion, setResponsableReactivacion] = useState('')
-  const [ansiedad,        setAnsiedad]        = useState<string | null>(null)
-  const [tuvoHambre,      setTuvoHambre]      = useState<string | null>(null)
-  const [cumplimiento,    setCumplimiento]    = useState<number | null>(null)
-  const [comoSeSiente,    setComoSeSiente]    = useState<number | null>(null)
 
   // Supplement cart
   const [cart, setCart]                   = useState<CartItem[]>([])
@@ -666,13 +631,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     formData.set('suplementoCobrado', String(supplementTotal))
     formData.set('envioCobrado', String(shippingCost))
     if (responsableReactivacion) formData.set('responsableReactivacion', responsableReactivacion)
-    if (ansiedad)   formData.set('ansiedad',   ansiedad)
-    if (tuvoHambre) formData.set('tuvoHambre', tuvoHambre)
-    if (nivelEnergia)  formData.set('nivelEnergia',       nivelEnergia)
-    if (calidadSueno)  formData.set('calidadSueno',       calidadSueno)
     if (metodoPago)    formData.set('metodoPago',         metodoPago)
-    if (cumplimiento !== null) formData.set('cumplimientoDieta', String(cumplimiento))
-    if (comoSeSiente !== null) formData.set('comoSeSiente',      String(comoSeSiente))
     const hasShipping = tipoConsulta === 'Suplementos + Envio' && shippingOption !== null
     if (cart.length > 0 || hasShipping) {
       const parts: string[] = []
@@ -949,72 +908,6 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
             ))}
           </div>
 
-          </details>
-
-          <details className={styles.optional}>
-            <summary>{es ? 'Bienestar y cumplimiento · opcional' : 'Wellness and adherence · optional'}</summary>
-            <div className={styles.optionalContent}>
-
-          <ScoreInput
-            label={es ? 'Cumplimiento de Dieta (1-10)' : 'Diet Compliance (1-10)'}
-            value={cumplimiento} onChange={setCumplimiento}
-          />
-          <ScoreInput
-            label={es ? 'Cómo Se Siente (1-10)' : 'How They Feel (1-10)'}
-            value={comoSeSiente} onChange={setComoSeSiente}
-          />
-
-          <ToggleGroup
-            label={es ? 'Nivel de Energía' : 'Energy Level'}
-            options={[
-              { value: 'Excelente', label: es ? 'Excelente' : 'Excellent' },
-              { value: 'Bueno',     label: es ? 'Bueno'     : 'Good'      },
-              { value: 'Regular',   label: es ? 'Regular'   : 'Fair'      },
-              { value: 'Malo',      label: es ? 'Malo'      : 'Poor'      },
-              { value: 'Muy Malo',  label: es ? 'Muy Malo'  : 'Very Poor' },
-            ]}
-            value={nivelEnergia}
-            onChange={setNivelEnergia}
-          />
-
-          <ToggleGroup
-            label={es ? 'Calidad de Sueño' : 'Sleep Quality'}
-            options={[
-              { value: 'Excelente', label: es ? 'Excelente' : 'Excellent' },
-              { value: 'Bueno',     label: es ? 'Bueno'     : 'Good'      },
-              { value: 'Regular',   label: es ? 'Regular'   : 'Fair'      },
-              { value: 'Malo',      label: es ? 'Malo'      : 'Poor'      },
-              { value: 'Muy Malo',  label: es ? 'Muy Malo'  : 'Very Poor' },
-            ]}
-            value={calidadSueno}
-            onChange={setCalidadSueno}
-          />
-
-          <div className={styles.twoColumns}>
-            <ToggleGroup
-              label={es ? '¿Ansiedad?' : 'Anxiety?'}
-              options={[
-                { value: 'Mucha', label: es ? 'Mucha' : 'High'  },
-                { value: 'Poca',  label: es ? 'Poca'  : 'Some'  },
-                { value: 'Nada',  label: es ? 'Nada'  : 'None'  },
-              ]}
-              value={ansiedad}
-              onChange={setAnsiedad}
-            />
-            <ToggleGroup
-              label={es ? '¿Tuvo Hambre?' : 'Felt Hungry?'}
-              options={[
-                { value: 'Mucha',     label: es ? 'Mucha'     : 'Very hungry'    },
-                { value: 'Manejable', label: es ? 'Manejable' : 'Manageable'     },
-                { value: 'Poca',      label: es ? 'Poca'      : 'A little'       },
-                { value: 'Nada',      label: es ? 'Nada'      : 'Not at all'     },
-              ]}
-              value={tuvoHambre}
-              onChange={setTuvoHambre}
-            />
-          </div>
-
-            </div>
           </details>
 
           <SectionDivider label={es ? 'Suplementos' : 'Supplements'} />
