@@ -765,8 +765,13 @@ export async function getConsultasRevenueSummary(): Promise<ConsultasRevenueSumm
   const formula = encodeURIComponent(
     `AND(YEAR({Fecha Consulta}) = ${ptYear}, MONTH({Fecha Consulta}) = ${ptMonth}, {Monto Cobrado ($)} > 0)`
   )
-  const data = await airtableFetch(`/Consultas?filterByFormula=${formula}`)
-  const consultas: Consulta[] = data.records ?? []
+  const consultas: Consulta[] = []
+  let offset: string | undefined
+  do {
+    const page = await airtableFetch(`/Consultas?filterByFormula=${formula}&pageSize=100${offset ? `&offset=${encodeURIComponent(offset)}` : ''}`)
+    consultas.push(...(page.records ?? []))
+    offset = page.offset
+  } while (offset)
 
   const byMethodMap = new Map<string, { total: number; count: number }>()
   let today = 0, week = 0

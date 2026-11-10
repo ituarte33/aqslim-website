@@ -47,6 +47,8 @@ export default async function DashboardPage() {
   let todaysBookingCount: number | null = null
   let consultasCash: number | null = null
   let consultasCard: number | null = null
+  let consultasTotal: number | null = null
+  let bookingsUnavailable = false
   let airtableError: string | null = null
   try {
     patients = await getClientes()
@@ -57,14 +59,16 @@ export default async function DashboardPage() {
   const [_rev, _bookings, _upcoming, _consultas] = await Promise.all([
     getMonthlyRevenue().catch((): null => null),
     getTodaysBookingCount().catch((): null => null),
-    getUpcomingBookings().catch(() => []),
+    getUpcomingBookings().catch(() => null),
     getConsultasRevenueSummary().catch((): null => null),
   ])
   monthlyRevenue  = _rev
   todaysBookingCount = _bookings
-  upcomingBookings = _upcoming
+  upcomingBookings = _upcoming ?? []
+  bookingsUnavailable = _upcoming === null
   consultasCash  = _consultas?.cash ?? null
   consultasCard  = _consultas?.card ?? null
+  consultasTotal = _consultas?.total ?? null
 
   return (
     <DashboardClient
@@ -75,6 +79,8 @@ export default async function DashboardPage() {
       todaysBookingCount={todaysBookingCount}
       consultasCash={consultasCash}
       consultasCard={consultasCard}
+      consultasTotal={consultasTotal}
+      bookingsUnavailable={bookingsUnavailable}
       airtableError={airtableError}
     />
   )

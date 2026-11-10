@@ -55,18 +55,20 @@ test('only accepts governed pilot feedback workflow states', () => {
 })
 
 test('provides an admin report inbox with filters and status tracking', async () => {
-  const [page, client, actions, shell] = await Promise.all([
+  const [page, client, actions, shell, reportClient] = await Promise.all([
     readFile(new URL('../app/dashboard/pilot-feedback/page.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/dashboard/pilot-feedback/pilot-feedback-client.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/dashboard/pilot-feedback/actions.ts', import.meta.url), 'utf8'),
     readFile(new URL('../app/dashboard/dashboard-shell.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/dashboard/reports/reports-client.tsx', import.meta.url), 'utf8'),
   ])
   assert.match(page, /feedback:read:any/)
   assert.match(client, /Reportes del piloto/)
   assert.match(client, /FEEDBACK_CATEGORIES/)
   assert.match(client, /updatePilotFeedbackStatusAction/)
   assert.match(actions, /feedback:write:any/)
-  assert.match(shell, /dashboard\/pilot-feedback/)
+  assert.match(shell, /dashboard\/reports/)
+  assert.match(reportClient, /dashboard\/pilot-feedback/)
 })
 
 test('integrates permanent feedback access into the pilot home and all four tools', async () => {

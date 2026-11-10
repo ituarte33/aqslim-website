@@ -6,6 +6,7 @@ import {
   type Consulta, type CuestionarioSintoma,
 } from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
+import { businessDateTimeToUtc } from '@/lib/business-time'
 import { clinicWritesPaused } from '@/lib/clinic-runtime-policy'
 import { updateAccessAfterCompletedConsultation } from '@/lib/clinic-access-after-consultation'
 import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
@@ -23,7 +24,7 @@ export async function fetchPatientCuestionarios(nombreCliente: string): Promise<
   return getCuestionariosByCliente(nombreCliente)
 }
 
-export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string }> {
+export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string; warnings: string[] }> {
   const actor = await requireCapability('consultations:write:any')
   if (clinicWritesPaused()) throw new Error('CLINIC_WRITES_PAUSED')
 
@@ -97,7 +98,9 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
 
   // Consultation is the clinical source of truth. P4 entitlement provisioning runs only
   // after this write succeeds, never before it.
+  const nextAppointmentAt = proximaCita ? businessDateTimeToUtc(proximaCita) : null
   const consulta = await createConsulta(fields)
+  const warnings: string[] = []
 
   try {
     const provisioning = await updateAccessAfterCompletedConsultation({
@@ -116,6 +119,7 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
       reason: provisioning.reason,
     })
   } catch (error) {
+    warnings.push('La consulta quedó guardada. El acceso a My AQSLIM requiere revisión; no vuelvas a guardar esta consulta.')
     // Do not turn a successfully committed consultation into a false save failure.
     // Access recovery is separate from the already committed clinical visit.
     console.error('[p4-entitlement-provisioning] failed_after_consultation_commit', {
@@ -126,12 +130,14 @@ export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id:
     })
   }
 
-  // Próxima Cita lives on the Cliente record (the Consultas field is a lookup — read-only).
-  if (proximaCita) {
-    const d = new Date(proximaCita)
-    const isoDate = isNaN(d.getTime()) ? proximaCita : d.toISOString()
-    await updateCliente(clienteRecordId, { [CLIENTES_FIELDS.PROXIMA_CITA]: isoDate })
+  // A failure here must not invite a second clinical write.
+  if (nextAppointmentAt) {
+    try {
+      await updateCliente(clienteRecordId, { [CLIENTES_FIELDS.PROXIMA_CITA]: nextAppointmentAt })
+    } catch {
+      warnings.push('La consulta quedó guardada, pero no se actualizó la próxima cita. Revisa la cita en el expediente; no vuelvas a guardar esta consulta.')
+    }
   }
 
-  return { id: consulta.id }
+  return { id: consulta.id, warnings }
 }

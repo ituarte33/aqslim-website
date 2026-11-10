@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useRef } from 'react'
 import { pt } from '@/lib/portal-type'
+import { bookingCalendarNavigation } from '@/lib/appointment-metrics'
 import { fetchServices, fetchAvailability, bookAppointment, searchPatients, type PatientResult } from './booking-actions'
 import type { SquareService, AvailableSlot } from '@/lib/square'
 
@@ -63,8 +64,7 @@ function Calendar({
   const firstWeekday = new Date(calYear, calMonth, 1).getDay()
   const monthLabel   = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'es-MX', { month: 'long' })
     .format(new Date(calYear, calMonth, 1))
-  const canPrev = !(calYear === y0 && calMonth === m0 - 1)
-  const canNext = !(calYear === y0 && calMonth === m0 + 1)
+  const { canPrev, canNext } = bookingCalendarNavigation(calYear, calMonth, todayStr)
 
   function prev() {
     if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11) }

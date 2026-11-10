@@ -18,7 +18,7 @@ test('consultation commit occurs before P4 entitlement provisioning and provisio
   const action = await source('app/dashboard/consulta-subsecuente/actions.ts')
   const createIndex = action.indexOf('const consulta = await createConsulta(fields)')
   const provisionIndex = action.indexOf('await updateAccessAfterCompletedConsultation({')
-  const returnIndex = action.indexOf('return { id: consulta.id }')
+  const returnIndex = action.indexOf('return { id: consulta.id, warnings }')
 
   assert.ok(createIndex >= 0, 'consultation commit must exist')
   assert.ok(provisionIndex > createIndex, 'provisioning must run after consultation commit')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
 import { saveConsultaSubsecuente, fetchPatientConsultations, fetchPatientCuestionarios } from './actions'
@@ -575,9 +575,10 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [proximaCita, setProximaCita] = useState(nextWeekDatetimeLocal)
   const [showBooking, setShowBooking] = useState(false)
 
-  const [saved,      setSaved]      = useState<{ id: string } | null>(null)
+  const [saved,      setSaved]      = useState<{ id: string; warnings?: string[] } | null>(null)
   const [error,      setError]      = useState<string | null>(null)
   const [isPending,  startTransition] = useTransition()
+  const submitInProgress = useRef(false)
 
   const [emailPending, startEmailTransition] = useTransition()
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'error'>('idle')
@@ -613,6 +614,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submitInProgress.current) return
     if (!patient) { setError(es ? 'Selecciona un paciente.' : 'Select a patient.'); return }
     if (!tipoConsulta) { setError(es ? 'Selecciona el tipo de consulta.' : 'Select the consultation type.'); return }
     setError(null)
@@ -649,12 +651,15 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
       formData.set('notasSuplemento', parts.join('\n'))
     }
 
+    submitInProgress.current = true
     startTransition(async () => {
       try {
         const result = await saveConsultaSubsecuente(formData)
         setSaved(result)
       } catch (err) {
         setError(err instanceof Error ? err.message : (es ? 'Error al guardar.' : 'Error saving.'))
+      } finally {
+        submitInProgress.current = false
       }
     })
   }
@@ -678,6 +683,7 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
               {es ? 'La consulta subsecuente fue guardada exitosamente en Airtable.' : 'The follow-up consultation was saved successfully to Airtable.'}
             </div>
           </div>
+          {saved.warnings?.map(warning => <p key={warning} role="status" style={{ color: '#E2C87A', lineHeight: 1.6 }}>{es ? warning : 'The consultation was saved. A related access or appointment update needs review; do not save the consultation again.'}</p>)}
           <div style={{ display: 'flex', gap: 12 }}>
             <button
               onClick={() => { setSaved(null); setSelectedPatient(initialPatient) }}

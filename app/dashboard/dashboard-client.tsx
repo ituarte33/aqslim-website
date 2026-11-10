@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { DashboardShell } from './dashboard-shell'
 import type { getClientes } from '@/lib/airtable'
 import type { SquareBooking } from '@/lib/square'
@@ -18,6 +19,8 @@ type Props = {
   todaysBookingCount: number | null
   consultasCash: number | null
   consultasCard: number | null
+  consultasTotal: number | null
+  bookingsUnavailable: boolean
   airtableError: string | null
 }
 
@@ -28,7 +31,7 @@ const copy = {
     consultaSubsecuente: 'Consulta Subsecuente',
     appointments: {
       label: 'Citas',
-      statUnit: 'citas hoy',
+      statUnit: 'citas pendientes hoy',
       desc: 'Gestiona y programa citas con tus pacientes.',
       link: 'Ver citas →',
       none: 'Sin citas próximas',
@@ -36,7 +39,7 @@ const copy = {
     },
     finances: {
       label: 'Finanzas',
-      statUnit: 'ingresos este mes',
+      statUnit: 'ingresos registrados este mes',
       desc: 'Revisa pagos, facturas y reportes financieros.',
       link: 'Ver finanzas →',
     },
@@ -53,7 +56,7 @@ const copy = {
     consultaSubsecuente: 'Follow-up Consultation',
     appointments: {
       label: 'Appointments',
-      statUnit: 'appointments today',
+      statUnit: 'remaining appointments today',
       desc: 'Manage and schedule patient appointments.',
       link: 'View appointments →',
       none: 'No upcoming appointments',
@@ -62,7 +65,7 @@ const copy = {
     finances: {
       label: 'Finances',
       stat: '—',
-      statUnit: 'revenue this month',
+      statUnit: 'recorded revenue this month',
       desc: 'Review payments, invoices, and financial reports.',
       link: 'View finances →',
     },
@@ -79,14 +82,15 @@ function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
 }
 
-export function DashboardClient({ user, patients, upcomingBookings, monthlyRevenue, todaysBookingCount, consultasCash, consultasCard, airtableError }: Props) {
+export function DashboardClient({ user, patients, upcomingBookings, monthlyRevenue, todaysBookingCount, consultasCash, consultasCard, consultasTotal, bookingsUnavailable, airtableError }: Props) {
+  const router = useRouter()
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const t = copy[lang]
   const es = lang === 'es'
   const [showBooking, setShowBooking] = useState(false)
 
-  const hasFinancesData = monthlyRevenue !== null || consultasCash !== null
-  const combinedTotal   = (monthlyRevenue ?? 0) + (consultasCash ?? 0)
+  const hasFinancesData = consultasTotal !== null
+  const combinedTotal = consultasTotal ?? 0
   const cardDiff        = monthlyRevenue !== null && consultasCard !== null
     ? consultasCard - monthlyRevenue
     : null
@@ -145,7 +149,7 @@ export function DashboardClient({ user, patients, upcomingBookings, monthlyReven
             allowedServices={ADMIN_SERVICES}
             isAdmin
             lang={lang}
-            onBooked={() => setShowBooking(false)}
+            onBooked={() => { setShowBooking(false); router.refresh() }}
           />
         </div>
       )}
@@ -168,7 +172,7 @@ export function DashboardClient({ user, patients, upcomingBookings, monthlyReven
           preview={
             upcomingBookings.length === 0 ? (
               <p style={{ fontSize: pt.sm, color: '#6A6560', margin: 0 }}>
-                {t.appointments.none}
+                {bookingsUnavailable ? (es ? 'No se pudo consultar la agenda. Abre Citas para volver a intentar.' : 'Appointments could not be loaded. Open Appointments to try again.') : t.appointments.none}
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -213,7 +217,7 @@ export function DashboardClient({ user, patients, upcomingBookings, monthlyReven
         <SummaryCard
           href="/dashboard/patients"
           title={t.patients.label}
-          stat={String(patients.length)}
+          stat={airtableError ? '—' : String(patients.length)}
           statUnit={t.patients.statUnit}
           description={t.patients.desc}
           linkLabel={t.patients.link}

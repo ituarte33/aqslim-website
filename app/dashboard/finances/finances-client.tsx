@@ -6,6 +6,7 @@ import { pt } from '@/lib/portal-type'
 import type { FinanceRecord } from '@/lib/airtable'
 import type { getFinancesSummary, SquarePayment } from '@/lib/square'
 import { getFinanceMetrics, getGrowthMetrics } from '@/lib/finance-metrics'
+import { businessDate } from '@/lib/business-time'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ function formatUSD(amount: number): string {
 function formatDate(iso: string, lang: 'es' | 'en'): string {
   try {
     return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
+      month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles',
       hour: 'numeric', minute: '2-digit',
     }).format(new Date(iso))
   } catch { return iso }
@@ -62,7 +63,7 @@ function classifyMethod(method: string): 'cash' | 'card' | 'other' {
 // ─── Period helpers ────────────────────────────────────────────────────────────
 
 function getTodayStr(): string {
-  return new Date().toLocaleDateString('en-CA')
+  return businessDate()
 }
 
 function getMondayOfWeek(dateStr: string): string {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { DashboardShell } from '../dashboard-shell'
 import { pt } from '@/lib/portal-type'
 import type { SquareBooking } from '@/lib/square'
@@ -10,7 +11,7 @@ import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 
 const SQUARE_MANAGE_URL   = 'https://app.squareup.com/dashboard/appointments/calendar'
-const GOOGLE_CALENDAR_SRC = 'https://calendar.google.com/calendar/embed?src=9d8c0344cef5ea1337d190292b059834d0cdbbee9b2282712a61f89dc804fbf7%40group.calendar.google.com&ctz=America%2FPhoenix'
+const GOOGLE_CALENDAR_SRC = 'https://calendar.google.com/calendar/embed?src=9d8c0344cef5ea1337d190292b059834d0cdbbee9b2282712a61f89dc804fbf7%40group.calendar.google.com&ctz=America%2FLos_Angeles'
 
 type Tab = 'list' | 'calendar'
 
@@ -51,6 +52,7 @@ function StatusBadge({ status, lang }: { status: string; lang: 'es' | 'en' }) {
 }
 
 export function AppointmentsClient({ user, bookings, airtableHrefs, squareError }: Props) {
+  const router = useRouter()
   const [lang, setLang] = useState<'es' | 'en'>('es')
   const [tab, setTab]   = useState<Tab>('list')
   const [showBooking, setShowBooking] = useState(false)
@@ -115,7 +117,7 @@ export function AppointmentsClient({ user, bookings, airtableHrefs, squareError 
             allowedServices={ADMIN_SERVICES}
             isAdmin
             lang={lang}
-            onBooked={() => setShowBooking(false)}
+            onBooked={() => { setShowBooking(false); router.refresh() }}
           />
         </div>
       )}

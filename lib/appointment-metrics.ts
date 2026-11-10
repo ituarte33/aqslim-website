@@ -22,3 +22,10 @@ export function formatAppointmentDate(iso: string, lang: 'es' | 'en'): string {
     return iso
   }
 }
+
+export function bookingCalendarNavigation(year: number, monthIndex: number, today: string) {
+  const [todayYear, todayMonth] = today.split('-').map(Number)
+  const first = todayYear * 12 + todayMonth - 1
+  const selected = year * 12 + monthIndex
+  return { canPrev: selected > first, canNext: selected < first + 1 }
+}

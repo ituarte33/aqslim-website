@@ -20,7 +20,7 @@ const NAV = [
   { href: '/dashboard/finances', exact: false, es: 'Finanzas', en: 'Finances' },
   { href: '/dashboard/patients', exact: false, es: 'Clientes', en: 'Clients' },
   { href: '/dashboard/plan-preview', exact: false, es: 'Planes Preview', en: 'Plan Preview' },
-  { href: '/dashboard/pilot-feedback', exact: false, es: 'Reportes', en: 'Reports' },
+  { href: '/dashboard/reports', exact: false, es: 'Reportes', en: 'Reports' },
   { href: '/food-scanner', exact: false, es: '🍽 Mis Comidas', en: '🍽 My Meals' },
 ]
 
@@ -61,7 +61,7 @@ export function DashboardShell({ user, lang, setLang, isolatedPreview = false, c
         background: 'rgba(10,10,10,0.95)', zIndex: 10,
         gap: 32,
       }}>
-        <Link href={isolatedPreview ? '/dashboard/plan-preview' : '/'} style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
+        <Link href={isolatedPreview ? '/dashboard/plan-preview' : '/dashboard'} style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
           <span style={{ fontFamily: pt.serif, fontSize: pt.lg, letterSpacing: '0.08em' }}>
             AQ<span style={{ color: '#C9A84C' }}>SLIM</span>
             <span style={{ fontSize: pt.xs, color: '#9A9590', marginLeft: 10, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: pt.sans }}>
@@ -71,7 +71,7 @@ export function DashboardShell({ user, lang, setLang, isolatedPreview = false, c
         </Link>
 
         {/* Nav links — using div to avoid global nav { position: fixed } in globals.css */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflowX: 'auto' }}>
           {visibleNav.map(item => {
             const active = isActive(item)
             const isHov = hovered === item.href

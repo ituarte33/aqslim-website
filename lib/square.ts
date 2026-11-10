@@ -1,3 +1,6 @@
+import { businessPeriod } from './business-time'
+import { isUpcomingAppointment } from './appointment-metrics'
+
 const BASE = process.env.SQUARE_ENVIRONMENT === 'sandbox'
   ? 'https://connect.squareupsandbox.com/v2'
   : 'https://connect.squareup.com/v2'
@@ -68,41 +71,18 @@ function sum(payments: SquarePayment[]): number {
 }
 
 // Returns today/week/month totals + recent payments, all from a single API sweep.
-export async function getFinancesSummary() {
-  const now = new Date()
-
-  // Derive current date in Pacific time so "today" / "this week" match the business timezone.
-  const ptParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: 'numeric', minute: 'numeric', second: 'numeric',
-    hour12: false,
-  }).formatToParts(now)
-  const ptGet = (t: string) => Number(ptParts.find(p => p.type === t)?.value ?? 0)
-  const ptYear = ptGet('year'), ptMonth = ptGet('month'), ptDay = ptGet('day')
-
-  // "PT clock treated as UTC" lets us recover the real PT→UTC offset at this instant.
-  const ptAsUTC  = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay, ptGet('hour'), ptGet('minute'), ptGet('second')))
-  const offsetMs = now.getTime() - ptAsUTC.getTime()
-
-  // PT midnight → UTC instant
-  const todayStart = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay) + offsetMs)
-
-  // Day of week in PT (0=Sun…6=Sat); use noon UTC on that date to avoid DST edge cases.
-  const dow = new Date(Date.UTC(ptYear, ptMonth - 1, ptDay, 12)).getUTCDay()
-  const weekStart = new Date(todayStart.getTime() - (dow === 0 ? 6 : dow - 1) * 86_400_000)
-
-  const monthStart = new Date(Date.UTC(ptYear, ptMonth - 1, 1) + offsetMs)
-  const all = await fetchAllPayments(monthStart.toISOString())
-
-  const todayISO = todayStart.toISOString()
-  const weekISO  = weekStart.toISOString()
-
+export async function getFinancesSummary(now = new Date()) {
+  const period = businessPeriod(now)
+  // A Monday-to-Sunday week can start in the preceding month.
+  const earliest = period.weekStart < period.monthStart ? period.weekStart : period.monthStart
+  const all = await fetchAllPayments(earliest)
+  const completed = all.filter(payment => payment.created_at <= now.toISOString())
+  const month = completed.filter(payment => payment.created_at >= period.monthStart)
   return {
-    month:  sum(all),
-    week:   sum(all.filter(p => p.created_at >= weekISO)),
-    today:  sum(all.filter(p => p.created_at >= todayISO)),
-    recent: all.slice(0, 25),
+    month: sum(month),
+    week: sum(completed.filter(payment => payment.created_at >= period.weekStart)),
+    today: sum(completed.filter(payment => payment.created_at >= period.todayStart)),
+    recent: month.slice(0, 25),
   }
 }
 
@@ -144,22 +124,38 @@ async function getServiceVariationName(variationId: string): Promise<string | un
   }
 }
 
-export async function getUpcomingBookings(): Promise<SquareBooking[]> {
+export async function getUpcomingBookings(now = new Date()): Promise<SquareBooking[]> {
   const params = new URLSearchParams({
     location_id: process.env.SQUARE_LOCATION_ID!,
-    start_at_min: new Date().toISOString(),
+    start_at_min: now.toISOString(),
     limit: '100',
   })
 
-  const data = await squareFetch(`/bookings?${params}`)
   const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_SELLER', 'DECLINED', 'NO_SHOW'])
-  const raw: {
+  type RawBooking = {
     id: string
     status: string
     start_at: string
     customer_id?: string
     appointment_segments?: { duration_minutes?: number; service_variation_id?: string }[]
-  }[] = (data.bookings ?? []).filter((b: { status: string }) => !CANCELLED.has(b.status))
+  }
+  const raw: RawBooking[] = []
+  const seen = new Set<string>()
+  const cursors = new Set<string>()
+  let cursor: string | undefined
+  do {
+    if (cursor) params.set('cursor', cursor)
+    const data = await squareFetch(`/bookings?${params}`)
+    for (const booking of (data.bookings ?? []) as RawBooking[]) {
+      if (!seen.has(booking.id) && !CANCELLED.has(booking.status) && isUpcomingAppointment(booking.start_at, now)) {
+        seen.add(booking.id)
+        raw.push(booking)
+      }
+    }
+    cursor = data.cursor || undefined
+    if (cursor && cursors.has(cursor)) throw new Error('Square booking pagination did not advance')
+    if (cursor) cursors.add(cursor)
+  } while (cursor)
 
   // Deduplicate IDs before fetching to avoid redundant API calls
   const customerIds   = [...new Set(raw.map(b => b.customer_id).filter(Boolean) as string[])]
@@ -381,40 +377,11 @@ export async function hasUpcomingBookingByEmail(email: string): Promise<boolean>
   }
 }
 
-// Returns the count of remaining bookings for today (Pacific time, from now onward).
-export async function getTodaysBookingCount(): Promise<number> {
-  const now = new Date()
-
-  // Compute end-of-day in Pacific time as a UTC instant
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: 'numeric', minute: 'numeric', second: 'numeric',
-    hour12: false,
-  }).formatToParts(now)
-  const get = (type: string) => Number(parts.find(p => p.type === type)?.value ?? 0)
-
-  // "PT time treated as UTC" lets us compute the real UTC↔PT offset at this moment
-  const ptAsUTC = new Date(Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')))
-  const offsetMs = now.getTime() - ptAsUTC.getTime()
-
-  // End of PT today = 23:59:59 PT → expressed as UTC
-  const endOfDayUTC = new Date(
-    Date.UTC(get('year'), get('month') - 1, get('day'), 23, 59, 59, 999) + offsetMs
-  )
-
-  const params = new URLSearchParams({
-    location_id: process.env.SQUARE_LOCATION_ID!,
-    start_at_min: now.toISOString(),
-    start_at_max: endOfDayUTC.toISOString(),
-    limit: '100',
-  })
-
-  const data = await squareFetch(`/bookings?${params}`)
-  const CANCELLED = new Set(['CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_SELLER', 'DECLINED', 'NO_SHOW'])
-  return (data.bookings ?? []).filter(
-    (b: { status: string }) => !CANCELLED.has(b.status)
-  ).length
+// Remaining appointments today, using the same paginated list and Pacific boundaries.
+export async function getTodaysBookingCount(now = new Date()): Promise<number> {
+  const { tomorrowStart } = businessPeriod(now)
+  const bookings = await getUpcomingBookings(now)
+  return bookings.filter(booking => Date.parse(booking.start_at) < Date.parse(tomorrowStart)).length
 }
 
 // Search Square customers by email (fuzzy) or phone. Returns raw customer objects.
@@ -451,9 +418,7 @@ export async function searchSquareCustomers(query: string): Promise<{
 // ---------- Revenue ----------
 
 // Lightweight version for the Resumen dashboard card.
-export async function getMonthlyRevenue(): Promise<number> {
-  const now = new Date()
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-  const all = await fetchAllPayments(monthStart.toISOString())
-  return sum(all)
+export async function getMonthlyRevenue(now = new Date()): Promise<number> {
+  const all = await fetchAllPayments(businessPeriod(now).monthStart)
+  return sum(all.filter(payment => payment.created_at <= now.toISOString()))
 }
