@@ -1,3 +1,4 @@
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 'use server'
 
 import { clerkClient } from '@clerk/nextjs/server'
@@ -249,6 +250,7 @@ export async function updatePaciente(formData: FormData): Promise<void> {
   if (responsableCaptacion) fields[CLIENTES_FIELDS.RESPONSABLE_CAPTACION] = responsableCaptacion
 
   const existingPatient = await getClienteById(clienteId)
+  if (patientIsUnavailable(existingPatient)) throw new Error('PATIENT_ARCHIVED')
   const planFields: Record<string, unknown> = {}
   const existingPatientName = existingPatient.fields['Nombre Completo']?.trim()
   if (existingPatientName) planFields[PLAN_AQSLIM_FIELDS.PATIENT_NAME] = existingPatientName

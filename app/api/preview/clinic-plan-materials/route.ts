@@ -1,3 +1,4 @@
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
@@ -15,6 +16,7 @@ async function context(request: NextRequest, body?: Record<string, unknown>) {
   const patientId = String(body?.patientId ?? request.nextUrl.searchParams.get('patientId') ?? '')
   if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) throw new Error('NOT_FOUND')
   const patient = await getClienteById(patientId)
+  if (body && patientIsUnavailable(patient)) throw new Error('FORBIDDEN')
   const id = patient.fields['Plan AQSLIM']?.[0]
   if (!id) throw new Error('NOT_FOUND')
   const [plan, events] = await Promise.all([getPlanById(id), getClinicMaterialEvents(patientId)])
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     assertClinicSourceWriteAllowed()
+    if (request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({ ok: false }, { status: 403 })
     const body = await request.json()
     const { actor, patientId, plan, events } = await context(request, body)
     if (body.confirmation !== 'ASIGNAR MATERIALES PLAN ACTUAL' || body.revision !== materialPlanRevision(plan)) return NextResponse.json({ ok: false }, { status: 409 })

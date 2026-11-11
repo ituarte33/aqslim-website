@@ -1,4 +1,4 @@
-import { patientAdministration } from './clinic-patient-administration-policy'
+import { patientAdministration, patientIsUnavailable } from './clinic-patient-administration-policy'
 import { parseSalesNotes } from './finance-metrics'
 import { isUpcomingAppointment } from './appointment-metrics'
 import { filterConsultationsForPatient } from './patient-portal-policy'
@@ -250,10 +250,12 @@ export async function getClientesPage({
   offset,
   query,
   pageSize = 100,
+  includeInactive = false,
 }: {
   offset?: string | null
   query?: string
   pageSize?: number
+  includeInactive?: boolean
 } = {}): Promise<ClientesPage> {
   const params = new URLSearchParams({ pageSize: String(Math.min(Math.max(pageSize, 1), 100)) })
   if (offset) params.set('offset', offset)
@@ -267,10 +269,17 @@ export async function getClientesPage({
     )
   }
 
-  const data = await airtableFetch(`/${CLIENTES_TABLE}?${params}`)
-  return {
-    records: data.records ?? [],
-    offset: typeof data.offset === 'string' ? data.offset : null,
+  // Advance across fully hidden pages so archived records cannot mask active results.
+  const seenOffsets = new Set<string>()
+  for (;;) {
+    const data = await airtableFetch(`/${CLIENTES_TABLE}?${params}`)
+    const records: Cliente[] = data.records ?? []
+    const visible = includeInactive ? records : records.filter(patient => !patientIsUnavailable(patient))
+    const next = typeof data.offset === 'string' ? data.offset : null
+    if (visible.length || !next) return { records: visible, offset: next }
+    if (seenOffsets.has(next)) throw new Error('PATIENT_PAGINATION_STALLED')
+    seenOffsets.add(next)
+    params.set('offset', next)
   }
 }
 
@@ -935,6 +944,25 @@ export async function getConsultasByCliente(nombreCliente: string): Promise<Cons
   const formula = encodeURIComponent(`{ID Cliente} = "${safeName}"`)
   const data = await airtableFetch(`/Consultas?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Fecha%20Consulta&sort%5B0%5D%5Bdirection%5D=desc`)
   return data.records ?? []
+}
+
+// Read the reciprocal links so merged histories remain attached without a name search.
+export async function getConsultasForPatient(patient: Cliente): Promise<Consulta[]> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patient.id)) throw new Error('Invalid patient record')
+  const links = patient.fields.Consultas
+  if (links === undefined) return []
+  if (!Array.isArray(links) || links.some(id => typeof id !== 'string' || !/^rec[A-Za-z0-9]{14}$/.test(id))) throw new Error('Invalid consultation links')
+  const ids = [...new Set(links as string[])]
+  const records: Consulta[] = []
+  for (let start = 0; start < ids.length; start += 10) {
+    const batch = ids.slice(start, start + 10)
+    const values = await Promise.all(batch.map(id => getConsultaById(id)))
+    values.forEach((record, index) => {
+      if (record.id !== batch[index] || !record.fields) throw new Error('Invalid consultation record')
+      records.push(record)
+    })
+  }
+  return records.sort((a, b) => String(b.fields['Fecha Consulta'] ?? '').localeCompare(String(a.fields['Fecha Consulta'] ?? '')))
 }
 
 export async function getConsultasByPatientId(clienteId: string, nombreCliente: string): Promise<Consulta[]> {

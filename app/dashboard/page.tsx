@@ -1,3 +1,4 @@
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getClientes, getConsultasByCliente, createProspecto, getConsultasRevenueSummary } from '@/lib/airtable'
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
   let bookingsUnavailable = false
   let airtableError: string | null = null
   try {
-    patients = await getClientes()
+    patients = (await getClientes()).filter(patient => !patientIsUnavailable(patient))
   } catch (e) {
     airtableError = e instanceof Error ? e.message : String(e)
   }

@@ -6,6 +6,8 @@ test('release gating requires the exact branch and explicit production enablemen
  assert.equal(clinicRuntimeMode({VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'main'}),null)
  assert.equal(clinicRuntimeMode({VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'main',MYAQ_CLINIC_ENABLED:'enabled'}),'production')
  assert.equal(clinicRuntimeMode({VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'other',MYAQ_CLINIC_ENABLED:'enabled'}),null)
+ assert.equal(clinicRuntimeMode({VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'3d0825b26890959b7c28a278a7f79af2af335e12',MYAQ_CLINIC_ENABLED:'enabled'}),null)
+ assert.equal(clinicRuntimeMode({VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:CLINIC_RELEASE_BRANCH,MYAQ_CLINIC_ENABLED:'enabled'}),'production')
  assert.equal(clinicRuntimeMode({VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:CLINIC_RELEASE_BRANCH}),'candidate')
  assert.equal(clinicRuntimeMode({VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'arbitrary'}),null)
  const environment={VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'main',MYAQ_CLINIC_ENABLED:'enabled'}

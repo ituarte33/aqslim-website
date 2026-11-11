@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { patientIsUnavailable } from '../lib/clinic-patient-administration-policy.ts'
 import * as policy from '../lib/clinic-plan-materials.ts'
 import { isClinicRuntimeOperatorIdentity } from '../lib/clinic-runtime-policy.ts'
 
@@ -25,9 +26,10 @@ test('Clinic materials API requires a verified Clinic operator, rejects stale/fo
   '@/lib/clinic-runtime-policy':{assertClinicSourceWriteAllowed:()=>{},isClinicRuntimeOperatorIdentity:(identity:{email:string;emailVerified?:boolean})=>isClinicRuntimeOperatorIdentity({...identity,environment:{VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'main',MYAQ_CLINIC_ENABLED:'enabled'}})},
   '@/lib/clinic-plan-materials-store':{clinicMaterialStoreEnabled:()=>enabled,getClinicMaterialEvents:async()=>events,saveClinicMaterialEvent:async(id:string,event:policy.ClinicMaterialEvent)=>{assert.equal(id,patientId);saves++;events.unshift(event)}},
   '@/lib/clinic-plan-materials':policy,
+  '@/lib/clinic-patient-administration-policy':{patientIsUnavailable},
  }
  vm.runInNewContext(code,{exports,require:(name:string)=>{if(!(name in mocks))throw new Error(name);return mocks[name]},process:{env:{}},URL,Date,JSON})
- const req=(body?:unknown)=>({nextUrl:new URL(`https://example.test/api?patientId=${patientId}`),json:async()=>body})
+ const req=(body?:unknown)=>({headers:new Headers({origin:'https://example.test'}),nextUrl:new URL(`https://example.test/api?patientId=${patientId}`),json:async()=>body})
  assert.equal((await exports.GET(req())).status,401);assert.equal(reads,0)
  actor={email:'other@test'};assert.equal((await exports.GET(req())).status,403);assert.equal(reads,0)
  actor={email:'editor@example.test',emailVerified:false};assert.equal((await exports.GET(req())).status,403);assert.equal(reads,0)

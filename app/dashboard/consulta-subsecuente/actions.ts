@@ -2,7 +2,7 @@
 
 import {
   createConsulta, updateCliente, CLIENTES_FIELDS,
-  getConsultasByCliente, getCuestionariosByCliente,
+  getConsultasForPatient, getCuestionariosForPatient,
   type Consulta, type CuestionarioSintoma,
 } from '@/lib/airtable'
 import { requireCapability } from '@/lib/auth'
@@ -12,16 +12,16 @@ import { updateAccessAfterCompletedConsultation } from '@/lib/clinic-access-afte
 import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 import { getClienteById } from '@/lib/airtable'
 
-export async function fetchPatientConsultations(nombreCliente: string): Promise<Consulta[]> {
+export async function fetchPatientConsultations(patientId: string): Promise<Consulta[]> {
   await requireCapability('consultations:read:any')
-  if (!nombreCliente) return []
-  return getConsultasByCliente(nombreCliente)
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) return []
+  return getConsultasForPatient(await getClienteById(patientId))
 }
 
-export async function fetchPatientCuestionarios(nombreCliente: string): Promise<CuestionarioSintoma[]> {
+export async function fetchPatientCuestionarios(patientId: string): Promise<CuestionarioSintoma[]> {
   await requireCapability('consultations:read:any')
-  if (!nombreCliente) return []
-  return getCuestionariosByCliente(nombreCliente)
+  if (!/^rec[A-Za-z0-9]{14}$/.test(patientId)) return []
+  return getCuestionariosForPatient(await getClienteById(patientId))
 }
 
 export async function saveConsultaSubsecuente(formData: FormData): Promise<{ id: string; warnings: string[] }> {

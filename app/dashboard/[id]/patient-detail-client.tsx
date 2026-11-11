@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { patientAdministration } from '@/lib/clinic-patient-administration-policy'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, Consulta, CuestionarioSintoma } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
@@ -418,6 +419,8 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
   const [noShowError, setNoShowError]   = useState<string | null>(null)
 
   const t = copy[lang]
+  const administration = patientAdministration(patient?.fields['Notas Generales'])
+  const inactive = administration.state !== 'active'
 
   const tabBtn = (id: TabId) => ({
     background: 'none' as const,
@@ -497,6 +500,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
 
         {patient && (
           <>
+            {inactive && <div role="status" style={{ padding: 20, border: '1px solid #C9A84C', marginBottom: 20 }}><strong>{lang === 'es' ? 'Expediente de sólo lectura' : 'Read-only record'}</strong><p>{administration.state === 'merged' ? 'Este duplicado fue unificado. Su historial original se conserva.' : 'El expediente está archivado o requiere revisión antes de volver a utilizarlo.'}</p>{administration.targetId && <Link href={`/dashboard/${administration.targetId}`}>Abrir expediente principal →</Link>}{isAdmin && <p><Link href={`/clinic-preview?patient=${patient.id}`}>Revisar administración del expediente →</Link></p>}</div>}
             {/* Patient header */}
             <div style={{ marginBottom: 40 }}>
               <p style={{ fontSize: pt.sm, color: '#9A9590', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -517,7 +521,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
-                {isAdmin && (
+                {isAdmin && !inactive && (
                   <>
                     <Link href={`/dashboard/consulta-subsecuente?clienteId=${patient.id}`} style={{
                       background: 'none', color: '#C9A84C',
@@ -537,6 +541,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                     }}>
                       {t.editPatient}
                     </Link>
+                    <Link href={`/dashboard/plans?clienteId=${patient.id}`} style={{ color: '#C9A84C', padding: '12px 24px', border: '1px solid #66552d' }}>Plan y guía</Link>
                   </>
                 )}
                 <button
@@ -563,7 +568,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                     {t.foodScanner}
                   </Link>
                 )}
-                {isAdmin && (
+                {isAdmin && !inactive && (
                   <button
                     disabled={noShowPending || noShowStatus === 'sent'}
                     onClick={() => {
@@ -602,7 +607,7 @@ export function PatientDetailClient({ patient, consultations, cuestionarios, err
                 </p>
               )}
 
-              {showBooking && (
+              {showBooking && !inactive && (
                 <div style={{ marginTop: 24, border: '1px solid rgba(201,168,76,0.2)', padding: '24px 28px' }}>
                   <BookingWidget
                     clienteId={patient.id}

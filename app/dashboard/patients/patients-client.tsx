@@ -19,6 +19,7 @@ export function PatientsPageClient({ user, initialPatients, initialOffset, airta
   const [patients, setPatients] = useState(initialPatients)
   const [offset, setOffset] = useState(initialOffset)
   const [search, setSearch] = useState('')
+  const [includeInactive, setIncludeInactive] = useState(false)
   const [loadError, setLoadError] = useState<'refresh' | 'more' | null>(null)
   const [isPending, startTransition] = useTransition()
   const requestId = useRef(0)
@@ -34,7 +35,7 @@ export function PatientsPageClient({ user, initialPatients, initialOffset, airta
     const timer = window.setTimeout(() => {
       startTransition(async () => {
         try {
-          const page = await fetchPatientsPage({ query: search })
+          const page = await fetchPatientsPage({ query: search, includeInactive })
           if (id !== requestId.current) return
           setPatients(page.records)
           setOffset(page.offset)
@@ -46,7 +47,7 @@ export function PatientsPageClient({ user, initialPatients, initialOffset, airta
     }, search ? 350 : 0)
 
     return () => window.clearTimeout(timer)
-  }, [search])
+  }, [search, includeInactive])
 
   function updateSearch(value: string) {
     requestId.current += 1
@@ -58,7 +59,7 @@ export function PatientsPageClient({ user, initialPatients, initialOffset, airta
     const id = requestId.current
     startTransition(async () => {
       try {
-        const page = await fetchPatientsPage({ offset, query: search })
+        const page = await fetchPatientsPage({ offset, query: search, includeInactive })
         if (id !== requestId.current) return
         setPatients(current => [...current, ...page.records])
         setOffset(page.offset)
@@ -107,6 +108,7 @@ export function PatientsPageClient({ user, initialPatients, initialOffset, airta
         {isPending && <span style={{ marginLeft: 14, color: '#C9A84C', fontSize: pt.sm }}>{lang === 'es' ? 'Buscando…' : 'Searching…'}</span>}
       </div>
 
+      <label style={{ display: 'flex', gap: 10, marginBottom: 20, color: '#D9C078' }}><input type="checkbox" checked={includeInactive} onChange={event => { requestId.current += 1; setIncludeInactive(event.target.checked) }} />{lang === 'es' ? 'Mostrar archivados y duplicados unificados' : 'Show archived and merged records'}</label>
       <PatientsTable patients={patients} lang={lang} />
 
       {offset ? (

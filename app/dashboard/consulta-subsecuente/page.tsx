@@ -1,11 +1,12 @@
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getRole } from '@/lib/auth'
 import {
   getClienteById,
   getClientes,
-  getConsultasByCliente,
-  getCuestionariosByCliente,
+  getConsultasForPatient,
+  getCuestionariosForPatient,
   getSupplementos,
   type Cliente,
   type Consulta,
@@ -39,8 +40,8 @@ export default async function ConsultaSubsecuentePage({
       patient = await getClienteById(clienteId)
       const nombre = patient.fields['Nombre Completo'] ?? ''
       const [consultasResult, cuestionariosResult, supplementosResult] = await Promise.allSettled([
-        nombre ? getConsultasByCliente(nombre) : Promise.resolve([]),
-        nombre ? getCuestionariosByCliente(nombre) : Promise.resolve([]),
+        getConsultasForPatient(patient),
+        getCuestionariosForPatient(patient),
         getSupplementos(),
       ])
       if (consultasResult.status === 'fulfilled') initialConsultations = consultasResult.value
@@ -52,9 +53,11 @@ export default async function ConsultaSubsecuentePage({
       getClientes(),
       getSupplementos(),
     ])
-    if (patientsResult.status === 'fulfilled') allPatients = patientsResult.value as Cliente[]
+    if (patientsResult.status === 'fulfilled') allPatients = (patientsResult.value as Cliente[]).filter(patient => !patientIsUnavailable(patient))
     if (supplementosResult.status === 'fulfilled') supplementos = supplementosResult.value
   }
+
+  if (patient && patientIsUnavailable(patient)) redirect(`/dashboard/${patient.id}`)
 
   return (
     <ConsultaSubsecuenteClient

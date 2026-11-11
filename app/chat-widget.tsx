@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useUser } from '@clerk/nextjs'
 import { ChatMessage } from './chat-message'
 import { PilotFeedback } from './pilot-feedback'
 
@@ -74,6 +75,7 @@ function detectState(text: string): BuddyState {
 }
 
 export function ChatWidget() {
+  const { user } = useUser()
   const pathname                  = usePathname()
   const router                    = useRouter()
   const inPatientPortal           = pathname.startsWith('/my-aqslim')
@@ -311,6 +313,8 @@ export function ChatWidget() {
     if (fullScreen) router.back()
     else setOpen(false)
   }
+
+  if ((inDashboard || pathname.startsWith('/clinic-preview')) && user?.primaryEmailAddress?.emailAddress?.toLowerCase() === 'rom@ituarteconsulting.com') return null
 
   return (
     <div className={`aqb-wrap${inPatientPortal ? ' aqb-wrap--portal' : ''}${inDashboard ? ' aqb-wrap--dashboard' : ''}${compactLauncher ? ' aqb-wrap--compact' : ''}${fullScreen ? ' aqb-wrap--fullscreen' : ''}${demo ? ' aqb-wrap--demo' : ''}${open ? ' aqb-wrap--open' : ''}`}>

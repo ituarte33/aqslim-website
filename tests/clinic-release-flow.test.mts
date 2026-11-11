@@ -6,6 +6,7 @@ import ts from 'typescript'
 import * as runtime from '../lib/clinic-runtime-policy.ts'
 import * as materials from '../lib/clinic-plan-materials.ts'
 import * as policy from '../lib/materials-policy.ts'
+import { administeredNotes, patientIsUnavailable } from '../lib/clinic-patient-administration-policy.ts'
 import * as phase from '../lib/phase-materials.ts'
 
 async function load(path:string,mocks:Record<string,unknown>,fetcher?:typeof fetch){
@@ -38,6 +39,8 @@ test('production plan publication archives before update, returns only current p
    assert.ok(String(input).includes('tblSaxNRZxJLpsnIm'));return Response.json({records:[{id:'rec33333333333333',fields}]})
   }
   const mocks={
+   'next/cache':{revalidatePath:()=>{}},
+   '@/lib/clinic-patient-administration-policy':{patientIsUnavailable},
    '@/lib/clinic-runtime-policy':runtime,'@/lib/clinic-plan-materials':materials,
    '@/lib/clinic-plan-materials-store':{saveClinicMaterialEvent:async(id:string,event:materials.ClinicMaterialEvent)=>{assert.equal(id,patientId);if(failArchive)throw new Error('archive failed');calls.push('archive');events.push(event)}},
    'next/server':{NextResponse:{json:(body:unknown,init?:ResponseInit)=>Response.json(body,init)}},
@@ -46,7 +49,14 @@ test('production plan publication archives before update, returns only current p
    '@/lib/clinic-date':{normalizeClinicIsoDate:(value:string)=>value},'@/lib/clinic-weight-entry':{clinicWeightInKg:(value:number)=>value},
   }
   const route=(await load('../app/api/preview/clinic-plans/route.ts',mocks,fetcher)).exports
-  const request={nextUrl:new URL('https://example.test/api'),json:async()=>({patientId,confirmation:'PUBLICAR PLAN PREVIEW'})}
+  const request={headers:new Headers({origin:'https://example.test'}),nextUrl:new URL('https://example.test/api'),json:async()=>({patientId,confirmation:'PUBLICAR PLAN PREVIEW'})}
+  const foreign={...request,headers:new Headers({origin:'https://other.test'})}
+  assert.equal((await route.PUT(foreign)).status,403);assert.equal(calls.length,0)
+  const stale={...request,json:async()=>({patientId,confirmation:'PUBLICAR PLAN PREVIEW',expectedDraftId:'recOtherDraft',expectedDraftUpdatedAt:'old'})}
+  assert.equal((await route.PUT(stale)).status,409);assert.equal(calls.length,0)
+  ;(patient.fields as Record<string,unknown>)['Notas Generales']=administeredNotes('', 'archived', {action:'archive',at:'2026-11-10T12:00:00Z',actor:'synthetic',reason:'fixture'})
+  assert.equal((await route.PUT(request)).status,409);assert.equal(calls.length,0)
+  delete (patient.fields as Record<string,unknown>)['Notas Generales']
   const response=await route.PUT(request);assert.equal(response.status,200,JSON.stringify({body:await response.clone().json(),current:current.fields}))
   assert.deepEqual(calls,['archive','update']);assert.equal(events[0].planFields?.['Fase Actual'],'Jing');assert.equal(current.fields['Fase Actual'],'Qi')
   const portal=(await load('../lib/patient-materials.ts',{

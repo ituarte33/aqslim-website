@@ -10,6 +10,7 @@ import { pt } from '@/lib/portal-type'
 import { BookingWidget } from '@/app/onboarding/booking-widget'
 import { ADMIN_SERVICES } from '@/app/onboarding/booking-constants'
 import styles from './consulta-subsecuente.module.css'
+import { PatientPlanEditor } from '../plans/patient-plan-editor'
 
 // One week from now as a datetime-local string (YYYY-MM-DDTHH:MM) in local time
 function nextWeekDatetimeLocal(): string {
@@ -584,13 +585,6 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'error'>('idle')
   const [emailError,  setEmailError]  = useState<string | null>(null)
 
-  // When opened from a patient's expediente, auto-redirect back after saving
-  useEffect(() => {
-    if (saved && initialPatient) {
-      router.push(`/dashboard/${initialPatient.id}`)
-    }
-  }, [saved, initialPatient, router])
-
   // Today in YYYY-MM-DD local
   const todayISO = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
 
@@ -602,11 +596,11 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
     if (p) {
       const nombre = p.fields['Nombre Completo'] ?? ''
       startConsultasTransition(async () => {
-        const consultas = await fetchPatientConsultations(nombre)
+        const consultas = await fetchPatientConsultations(p.id)
         setConsultasData(consultas)
       })
       startCuestionariosTransition(async () => {
-        const cuestionarios = await fetchPatientCuestionarios(nombre)
+        const cuestionarios = await fetchPatientCuestionarios(p.id)
         setCuestionariosData(cuestionarios)
       })
     }
@@ -1040,6 +1034,8 @@ export function ConsultaSubsecuenteClient({ user, patient: initialPatient, allPa
               </div>
             </div>
           )}
+
+          <details><summary style={{ color: '#E2C87A', cursor: 'pointer' }}>{es ? 'Plan y guía de alimentación' : 'Plan and nutrition guide'}</summary><PatientPlanEditor key={patient.id} patientId={patient.id} /></details>
 
           <SectionDivider label={es ? 'Notas y Pago' : 'Notes & Payment'} />
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 type Message = { role: 'user' | 'assistant'; text: string }
@@ -8,13 +8,24 @@ type Message = { role: 'user' | 'assistant'; text: string }
 export function ClinicAriosLauncher() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [available, setAvailable] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', text: 'Hola, Rom. Soy ARIOS en modo Clinic. Puedo ayudarte con seguimiento, preparación de consultas, notas, mensajes y decisiones operativas. Por ahora no leo automáticamente el expediente seleccionado.' },
   ])
 
-  if (!pathname?.startsWith('/clinic-preview')) return null
+  const supported = pathname?.startsWith('/clinic-preview') || pathname?.startsWith('/dashboard')
+  useEffect(() => {
+    setAvailable(false)
+    if (!supported) return
+    const controller = new AbortController()
+    fetch('/api/preview/clinic-arios', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      if (response.ok && (await response.json()).ok && !controller.signal.aborted) setAvailable(true)
+    }).catch(() => {})
+    return () => controller.abort()
+  }, [supported])
+  if (!supported || !available) return null
 
   async function send(event: FormEvent) {
     event.preventDefault()
@@ -31,8 +42,18 @@ export function ClinicAriosLauncher() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message }),
       })
-      if (!response.ok) throw new Error('request_failed')
       const result = await response.json()
+      if (!response.ok) {
+        const messages: Record<string, string> = {
+          sign_in_required: 'Tu sesión terminó. Vuelve a iniciar sesión.',
+          not_authorized: 'ARIOS está disponible únicamente para la cuenta de Rom.',
+          provider_unavailable: 'El asistente aún no tiene conexión configurada en esta versión.',
+          provider_busy: 'El proveedor está ocupado. Espera un momento y vuelve a intentar.',
+          provider_failed: 'No se pudo completar la respuesta del proveedor. La configuración requiere revisión.',
+        }
+        setMessages(current => [...current, { role: 'assistant', text: messages[result.error] || 'La conexión no respondió. Intenta nuevamente; no se modificó ningún expediente.' }])
+        return
+      }
       setMessages(current => [...current, { role: 'assistant', text: result.text || 'No pude generar una respuesta.' }])
     } catch {
       setMessages(current => [...current, { role: 'assistant', text: 'No pude responder en este momento. Intenta nuevamente.' }])
@@ -58,7 +79,7 @@ export function ClinicAriosLauncher() {
           <header style={{ padding: '16px 18px', borderBottom: '1px solid rgba(201,168,76,.18)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ color: '#E2C87A', fontWeight: 700, letterSpacing: '.1em', fontSize: 13 }}>ARIOS · CLINIC</div>
-              <div style={{ color: '#7E7872', fontSize: 11, marginTop: 3 }}>Asistente operativo · Preview</div>
+              <div style={{ color: '#7E7872', fontSize: 11, marginTop: 3 }}>Asistente operativo</div>
             </div>
             <button onClick={() => setOpen(false)} aria-label="Cerrar ARIOS" style={{ border: 0, background: 'transparent', color: '#9A9590', cursor: 'pointer', fontSize: 20 }}>×</button>
           </header>

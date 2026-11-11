@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import type { Cliente, PlanAqslim } from '@/lib/airtable'
 import { pt } from '@/lib/portal-type'
+import { PatientPlanEditor } from '../../plans/patient-plan-editor'
 import { bindCurrentAccountToPatient, updatePaciente, sendReinitiationEmail } from './actions'
 
 type Props = {
@@ -423,125 +424,7 @@ export function EditPatientClient({ patient, plan }: Props) {
             </div>
           </div>
 
-          <SectionDivider label="Programa" />
-
-          <div>
-            <label htmlFor="planName" style={labelStyle}>Plan asignado</label>
-            <input
-              id="planName"
-              name="planName"
-              type="text"
-              list="aqslim-plan-options"
-              defaultValue={plan?.fields['Notas del Plan'] ?? plan?.fields['Dieta en Nutrimind'] ?? ''}
-              placeholder="Selecciona o escribe el plan autorizado"
-              style={inputStyle}
-            />
-            <datalist id="aqslim-plan-options">
-              <option value="FAST 36 + Plan Hipocalórico" />
-              <option value="Kenkho Path — Jing" />
-              <option value="Kenkho Path — Qi" />
-              <option value="Kenkho Path — Xue" />
-              <option value="Kenkho Path — Yang Sheng" />
-            </datalist>
-          </div>
-
-          <div>
-            <label htmlFor="kenkhoTier" style={labelStyle}>Nivel Kenkho Path</label>
-            <select
-              id="kenkhoTier"
-              name="kenkhoTier"
-              defaultValue={plan?.fields['Nivel Kenkho Path'] ?? ''}
-              style={inputStyle}
-            >
-              <option value="">Atención en clínica — fuera de Kenkho Path</option>
-              <option value="Start">Kenkho Path — Start</option>
-              <option value="Plus">Kenkho Path — Plus</option>
-              <option value="Elite">Kenkho Path — Elite</option>
-            </select>
-            <small style={{ display: 'block', marginTop: 8, color: '#6A6560', fontSize: pt.xs, lineHeight: 1.5 }}>
-              Déjalo en atención en clínica para cualquier participante que no pertenezca a Kenkho Path.
-            </small>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-            <div>
-              <label htmlFor="planStartDate" style={labelStyle}>Inicio del plan</label>
-              <input id="planStartDate" name="planStartDate" type="date" defaultValue={plan?.fields['Fecha Inicio Tratamiento'] ?? ''} style={inputStyle} />
-            </div>
-            <div>
-              <label htmlFor="planWeek" style={labelStyle}>Semana actual</label>
-              <input id="planWeek" name="planWeek" type="number" min="1" max="99" defaultValue={plan?.fields['Semana en Fase Actual'] ?? ''} style={inputStyle} />
-            </div>
-            <div>
-              <label htmlFor="calorieTarget" style={labelStyle}>Calorías/día</label>
-              <input id="calorieTarget" name="calorieTarget" type="number" min="500" max="5000" defaultValue={plan?.fields['Calorías Objetivo'] ?? ''} placeholder="Pendiente" style={inputStyle} />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="planInstructions" style={labelStyle}>Indicaciones del plan</label>
-            <textarea
-              id="planInstructions"
-              name="planInstructions"
-              defaultValue={plan?.fields['Instrucciones Especiales'] ?? ''}
-              placeholder="Indicaciones autorizadas que también verá el paciente."
-              style={textareaStyle}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="planMaterials" style={labelStyle}>Materiales asignados</label>
-            <input
-              ref={materialInputRef}
-              id="planMaterials"
-              name="planMaterials"
-              type="file"
-              accept="application/pdf,.pdf"
-              multiple
-              style={inputStyle}
-            />
-            <button
-              type="button"
-              onClick={handleMaterialUpload}
-              disabled={materialPending}
-              style={{
-                marginTop: 10,
-                padding: '11px 18px',
-                border: '1px solid rgba(201,168,76,0.45)',
-                background: materialPending ? 'rgba(201,168,76,0.08)' : 'rgba(201,168,76,0.16)',
-                color: '#C9A84C',
-                cursor: materialPending ? 'wait' : 'pointer',
-                fontFamily: pt.sans,
-                fontSize: pt.sm,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-              }}
-            >
-              {materialPending ? 'Cargando…' : 'Cargar PDF'}
-            </button>
-            <small style={{ display: 'block', marginTop: 8, color: '#6A6560', fontSize: pt.xs, lineHeight: 1.5 }}>
-              PDF únicamente, hasta 10 MB por carga. Usa “Cargar PDF” para asignarlo sin modificar los demás datos del expediente.
-            </small>
-            {materialStatus === 'uploaded' && (
-              <p style={{ margin: '8px 0 0', color: '#9ed06c', fontSize: pt.xs }}>
-                Material cargado correctamente. Ya está disponible en MY AQSLIM.
-              </p>
-            )}
-            {materialStatus === 'error' && materialError && (
-              <p style={{ margin: '8px 0 0', color: '#E07A6A', fontSize: pt.xs }}>
-                {materialError}
-              </p>
-            )}
-            {Boolean(plan?.fields['Materiales asignados']?.length) && (
-              <div style={{ marginTop: 12, display: 'grid', gap: 6 }}>
-                {plan?.fields['Materiales asignados']?.map(material => (
-                  <span key={material.id} style={{ color: '#9A9590', fontSize: pt.xs }}>
-                    ✓ {material.filename}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <PatientPlanEditor patientId={patient.id} />
 
           <div>
             <span style={labelStyle}>Idioma Preferido</span>

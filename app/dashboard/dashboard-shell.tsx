@@ -19,7 +19,7 @@ const NAV = [
   { href: '/dashboard/appointments', exact: false, es: 'Citas', en: 'Appointments' },
   { href: '/dashboard/finances', exact: false, es: 'Finanzas', en: 'Finances' },
   { href: '/dashboard/patients', exact: false, es: 'Clientes', en: 'Clients' },
-  { href: '/dashboard/plan-preview', exact: false, es: 'Planes Preview', en: 'Plan Preview' },
+  { href: '/dashboard/plans', exact: false, es: 'Planes y guías', en: 'Plans and guides' },
   { href: '/dashboard/reports', exact: false, es: 'Reportes', en: 'Reports' },
   { href: '/food-scanner', exact: false, es: '🍽 Mis Comidas', en: '🍽 My Meals' },
 ]

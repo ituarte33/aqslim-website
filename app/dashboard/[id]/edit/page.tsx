@@ -1,3 +1,4 @@
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { getClienteById, getPlanById } from '@/lib/airtable'
@@ -13,6 +14,7 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
 
   const { id } = await params
   const patient = await getClienteById(id)
+  if (patientIsUnavailable(patient)) redirect(`/dashboard/${id}`)
   const planId = patient.fields['Plan AQSLIM']?.[0]
   const plan = planId ? await getPlanById(planId).catch(() => null) : null
 

@@ -1,71 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireActor } from '@/lib/auth'
+import { getActor } from '@/lib/auth'
 import { isClinicRuntimeFounderIdentity, isClinicRuntimeEnvironment } from '@/lib/clinic-runtime-policy'
 
+const privateHeaders = { 'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization' }
+const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: privateHeaders })
 function clinicEnvironment() {
-  return {
-    VERCEL_ENV: process.env.VERCEL_ENV,
-    MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF,
-  }
+  return { VERCEL_ENV: process.env.VERCEL_ENV, MYAQ_CLINIC_ENABLED: process.env.MYAQ_CLINIC_ENABLED, VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF }
 }
-
+async function authorize() {
+  const environment = clinicEnvironment()
+  if (!isClinicRuntimeEnvironment(environment)) return reply({ ok: false, error: 'unavailable' }, 404)
+  const actor = await getActor()
+  if (!actor) return reply({ ok: false, error: 'sign_in_required' }, 401)
+  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) return reply({ ok: false, error: 'not_authorized' }, 403)
+  return null
+}
 function extractText(data: any): string {
   if (typeof data?.output_text === 'string' && data.output_text.trim()) return data.output_text.trim()
-  const parts: string[] = []
-  for (const item of Array.isArray(data?.output) ? data.output : []) {
-    for (const content of Array.isArray(item?.content) ? item.content : []) {
-      if (typeof content?.text === 'string' && content.text.trim()) parts.push(content.text.trim())
-    }
-  }
-  return parts.join('\n').trim()
+  return (Array.isArray(data?.output) ? data.output : []).flatMap((item: any) => (Array.isArray(item?.content) ? item.content : []).map((content: any) => typeof content?.text === 'string' ? content.text : '')).join('\n').trim()
 }
-
+export async function GET() {
+  try {
+    const denied = await authorize()
+    if (denied) return denied
+    return reply({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY?.trim()) })
+  } catch { return reply({ ok: false, error: 'unavailable' }, 503) }
+}
 export async function POST(request: NextRequest) {
-  const environment = clinicEnvironment()
-  if (!isClinicRuntimeEnvironment(environment)) return NextResponse.json({ ok: false }, { status: 404 })
-
-  const actor = await requireActor()
-  if (!isClinicRuntimeFounderIdentity({ email: actor.email, environment })) {
-    return NextResponse.json({ ok: false }, { status: 403 })
+  try {
+    const denied = await authorize()
+    if (denied) return denied
+    if (request.headers.get('origin') !== request.nextUrl.origin) return reply({ ok: false, error: 'not_authorized' }, 403)
+    const body = await request.json().catch(() => ({}))
+    const message = typeof body?.message === 'string' ? body.message.trim().slice(0, 6000) : ''
+    if (!message) return reply({ ok: false, error: 'message_required' }, 400)
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return reply({ ok: false, error: 'provider_unavailable' }, 503)
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OPENAI_AQ_BUDDY_MODEL?.trim() || 'gpt-5.6-luna',
+        instructions: [
+          'You are ARIOS, the founder-only operational assistant in AQSLIM.',
+          'Respond in the language used by Rom, concisely and concretely.',
+          'The daily program is /dashboard. Its sections are Resumen, Citas, Finanzas, Clientes, Planes y guías, and Reportes.',
+          'A plan is managed in Planes y guías or the Plan y guía section inside a consultation. Save draft first; Revisar y publicar opens a summary, then an explicit confirmation publishes to My AQSLIM.',
+          'A linked client with current access sees the published plan and its phase guide in My AQSLIM. A draft is not visible. Old plans and files remain in the clinical history.',
+          'You do not automatically read the selected patient, personal medical records, or consultation data. Do not claim you can see them or that you performed a write.',
+          'Help with application workflow, follow-up organization, and drafts. Never diagnose or prescribe. Do not invent clinical facts or make treatment choices.',
+        ].join(' '),
+        input: message, max_output_tokens: 800,
+      }), cache: 'no-store', signal: AbortSignal.timeout(25000),
+    })
+    if (!response.ok) {
+      console.error('[clinic-arios] provider_failed', { status: response.status })
+      return reply({ ok: false, error: response.status === 429 ? 'provider_busy' : 'provider_failed' }, 502)
+    }
+    const text = extractText(await response.json())
+    if (!text) return reply({ ok: false, error: 'empty_response' }, 502)
+    return reply({ ok: true, text })
+  } catch {
+    console.error('[clinic-arios] request_failed')
+    return reply({ ok: false, error: 'request_failed' }, 503)
   }
-
-  const body = await request.json().catch(() => ({}))
-  const message = typeof body?.message === 'string' ? body.message.trim().slice(0, 6000) : ''
-  if (!message) return NextResponse.json({ ok: false, error: 'message_required' }, { status: 400 })
-
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return NextResponse.json({ ok: false, error: 'provider_unavailable' }, { status: 503 })
-
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_AQ_BUDDY_MODEL || 'gpt-5.6-luna',
-      instructions: [
-        'You are ARIOS inside AQSLIM Clinic Preview, assisting the Founder with clinic operations.',
-        'Be calm, precise, concise, strategic, and operational.',
-        'Help with workflow, follow-up, consultation preparation, notes organization, patient communication drafts, and identifying unanswered operational questions.',
-        'Do not claim access to patient records, consultation notes, messages, plans, or other Clinic data unless those facts are explicitly included in the user message or provided by the application context.',
-        'Do not diagnose, prescribe, or replace licensed medical advice. When a question depends on clinical facts not provided, say what information is missing.',
-        'Respond in the language used by the Founder.',
-      ].join(' '),
-      input: message,
-      max_output_tokens: 800,
-    }),
-    cache: 'no-store',
-  })
-
-  if (!response.ok) {
-    console.error('[clinic-arios-preview] provider_failed', { status: response.status })
-    return NextResponse.json({ ok: false, error: 'provider_failed' }, { status: 502 })
-  }
-
-  const data = await response.json()
-  const text = extractText(data)
-  if (!text) return NextResponse.json({ ok: false, error: 'empty_response' }, { status: 502 })
-
-  return NextResponse.json({ ok: true, text })
 }

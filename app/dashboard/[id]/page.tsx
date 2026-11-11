@@ -2,8 +2,8 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import {
   getClienteById,
-  getConsultasByCliente,
-  getCuestionariosByCliente,
+  getConsultasForPatient,
+  getCuestionariosForPatient,
   type Cliente,
   type Consulta,
   type CuestionarioSintoma,
@@ -34,8 +34,8 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     const nombreCliente = patient.fields['Nombre Completo'] ?? ''
     if (nombreCliente) {
       ;[consultations, cuestionarios] = await Promise.all([
-        getConsultasByCliente(nombreCliente),
-        getCuestionariosByCliente(nombreCliente),
+        getConsultasForPatient(patient),
+        getCuestionariosForPatient(patient),
       ])
     }
   } catch (e) {

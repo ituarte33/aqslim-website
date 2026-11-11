@@ -1,3 +1,5 @@
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
+import { revalidatePath } from 'next/cache'
 import { clinicPlanDraftKey, clinicUsesPreviewRecords, clinicRecordFilter } from '@/lib/clinic-runtime-policy'
 import { assertClinicSourceWriteAllowed } from '@/lib/clinic-runtime-policy'
 import { materialPlanRevision, planAttachments } from '@/lib/clinic-plan-materials'
@@ -266,10 +268,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     assertClinicSourceWriteAllowed()
+    if (request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({ ok: false }, { status: 403 })
     const actor = await requireFounder()
     const body = await request.json() as Record<string, unknown>
     const patient = await resolvePatient(request, body)
     if (!patient) return NextResponse.json({ ok: false, error: 'patient_not_found_or_ambiguous' }, { status: 404 })
+    if (patientIsUnavailable(patient)) return NextResponse.json({ ok: false, error: 'patient_unavailable' }, { status: 409 })
 
     const allowedPhases = ['Jing', 'Qi', 'Xue', 'Yang Sheng', 'Sin fase']
     const allowedTiers = ['Clinic', 'Start', 'Plus', 'Elite']
@@ -401,6 +405,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     assertClinicSourceWriteAllowed()
+    if (request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({ ok: false }, { status: 403 })
     const actor = await requireFounder()
     const body = await request.json() as Record<string, unknown>
     if (body.confirmation !== 'PUBLICAR PLAN PREVIEW') {
@@ -423,6 +428,11 @@ export async function PUT(request: NextRequest) {
     if (!draftRecord || !draftInScope(draftRecord, patient.id)) return NextResponse.json({ ok: false, error: 'draft_not_found' }, { status: 404 })
 
     const draft = mapDraft(draftRecord)
+    if (patientIsUnavailable(patient)) return NextResponse.json({ ok: false, error: 'patient_unavailable' }, { status: 409 })
+    if ((body.expectedDraftId !== undefined && body.expectedDraftId !== draft.id)
+      || (body.expectedDraftUpdatedAt !== undefined && body.expectedDraftUpdatedAt !== draft.updatedAt)) {
+      return NextResponse.json({ ok: false, error: 'draft_changed_since_review' }, { status: 409 })
+    }
     if (draft.status !== 'Ready for Review') {
       return NextResponse.json({ ok: false, error: 'plan_not_ready_for_publication' }, { status: 409 })
     }
@@ -475,6 +485,9 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    revalidatePath('/my-aqslim')
+    revalidatePath('/my-aqslim/plan')
+    revalidatePath('/my-aqslim/materials')
     const publishedAt = new Date().toISOString()
     const auditResponse = await fetch(`${baseUrl()}/${draftRecord.id}?returnFieldsByFieldId=true`, {
       method: 'PATCH',
