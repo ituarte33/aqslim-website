@@ -1,5 +1,6 @@
-import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 'use server'
+
+import { patientIsUnavailable } from '@/lib/clinic-patient-administration-policy'
 
 import { clerkClient } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
